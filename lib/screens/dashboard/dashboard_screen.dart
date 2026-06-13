@@ -47,7 +47,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final linksRemaining = user.linksRemaining;
             final linksUsed = user.monthlyLinksGenerated;
 
             return SingleChildScrollView(
@@ -153,7 +152,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                           child: Column(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.link_off,
                                 size: 48,
                                 color: KriptonTheme.graphite,

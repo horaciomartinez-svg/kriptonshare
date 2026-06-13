@@ -374,7 +374,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                 ),
                 child: Column(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.check_circle,
                       size: 64,
                       color: KriptonTheme.cryptoGreen,
@@ -407,7 +407,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                         version: QrVersions.auto,
                         size: 160,
                         backgroundColor: KriptonTheme.platinum,
-                        foregroundColor: KriptonTheme.charcoalBlack,
+                        eyeStyle: const QrEyeStyle(
+                          color: KriptonTheme.charcoalBlack,
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          color: KriptonTheme.charcoalBlack,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),

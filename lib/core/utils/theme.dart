@@ -38,8 +38,6 @@ class KriptonTheme {
         onSurface: platinum,
         error: alertRed,
         onError: platinum,
-        background: charcoalBlack,
-        onBackground: platinum,
       ),
       textTheme: const TextTheme(
         displayLarge: TextStyle(

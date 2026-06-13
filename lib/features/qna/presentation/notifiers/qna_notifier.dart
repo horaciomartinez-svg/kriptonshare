@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/entities/chat_message_entity.dart';
-import '../../domain/repositories/i_qna_repository.dart';
 
 /// Estado del Q&A Contextual por link_id.
 class QnaState {

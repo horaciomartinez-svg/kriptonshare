@@ -94,7 +94,7 @@ class CircularGaugePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - 8;
-    final strokeWidth = 8.0;
+    const strokeWidth = 8.0;
 
     // Background circle
     final bgPaint = Paint()

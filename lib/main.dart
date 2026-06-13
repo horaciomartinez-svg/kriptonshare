@@ -75,11 +75,10 @@ void main() async {
     DeviceOrientation.portraitUp,
   ]);
   
-  // Initialize Supabase
-  await Supabase.initialize(
-    url: AppConstants.supabaseUrl,
-    anonKey: AppConstants.supabaseAnonKey,
-  );
+    await Supabase.initialize(
+      url: AppConstants.supabaseUrl,
+      publishableKey: AppConstants.supabaseAnonKey,
+    );
   
   // Initialize screenshot blocker on Android
   await ScreenshotService.initialize();

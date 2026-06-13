@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
 import '../models/kripton_file.dart';
 import '../utils/theme.dart';
-import '../utils/constants.dart';
 
 class DataRoomCard extends StatelessWidget {
   final ShareLink link;
@@ -115,33 +112,33 @@ class DataRoomCard extends StatelessWidget {
                       }
                     },
                     itemBuilder: (context) => [
-                      PopupMenuItem(
+                      const PopupMenuItem(
                         value: 'share',
                         child: Row(
                           children: [
                             Icon(Icons.share, color: KriptonTheme.electricLime, size: 18),
-                            const SizedBox(width: 8),
-                            const Text('Compartir'),
+                            SizedBox(width: 8),
+                            Text('Compartir'),
                           ],
                         ),
                       ),
-                      PopupMenuItem(
+                      const PopupMenuItem(
                         value: 'revoke',
                         child: Row(
                           children: [
                             Icon(Icons.cancel, color: KriptonTheme.alertRed, size: 18),
-                            const SizedBox(width: 8),
-                            const Text('Revocar'),
+                            SizedBox(width: 8),
+                            Text('Revocar'),
                           ],
                         ),
                       ),
-                      PopupMenuItem(
+                      const PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
                             Icon(Icons.delete, color: KriptonTheme.alertRed, size: 18),
-                            const SizedBox(width: 8),
-                            const Text('Eliminar'),
+                            SizedBox(width: 8),
+                            Text('Eliminar'),
                           ],
                         ),
                       ),

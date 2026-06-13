@@ -135,7 +135,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.link_off,
                     size: 64,
                     color: KriptonTheme.graphite,

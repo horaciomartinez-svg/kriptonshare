@@ -1,8 +1,8 @@
 import 'package:flutter/services.dart';
 
 class ScreenshotService {
-  static final MethodChannel _channel =
-      const MethodChannel('com.kriptonshare/screenshot');
+  static const MethodChannel _channel =
+      MethodChannel('com.kriptonshare/screenshot');
   static bool _isInitialized = false;
 
   static Future<void> initialize() async {

@@ -189,7 +189,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         Positioned.fill(
           child: IgnorePointer(
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.transparent,
               ),
               child: CustomPaint(
@@ -248,10 +248,6 @@ class WatermarkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(opacity)
-      ..style = PaintingStyle.fill;
-
     final textStyle = TextStyle(
       color: Colors.white.withOpacity(opacity),
       fontSize: 24,

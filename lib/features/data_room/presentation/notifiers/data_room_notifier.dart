@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/data_room_entity.dart';
 import '../../domain/repositories/i_data_room_repository.dart';
 import '../../domain/repositories/i_crypto_repository.dart';
-import '../../../../core/network/network_info.dart';
 
 /// Estado de Data Room para la capa de presentación.
 class DataRoomState {

@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class AppConstants {
   // === SUPABASE CONFIG ===
   // Reemplazar con tus credenciales reales de Supabase

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/kripton_file.dart';
-import '../models/user_model.dart';
 import '../services/crypto_service.dart';
 import '../utils/constants.dart';
 import 'auth_provider.dart';
@@ -68,7 +67,7 @@ class FileService {
     await _client.storage.from(AppConstants.bucketName).uploadBinary(
       storageKey,
       encryptedBytes,
-      fileOptions: FileOptions(
+      fileOptions: const FileOptions(
         contentType: 'application/octet-stream',
         upsert: false,
       ),
@@ -166,7 +165,7 @@ class FileService {
         .select('file_id')
         .eq('id', linkId)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
     
     if (linkResponse == null) return null;
     
@@ -176,7 +175,7 @@ class FileService {
         .from('files')
         .select()
         .eq('id', fileId)
-        .single();
+        .maybeSingle();
     
     if (fileResponse == null) return null;
     
@@ -238,7 +237,7 @@ class FileService {
         .select()
         .eq('id', fileId)
         .eq('owner_id', user.id)
-        .single();
+        .maybeSingle();
     
     if (file == null) return;
     

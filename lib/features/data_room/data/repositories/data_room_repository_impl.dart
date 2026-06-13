@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 import '../../domain/entities/data_room_entity.dart';
 import '../../domain/repositories/i_data_room_repository.dart';
 import '../datasources/local_database_datasource.dart';
@@ -66,14 +65,14 @@ class DataRoomRepositoryImpl implements IDataRoomRepository {
     Uint8List encryptedPayload,
   ) async {
     if (room.storageObjectKey == null) {
-      throw ServerFailure('storage_object_key no puede ser nulo para sincronización');
+      throw const ServerFailure('storage_object_key no puede ser nulo para sincronización');
     }
 
     // Subir payload encriptado a Supabase Storage
     await _supabase.storage.from(AppConstants.bucketName).uploadBinary(
       room.storageObjectKey!,
       encryptedPayload,
-      fileOptions: FileOptions(
+      fileOptions: const FileOptions(
         contentType: 'application/octet-stream',
         upsert: false,
       ),
