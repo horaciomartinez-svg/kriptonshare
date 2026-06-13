@@ -1,70 +1,124 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:dartz/dartz.dart';
+import 'package:pointycastle/export.dart';
 import '../../domain/repositories/i_crypto_repository.dart';
+import '../../../../core/error/failures.dart';
 import '../../../../services/crypto_service.dart';
 
 /// Implementación del Repositorio Criptográfico con Zero-Knowledge.
-/// La clave de encriptación nunca sale del dispositivo.
-/// Se distribuye vía fragmentos de URI (#) según RFC 3986.
 class CryptoRepositoryImpl implements ICryptoRepository {
   final CryptoService _cryptoService;
 
   CryptoRepositoryImpl(this._cryptoService);
 
   @override
-  Future<Map<String, dynamic>> encryptPayload(Uint8List fileBytes, String password) async {
-    // Retorna el ciphertext, salt, nonce, authTag y la llave derivada
-    return await _cryptoService.encryptFile(
-      fileBytes: fileBytes,
-      password: password,
-    );
-  }
-
-  @override
-  String buildZeroKnowledgeLink(String roomId, List<int> encryptionKey) {
-    // Transforma la llave asimétrica a Base64
-    final String base64Key = base64Url.encode(encryptionKey);
-
-    // El secreto se ancla AL FINAL de la URL después del '#'.
-    // Supabase NO recibirá esta porción. El navegador/sistema operativo
-    // nunca envía el fragmento en la petición HTTP (RFC 3986).
-    return 'https://kriptonshare.com/room/$roomId#key=$base64Key';
-  }
-
-  @override
-  List<int> extractKeyFromFragment(Uri deepLink) {
-    // Extrae el fragmento en el dispositivo receptor de forma local
-    if (!deepLink.hasFragment) {
-      throw Exception('Enlace inválido o corrupto: Fragmento ZK ausente.');
+  Future<Either<Failure, List<int>>> generateKey() async {
+    try {
+      final key = _cryptoService.generateSalt(); // Usamos salt como base para key
+      return Right(key);
+    } catch (e) {
+      return Left(CryptoFailure('Error generating key: $e'));
     }
-
-    final String fragment = deepLink.fragment;
-
-    if (!fragment.startsWith('key=')) {
-      throw Exception('Firma criptográfica no encontrada en el fragmento.');
-    }
-
-    final String base64Key = fragment.substring(4);
-    return base64Url.decode(base64Key);
   }
 
   @override
-  Future<Uint8List> decryptPayload({
-    required List<int> ciphertext,
+  Future<Either<Failure, List<int>>> encrypt({
+    required List<int> data,
     required List<int> key,
-    required List<int> nonce,
-    required List<int> authTag,
   }) async {
-    return await _cryptoService.decryptFile(
-      ciphertext: ciphertext,
-      key: key,
-      nonce: nonce,
-      authTag: authTag,
-    );
+    try {
+      final nonce = _cryptoService.generateNonce();
+      final result = _cryptoService.encrypt(
+        plaintext: Uint8List.fromList(data),
+        key: key,
+        nonce: nonce,
+      );
+      // Concatenar: nonce + ciphertext + authTag
+      final encrypted = [
+        ...nonce,
+        ...result['ciphertext']!,
+        ...result['authTag']!,
+      ];
+      return Right(encrypted);
+    } catch (e) {
+      return Left(CryptoFailure('Error encrypting data: $e'));
+    }
   }
 
   @override
-  List<int> deriveKey(String password, List<int> salt) {
-    return _cryptoService.deriveKey(password, salt);
+  Future<Either<Failure, List<int>>> decrypt({
+    required List<int> encryptedData,
+    required List<int> key,
+  }) async {
+    try {
+      // Extraer nonce, ciphertext, authTag del formato: nonce(12) + ciphertext + authTag(16)
+      const nonceSize = 12;
+      const tagSize = 16;
+      final nonce = encryptedData.sublist(0, nonceSize);
+      final ciphertext = encryptedData.sublist(nonceSize, encryptedData.length - tagSize);
+      final authTag = encryptedData.sublist(encryptedData.length - tagSize);
+
+      final decrypted = _cryptoService.decrypt(
+        ciphertext: ciphertext,
+        key: key,
+        nonce: nonce,
+        authTag: authTag,
+      );
+      return Right(decrypted.toList());
+    } catch (e) {
+      return Left(CryptoFailure('Error decrypting data: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<int>>> deriveKeyFromFragment(String fragment) async {
+    try {
+      if (!fragment.startsWith('key=')) {
+        return const Left(CryptoFailure('Invalid fragment format'));
+      }
+      final base64Key = fragment.substring(4);
+      final key = base64Decode(base64Key); // Requiere dart:convert import
+      return Right(key.toList());
+    } catch (e) {
+      return Left(CryptoFailure('Error deriving key from fragment: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> generateSecureFragment() async {
+    try {
+      final key = _cryptoService.generateSalt();
+      final base64Key = base64Encode(key); // Requiere dart:convert import
+      return Right('key=$base64Key');
+    } catch (e) {
+      return Left(CryptoFailure('Error generating secure fragment: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<int>>> hash(List<int> data) async {
+    try {
+      // Usamos SHA-256 via pointycastle
+      final digest = SHA256Digest();
+      final hash = digest.process(Uint8List.fromList(data));
+      return Right(hash.toList());
+    } catch (e) {
+      return Left(CryptoFailure('Error hashing data: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<int>>> generateNonce(int length) async {
+    try {
+      final nonce = _cryptoService.generateNonce();
+      // Ajustar al length solicitado si es necesario
+      if (length <= nonce.length) {
+        return Right(nonce.sublist(0, length));
+      }
+      return Right(nonce);
+    } catch (e) {
+      return Left(CryptoFailure('Error generating nonce: $e'));
+    }
   }
 }

@@ -1,174 +1,161 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 
-/// DataSource Local: SQLite Offline-First.
-/// Fuente primaria de verdad. Toda escritura pasa aquí primero.
+/// Fuente de datos local SQLite para KRIPTONSHARE.
+/// Soporta Data Rooms, Files, Sync Queue y Telemetry.
 class LocalDatabaseDataSource {
-  static const String _dbName = 'kriptonshare_local.db';
-  static const int _dbVersion = 2;
-
-  Database? _database;
+  static Database? _database;
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDB();
+    _database ??= await _initDatabase();
     return _database!;
   }
 
-  Future<Database> _initDB() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _dbName);
+  Future<Database> _initDatabase() async {
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final path = join(documentsDirectory.path, 'kriptonshare.db');
 
     return await openDatabase(
       path,
-      version: _dbVersion,
-      onCreate: _createSchema,
-      onUpgrade: _onUpgrade,
+      version: 1,
+      onCreate: (Database db, int version) async {
+        // Tabla de Data Rooms
+        await db.execute('''
+          CREATE TABLE local_data_rooms (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            owner_id TEXT NOT NULL,
+            max_views INTEGER NOT NULL DEFAULT 0,
+            current_views INTEGER NOT NULL DEFAULT 0,
+            watermark_enabled INTEGER NOT NULL DEFAULT 1,
+            download_enabled INTEGER NOT NULL DEFAULT 0,
+            allowed_ips TEXT,
+            metadata TEXT,
+            sync_status TEXT NOT NULL DEFAULT 'pending',
+            last_sync_at TEXT,
+            created_locally INTEGER NOT NULL DEFAULT 1
+          )
+        ''');
+
+        // Tabla de Archivos
+        await db.execute('''
+          CREATE TABLE local_files (
+            id TEXT PRIMARY KEY,
+            room_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            storage_path TEXT NOT NULL,
+            owner_id TEXT NOT NULL,
+            is_encrypted INTEGER NOT NULL DEFAULT 1,
+            encryption_key_id TEXT,
+            metadata TEXT,
+            sync_status TEXT NOT NULL DEFAULT 'pending',
+            FOREIGN KEY (room_id) REFERENCES local_data_rooms(id) ON DELETE CASCADE
+          )
+        ''');
+
+        // Tabla de Cola de Sincronización
+        await db.execute('''
+          CREATE TABLE sync_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            operation_type TEXT NOT NULL,
+            table_name TEXT NOT NULL,
+            record_id TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            last_attempt_at TEXT,
+            status TEXT NOT NULL DEFAULT 'pending'
+          )
+        ''');
+
+        // Tabla de Eventos de Telemetría
+        await db.execute('''
+          CREATE TABLE local_telemetry (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            link_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            page_number INTEGER,
+            duration_ms INTEGER NOT NULL,
+            timestamp_ms INTEGER NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            geolocation TEXT,
+            sync_status TEXT NOT NULL DEFAULT 'pending'
+          )
+        ''');
+
+        // Índices
+        await db.execute('CREATE INDEX idx_rooms_owner ON local_data_rooms(owner_id)');
+        await db.execute('CREATE INDEX idx_rooms_expires ON local_data_rooms(expires_at)');
+        await db.execute('CREATE INDEX idx_files_room ON local_files(room_id)');
+        await db.execute('CREATE INDEX idx_sync_queue_status ON sync_queue(status)');
+        await db.execute('CREATE INDEX idx_telemetry_link ON local_telemetry(link_id)');
+      },
     );
   }
 
-  Future<void> _createSchema(Database db, int version) async {
-    // Tabla local para Data Rooms (retención offline-first)
-    await db.execute('''
-      CREATE TABLE local_data_rooms (
-        id TEXT PRIMARY KEY,
-        owner_id TEXT NOT NULL,
-        original_filename TEXT NOT NULL,
-        file_size_bytes INTEGER NOT NULL,
-        status TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
-        storage_object_key TEXT,
-        mime_type TEXT,
-        max_downloads INTEGER DEFAULT 5,
-        downloads_count INTEGER DEFAULT 0,
-        sync_status TEXT DEFAULT 'pending', -- pending, synced, error
-        created_at TEXT DEFAULT (datetime('now'))
-      )
-    ''');
+  // ─── Data Rooms (métodos que usan los repositorios) ───
 
-    // Índice para optimizar consultas de tablero (status + expiración)
-    await db.execute('''
-      CREATE INDEX idx_status_expires ON local_data_rooms(status, expires_at)
-    ''');
-
-    // Tabla de cola de sincronización (operaciones pendientes)
-    await db.execute('''
-      CREATE TABLE sync_queue (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        room_id TEXT NOT NULL,
-        operation TEXT NOT NULL, -- create, revoke, delete
-        payload TEXT, -- JSON opcional
-        created_at TEXT DEFAULT (datetime('now'))
-      )
-    ''');
-
-    // Tabla de telemetría offline (se sincroniza luego)
-    await db.execute('''
-      CREATE TABLE local_telemetry (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        link_id TEXT NOT NULL,
-        event_type TEXT NOT NULL,
-        page_number INTEGER,
-        duration_ms INTEGER NOT NULL,
-        timestamp_ms INTEGER NOT NULL,
-        sync_status TEXT DEFAULT 'pending'
-      )
-    ''');
-  }
-
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      // Migración: agregar tabla de cola de sincronización
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS sync_queue (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          room_id TEXT NOT NULL,
-          operation TEXT NOT NULL,
-          payload TEXT,
-          created_at TEXT DEFAULT (datetime('now'))
-        )
-      ''');
-    }
-  }
-
-  // ─── CRUD Data Rooms ───
-
-  Future<void> insertRoom(Map<String, dynamic> roomData) async {
+  Future<void> insertRoom(Map<String, dynamic> data) async {
     final db = await database;
-    await db.insert(
-      'local_data_rooms',
-      roomData,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('local_data_rooms', data, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<List<Map<String, dynamic>>> queryRooms({
-    String? status,
-    String? ownerId,
-    int? limit,
-  }) async {
+  Future<List<Map<String, dynamic>>> queryRooms() async {
     final db = await database;
-    String? where;
-    List<Object?>? whereArgs;
-
-    if (status != null && ownerId != null) {
-      where = 'status = ? AND owner_id = ?';
-      whereArgs = [status, ownerId];
-    } else if (status != null) {
-      where = 'status = ?';
-      whereArgs = [status];
-    } else if (ownerId != null) {
-      where = 'owner_id = ?';
-      whereArgs = [ownerId];
-    }
-
-    return await db.query(
-      'local_data_rooms',
-      where: where,
-      whereArgs: whereArgs,
-      orderBy: 'created_at DESC',
-      limit: limit,
-    );
+    return await db.query('local_data_rooms', orderBy: 'created_at DESC');
   }
 
-  Future<Map<String, dynamic>?> getRoomById(String roomId) async {
+  Future<Map<String, dynamic>?> getRoomById(String id) async {
     final db = await database;
-    final results = await db.query(
-      'local_data_rooms',
-      where: 'id = ?',
-      whereArgs: [roomId],
-      limit: 1,
-    );
-    return results.isNotEmpty ? results.first : null;
+    final maps = await db.query('local_data_rooms', where: 'id = ?', whereArgs: [id]);
+    if (maps.isEmpty) return null;
+    return maps.first;
   }
 
-  Future<void> updateSyncStatus(String roomId, String status) async {
+  Future<void> updateRoomStatus(String id, String status) async {
     final db = await database;
     await db.update(
       'local_data_rooms',
-      {'sync_status': status},
+      {'status': status, 'sync_status': 'pending'},
       where: 'id = ?',
-      whereArgs: [roomId],
+      whereArgs: [id],
     );
   }
 
-  Future<void> deleteRoom(String roomId) async {
-    final db = await database;
-    await db.delete(
-      'local_data_rooms',
-      where: 'id = ?',
-      whereArgs: [roomId],
-    );
-  }
-
-  Future<void> updateRoomStatus(String roomId, String status) async {
+  Future<void> updateSyncStatus(String id, String syncStatus) async {
     final db = await database;
     await db.update(
       'local_data_rooms',
-      {'status': status},
+      {'sync_status': syncStatus, 'last_sync_at': DateTime.now().toIso8601String()},
       where: 'id = ?',
-      whereArgs: [roomId],
+      whereArgs: [id],
     );
+  }
+
+  Future<void> deleteRoom(String id) async {
+    final db = await database;
+    await db.delete('local_data_rooms', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ─── Files ───
+
+  Future<void> insertFile(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert('local_files', data, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> getFilesByRoomId(String roomId) async {
+    final db = await database;
+    return await db.query('local_files', where: 'room_id = ?', whereArgs: [roomId]);
   }
 
   // ─── Sync Queue ───
@@ -180,9 +167,12 @@ class LocalDatabaseDataSource {
   }) async {
     final db = await database;
     await db.insert('sync_queue', {
-      'room_id': roomId,
-      'operation': operation,
-      'payload': payload,
+      'operation_type': operation,
+      'table_name': 'local_data_rooms',
+      'record_id': roomId,
+      'payload': payload ?? '',
+      'created_at': DateTime.now().toIso8601String(),
+      'status': 'pending',
     });
   }
 
@@ -190,29 +180,30 @@ class LocalDatabaseDataSource {
     final db = await database;
     return await db.query(
       'sync_queue',
+      where: 'status = ?',
+      whereArgs: ['pending'],
       orderBy: 'created_at ASC',
     );
   }
 
   Future<void> deleteSyncOperation(int id) async {
     final db = await database;
-    await db.delete(
-      'sync_queue',
-      where: 'id = ?',
-      whereArgs: [id],
+    await db.delete('sync_queue', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> incrementRetryCount(int id) async {
+    final db = await database;
+    await db.rawUpdate(
+      'UPDATE sync_queue SET retry_count = retry_count + 1, last_attempt_at = ? WHERE id = ?',
+      [DateTime.now().toIso8601String(), id],
     );
   }
 
-  Future<void> clearAllSyncOperations() async {
-    final db = await database;
-    await db.delete('sync_queue');
-  }
+  // ─── Telemetry ───
 
-  // ─── Telemetry (offline) ───
-
-  Future<void> insertTelemetry(Map<String, dynamic> telemetry) async {
+  Future<void> insertTelemetry(Map<String, dynamic> data) async {
     final db = await database;
-    await db.insert('local_telemetry', telemetry);
+    await db.insert('local_telemetry', data, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<Map<String, dynamic>>> getPendingTelemetry() async {
@@ -221,6 +212,7 @@ class LocalDatabaseDataSource {
       'local_telemetry',
       where: 'sync_status = ?',
       whereArgs: ['pending'],
+      orderBy: 'timestamp_ms ASC',
     );
   }
 
@@ -232,5 +224,14 @@ class LocalDatabaseDataSource {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // ─── General ───
+
+  Future<void> close() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
   }
 }

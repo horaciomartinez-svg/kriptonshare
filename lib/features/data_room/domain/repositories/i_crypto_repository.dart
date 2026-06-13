@@ -1,27 +1,31 @@
-import 'dart:typed_data';
+import 'package:dartz/dartz.dart';
+import '../../../../core/error/failures.dart';
 
-/// Interfaz de Repositorio Criptográfico (Capa de Dominio).
-/// Abstrae todas las operaciones de cifrado y Zero-Knowledge.
 abstract class ICryptoRepository {
-  /// Encripta el archivo usando AES-256-GCM.
-  /// Retorna el ciphertext, salt, nonce, authTag y la llave derivada.
-  Future<Map<String, dynamic>> encryptPayload(Uint8List fileBytes, String password);
+  // Generar clave AES-256-GCM
+  Future<Either<Failure, List<int>>> generateKey();
 
-  /// Compone el enlace Zero-Knowledge inyectando la clave en el fragmento (#).
-  /// La clave nunca viaja por la red; solo el fragmento local del receptor la extrae.
-  String buildZeroKnowledgeLink(String roomId, List<int> encryptionKey);
-
-  /// Extrae la clave criptográfica desde el fragmento de URL sin enviarla al servidor.
-  List<int> extractKeyFromFragment(Uri deepLink);
-
-  /// Descifra un payload usando la clave extraída localmente.
-  Future<Uint8List> decryptPayload({
-    required List<int> ciphertext,
+  // Cifrar datos
+  Future<Either<Failure, List<int>>> encrypt({
+    required List<int> data,
     required List<int> key,
-    required List<int> nonce,
-    required List<int> authTag,
   });
 
-  /// Deriva una clave AES-256 desde una contraseña + salt (PBKDF2).
-  List<int> deriveKey(String password, List<int> salt);
+  // Descifrar datos
+  Future<Either<Failure, List<int>>> decrypt({
+    required List<int> encryptedData,
+    required List<int> key,
+  });
+
+  // Derivar clave de fragmento URI
+  Future<Either<Failure, List<int>>> deriveKeyFromFragment(String fragment);
+
+  // Generar fragmento URI seguro
+  Future<Either<Failure, String>> generateSecureFragment();
+
+  // Hash SHA-256
+  Future<Either<Failure, List<int>>> hash(List<int> data);
+
+  // Generar nonce aleatorio
+  Future<Either<Failure, List<int>>> generateNonce(int length);
 }

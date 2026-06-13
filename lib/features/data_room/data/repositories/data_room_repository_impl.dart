@@ -1,207 +1,312 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'package:dartz/dartz.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/entities/data_room_entity.dart';
+import '../../domain/entities/file_entity.dart';
 import '../../domain/repositories/i_data_room_repository.dart';
 import '../datasources/local_database_datasource.dart';
-import '../../../../utils/constants.dart';
+import '../datasources/supabase_data_source.dart';
+import '../models/data_room_model.dart';
+import '../models/file_model.dart';
 import '../../../../core/error/failures.dart';
+import '../../../../utils/constants.dart';
 
 /// Implementación del Repositorio de Data Rooms con Offline-First.
-/// SQLite es la fuente primaria de verdad.
-/// Supabase es la réplica eventual sincronizada vía cola asíncrona.
 class DataRoomRepositoryImpl implements IDataRoomRepository {
   final LocalDatabaseDataSource _localDB;
-  final SupabaseClient _supabase;
+  final SupabaseDataSource _supabase;
 
   DataRoomRepositoryImpl({
     required LocalDatabaseDataSource localDB,
     required SupabaseClient supabase,
   })  : _localDB = localDB,
-        _supabase = supabase;
+        _supabase = SupabaseDataSource(supabase);
 
   @override
-  Future<DataRoomEntity> createEphemeralRoom(
-    DataRoomEntity room,
-    Uint8List encryptedPayload,
-  ) async {
-    // 1. Persistir localmente INMEDIATAMENTE (Offline-First)
-    await _localDB.insertRoom({
-      'id': room.id,
-      'owner_id': room.ownerId,
-      'original_filename': room.originalFilename,
-      'file_size_bytes': room.fileSizeBytes,
-      'status': room.status,
-      'expires_at': room.expiresAt.toIso8601String(),
-      'storage_object_key': room.storageObjectKey,
-      'mime_type': room.mimeType,
-      'max_downloads': room.maxDownloads,
-      'downloads_count': room.downloadsCount,
-      'sync_status': 'pending',
-    });
-
-    // 2. Encolar sincronización asíncrona con Supabase
-    await _localDB.enqueueSyncOperation(
-      roomId: room.id,
-      operation: 'create',
-      payload: room.mimeType,
-    );
-
-    // 3. Intentar sincronización inmediata si hay red
+  Future<Either<Failure, DataRoomEntity>> createDataRoom({
+    required String name,
+    required DateTime expiresAt,
+    required String ownerId,
+    int? maxViews,
+    bool? watermarkEnabled,
+    bool? downloadEnabled,
+    List<String>? allowedIPs,
+  }) async {
     try {
-      await _syncRoomToSupabase(room, encryptedPayload);
-      await _localDB.updateSyncStatus(room.id, 'synced');
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      final room = DataRoomModel(
+        id: id,
+        name: name,
+        createdAt: DateTime.now(),
+        expiresAt: expiresAt,
+        isActive: true,
+        ownerId: ownerId,
+        maxViews: maxViews ?? 0,
+        currentViews: 0,
+        watermarkEnabled: watermarkEnabled ?? true,
+        downloadEnabled: downloadEnabled ?? false,
+        allowedIPs: allowedIPs ?? const [],
+      );
+
+      await _localDB.insertRoom(room.toJson());
+      await _localDB.enqueueSyncOperation(roomId: id, operation: 'create');
+
+      // Intentar sync inmediato
+      try {
+        await _supabase.createRoom(room.toJson());
+        await _localDB.updateSyncStatus(id, 'synced');
+      } catch (_) {
+        await _localDB.updateSyncStatus(id, 'pending');
+      }
+
+      return Right(room.toEntity());
     } catch (e) {
-      // Si falla, permanece en cola para Workmanager
-      await _localDB.updateSyncStatus(room.id, 'error');
+      return Left(CacheFailure('Error creating data room: $e'));
     }
-
-    return room;
-  }
-
-  /// Sincroniza un room a Supabase + Storage
-  Future<void> _syncRoomToSupabase(
-    DataRoomEntity room,
-    Uint8List encryptedPayload,
-  ) async {
-    if (room.storageObjectKey == null) {
-      throw const ServerFailure('storage_object_key no puede ser nulo para sincronización');
-    }
-
-    // Subir payload encriptado a Supabase Storage
-    await _supabase.storage.from(AppConstants.bucketName).uploadBinary(
-      room.storageObjectKey!,
-      encryptedPayload,
-      fileOptions: const FileOptions(
-        contentType: 'application/octet-stream',
-        upsert: false,
-      ),
-    );
-
-    // Crear registro en tabla files
-    await _supabase.from('files').insert({
-      'id': room.id,
-      'owner_id': room.ownerId,
-      'original_filename': room.originalFilename,
-      'file_size_bytes': room.fileSizeBytes,
-      'mime_type': room.mimeType ?? 'application/octet-stream',
-      'storage_provider': AppConstants.storageProvider,
-      'bucket_name': AppConstants.bucketName,
-      'storage_object_key': room.storageObjectKey,
-      'expires_at': room.expiresAt.toIso8601String(),
-      'status': room.status,
-      'max_downloads': room.maxDownloads ?? AppConstants.maxDownloadsDefault,
-    });
   }
 
   @override
-  Stream<List<DataRoomEntity>> watchLocalDataRooms() {
-    // Retorna un stream que emite cada vez que cambia la DB local
-    final controller = StreamController<List<DataRoomEntity>>.broadcast();
-
-    Future<void> emitRooms() async {
-      final rooms = await getLocalDataRooms();
-      controller.add(rooms);
-    }
-
-    emitRooms();
-
-    // Polling simple cada 2 segundos (SQLite no tiene streams nativos)
-    final timer = Timer.periodic(const Duration(seconds: 2), (_) {
-      emitRooms();
-    });
-
-    controller.onCancel = () {
-      timer.cancel();
-      controller.close();
-    };
-
-    return controller.stream;
-  }
-
-  @override
-  Future<List<DataRoomEntity>> getLocalDataRooms() async {
-    final rows = await _localDB.queryRooms();
-    return rows.map((json) => _mapToEntity(json)).toList();
-  }
-
-  @override
-  Future<DataRoomEntity?> getDataRoomById(String roomId) async {
-    final row = await _localDB.getRoomById(roomId);
-    if (row == null) return null;
-    return _mapToEntity(row);
-  }
-
-  @override
-  Future<void> revokeDataRoom(String roomId) async {
-    // 1. Revocación inmediata local
-    await _localDB.updateRoomStatus(roomId, 'revoked');
-
-    // 2. Encolar revocación para sincronización
-    await _localDB.enqueueSyncOperation(
-      roomId: roomId,
-      operation: 'revoke',
-    );
-
-    // 3. Intentar sincronización inmediata
+  Future<Either<Failure, List<DataRoomEntity>>> getUserDataRooms(String userId) async {
     try {
-      await _supabase.from('share_links').update({
-        'is_active': false,
-      }).eq('file_id', roomId);
-      await _supabase.from('files').update({
-        'status': 'revoked',
-      }).eq('id', roomId);
+      final rows = await _localDB.queryRooms();
+      final rooms = rows
+          .where((r) => r['owner_id'] == userId)
+          .map((json) => _mapToEntity(json))
+          .toList();
+      return Right(rooms);
     } catch (e) {
-      // Queda en cola para sincronización futura
+      return Left(CacheFailure('Error reading data rooms: $e'));
     }
   }
 
   @override
-  Future<void> syncPendingOperations() async {
-    final pending = await _localDB.getPendingSyncOperations();
+  Future<Either<Failure, DataRoomEntity>> getDataRoomById(String id) async {
+    try {
+      final row = await _localDB.getRoomById(id);
+      if (row == null) {
+        return const Left(CacheFailure('Data room not found'));
+      }
+      return Right(_mapToEntity(row));
+    } catch (e) {
+      return Left(CacheFailure('Error reading data room: $e'));
+    }
+  }
 
-    for (final op in pending) {
-      final roomId = op['room_id'] as String;
-      final operation = op['operation'] as String;
+  @override
+  Future<Either<Failure, DataRoomEntity>> updateDataRoom(DataRoomEntity dataRoom) async {
+    try {
+      final model = DataRoomModel(
+        id: dataRoom.id,
+        name: dataRoom.name,
+        createdAt: dataRoom.createdAt,
+        expiresAt: dataRoom.expiresAt,
+        isActive: dataRoom.isActive,
+        ownerId: dataRoom.ownerId,
+        maxViews: dataRoom.maxViews,
+        currentViews: dataRoom.currentViews,
+        watermarkEnabled: dataRoom.watermarkEnabled,
+        downloadEnabled: dataRoom.downloadEnabled,
+        allowedIPs: dataRoom.allowedIPs,
+        metadata: dataRoom.metadata,
+      );
+
+      await _localDB.updateRoomStatus(dataRoom.id, 'updated');
+      await _localDB.enqueueSyncOperation(roomId: dataRoom.id, operation: 'update');
 
       try {
-        switch (operation) {
-          case 'create':
-            final room = await _localDB.getRoomById(roomId);
-            if (room != null) {
-              // Re-subir el payload si es necesario
-              // Nota: en un flujo real, el payload encriptado debe estar
-              // disponible en caché local o reprocesarse
-            }
-            break;
-          case 'revoke':
-            await _supabase.from('files').update({
-              'status': 'revoked',
-            }).eq('id', roomId);
-            break;
-          case 'delete':
-            await _supabase.from('files').delete().eq('id', roomId);
-            break;
-        }
-        await _localDB.deleteSyncOperation(op['id'] as int);
-      } catch (e) {
-        // Mantener en cola para reintento
+        await _supabase.updateRoom(dataRoom.id, model.toJson());
+        await _localDB.updateSyncStatus(dataRoom.id, 'synced');
+      } catch (_) {
+        await _localDB.updateSyncStatus(dataRoom.id, 'pending');
       }
+
+      return Right(dataRoom);
+    } catch (e) {
+      return Left(CacheFailure('Error updating data room: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteDataRoom(String id) async {
+    try {
+      await _localDB.deleteRoom(id);
+      await _localDB.enqueueSyncOperation(roomId: id, operation: 'delete');
+
+      try {
+        await _supabase.deleteRoom(id);
+      } catch (_) {}
+
+      return const Right(null);
+    } catch (e) {
+      return Left(CacheFailure('Error deleting data room: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> revokeDataRoom(String id) async {
+    try {
+      await _localDB.updateRoomStatus(id, 'revoked');
+      await _localDB.enqueueSyncOperation(roomId: id, operation: 'revoke');
+
+      try {
+        await _supabase.updateRoom(id, {'is_active': false, 'status': 'revoked'});
+      } catch (_) {}
+
+      return const Right(null);
+    } catch (e) {
+      return Left(CacheFailure('Error revoking data room: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, FileEntity>> addFileToRoom({
+    required String roomId,
+    required String fileName,
+    required String mimeType,
+    required int sizeBytes,
+    required String storagePath,
+    required bool isEncrypted,
+    String? encryptionKeyId,
+  }) async {
+    try {
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      final file = FileModel(
+        id: id,
+        roomId: roomId,
+        name: fileName,
+        mimeType: mimeType,
+        sizeBytes: sizeBytes,
+        createdAt: DateTime.now(),
+        expiresAt: DateTime.now().add(const Duration(hours: AppConstants.maxDurationHours)),
+        storagePath: storagePath,
+        ownerId: '',
+        isEncrypted: isEncrypted,
+        encryptionKeyId: encryptionKeyId,
+      );
+
+      await _localDB.insertFile(file.toJson());
+      return Right(file.toEntity());
+    } catch (e) {
+      return Left(CacheFailure('Error adding file: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<FileEntity>>> getRoomFiles(String roomId) async {
+    try {
+      final rows = await _localDB.getFilesByRoomId(roomId);
+      final files = rows.map((json) => FileModel.fromJson(json).toEntity()).toList();
+      return Right(files);
+    } catch (e) {
+      return Left(CacheFailure('Error reading files: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> incrementViewCount(String roomId) async {
+    try {
+      final room = await _localDB.getRoomById(roomId);
+      if (room == null) {
+        return const Left(CacheFailure('Room not found'));
+      }
+      // TODO: Increment view count in local DB
+      await _localDB.updateSyncStatus(roomId, 'active');
+      return const Right(null);
+    } catch (e) {
+      return Left(CacheFailure('Error incrementing view count: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> isRoomAccessible(String roomId) async {
+    try {
+      final row = await _localDB.getRoomById(roomId);
+      if (row == null) {
+        return const Right(false);
+      }
+      final isActive = (row['is_active'] as int? ?? 1) == 1;
+      final expiresAt = DateTime.parse(row['expires_at'] as String);
+      final maxViews = row['max_views'] as int? ?? 0;
+      final currentViews = row['current_views'] as int? ?? 0;
+
+      final isExpired = DateTime.now().isAfter(expiresAt);
+      final isViewLimitReached = maxViews > 0 && currentViews >= maxViews;
+
+      return Right(isActive && !isExpired && !isViewLimitReached);
+    } catch (e) {
+      return Left(CacheFailure('Error checking room accessibility: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> syncOfflineData() async {
+    try {
+      final pending = await _localDB.getPendingSyncOperations();
+      for (final op in pending) {
+        final roomId = op['record_id'] as String;
+        final operation = op['operation_type'] as String;
+        try {
+          switch (operation) {
+            case 'create':
+            case 'update':
+              final room = await _localDB.getRoomById(roomId);
+              if (room != null) {
+                if (operation == 'create') {
+                  await _supabase.createRoom(room);
+                } else {
+                  await _supabase.updateRoom(roomId, room);
+                }
+              }
+              break;
+            case 'delete':
+              await _supabase.deleteRoom(roomId);
+              break;
+            case 'revoke':
+              await _supabase.updateRoom(roomId, {'is_active': false, 'status': 'revoked'});
+              break;
+          }
+          await _localDB.deleteSyncOperation(op['id'] as int);
+        } catch (e) {
+          await _localDB.incrementRetryCount(op['id'] as int);
+        }
+      }
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure('Error syncing offline data: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<DataRoomEntity>>> getLocalDataRooms() async {
+    return getUserDataRooms(''); // Retorna todos los rooms locales
+  }
+
+  @override
+  Future<Either<Failure, void>> queueOfflineOperation(Map<String, dynamic> operation) async {
+    try {
+      final roomId = operation['room_id'] as String? ?? '';
+      final op = operation['operation'] as String? ?? 'unknown';
+      await _localDB.enqueueSyncOperation(roomId: roomId, operation: op);
+      return const Right(null);
+    } catch (e) {
+      return Left(CacheFailure('Error queuing operation: $e'));
     }
   }
 
   DataRoomEntity _mapToEntity(Map<String, dynamic> json) {
     return DataRoomEntity(
       id: json['id'] as String,
-      ownerId: json['owner_id'] as String,
-      originalFilename: json['original_filename'] as String,
-      fileSizeBytes: json['file_size_bytes'] as int,
-      status: json['status'] as String,
+      name: json['name'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String),
       expiresAt: DateTime.parse(json['expires_at'] as String),
-      storageObjectKey: json['storage_object_key'] as String?,
-      mimeType: json['mime_type'] as String?,
-      maxDownloads: json['max_downloads'] as int?,
-      downloadsCount: json['downloads_count'] as int? ?? 0,
+      isActive: (json['is_active'] as int? ?? 1) == 1,
+      ownerId: json['owner_id'] as String,
+      maxViews: json['max_views'] as int? ?? 0,
+      currentViews: json['current_views'] as int? ?? 0,
+      watermarkEnabled: (json['watermark_enabled'] as int? ?? 1) == 1,
+      downloadEnabled: (json['download_enabled'] as int? ?? 0) == 1,
+      allowedIPs: (json['allowed_ips'] as String?)?.split(',') ?? const [],
+      metadata: const {},
     );
   }
 }

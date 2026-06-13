@@ -1,59 +1,68 @@
-// lib/features/data_room/domain/entities/data_room_entity.dart
+import 'package:equatable/equatable.dart';
 
-/// Entidad pura de Data Room (agnóstica de frameworks).
-/// Representa la fuente de verdad de negocio.
-class DataRoomEntity {
+class DataRoomEntity extends Equatable {
   final String id;
-  final String ownerId;
-  final String originalFilename;
-  final int fileSizeBytes;
-  final String status;
+  final String name;
+  final DateTime createdAt;
   final DateTime expiresAt;
-  final String? storageObjectKey;
-  final String? mimeType;
-  final int? maxDownloads;
-  final int downloadsCount;
+  final bool isActive;
+  final String ownerId;
+  final int maxViews;
+  final int currentViews;
+  final bool watermarkEnabled;
+  final bool downloadEnabled;
+  final List<String> allowedIPs;
+  final Map<String, dynamic> metadata;
 
   const DataRoomEntity({
     required this.id,
-    required this.ownerId,
-    required this.originalFilename,
-    required this.fileSizeBytes,
-    required this.status,
+    required this.name,
+    required this.createdAt,
     required this.expiresAt,
-    this.storageObjectKey,
-    this.mimeType,
-    this.maxDownloads,
-    this.downloadsCount = 0,
+    required this.isActive,
+    required this.ownerId,
+    this.maxViews = 0,
+    this.currentViews = 0,
+    this.watermarkEnabled = true,
+    this.downloadEnabled = false,
+    this.allowedIPs = const [],
+    this.metadata = const {},
   });
-
-  bool get isExpired => expiresAt.isBefore(DateTime.now());
-  bool get isActive => status == 'active' && !isExpired;
-  bool get canDownload => isActive && (maxDownloads == null || downloadsCount < maxDownloads!);
 
   DataRoomEntity copyWith({
     String? id,
-    String? ownerId,
-    String? originalFilename,
-    int? fileSizeBytes,
-    String? status,
+    String? name,
+    DateTime? createdAt,
     DateTime? expiresAt,
-    String? storageObjectKey,
-    String? mimeType,
-    int? maxDownloads,
-    int? downloadsCount,
+    bool? isActive,
+    String? ownerId,
+    int? maxViews,
+    int? currentViews,
+    bool? watermarkEnabled,
+    bool? downloadEnabled,
+    List<String>? allowedIPs,
+    Map<String, dynamic>? metadata,
   }) {
     return DataRoomEntity(
       id: id ?? this.id,
-      ownerId: ownerId ?? this.ownerId,
-      originalFilename: originalFilename ?? this.originalFilename,
-      fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
-      status: status ?? this.status,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
       expiresAt: expiresAt ?? this.expiresAt,
-      storageObjectKey: storageObjectKey ?? this.storageObjectKey,
-      mimeType: mimeType ?? this.mimeType,
-      maxDownloads: maxDownloads ?? this.maxDownloads,
-      downloadsCount: downloadsCount ?? this.downloadsCount,
+      isActive: isActive ?? this.isActive,
+      ownerId: ownerId ?? this.ownerId,
+      maxViews: maxViews ?? this.maxViews,
+      currentViews: currentViews ?? this.currentViews,
+      watermarkEnabled: watermarkEnabled ?? this.watermarkEnabled,
+      downloadEnabled: downloadEnabled ?? this.downloadEnabled,
+      allowedIPs: allowedIPs ?? this.allowedIPs,
+      metadata: metadata ?? this.metadata,
     );
   }
+
+  @override
+  List<Object?> get props => [
+        id, name, createdAt, expiresAt, isActive, ownerId,
+        maxViews, currentViews, watermarkEnabled, downloadEnabled,
+        allowedIPs, metadata,
+      ];
 }

@@ -1,29 +1,57 @@
-import 'dart:typed_data';
+import 'package:dartz/dartz.dart';
+import '../../../../core/error/failures.dart';
 import '../entities/data_room_entity.dart';
+import '../entities/file_entity.dart';
 
-/// Interfaz de Repositorio de Data Rooms (Capa de Dominio).
-/// Define el contrato de negocio sin conocer implementaciones externas.
-/// Fuente de verdad: SQLite local (Offline-First).
 abstract class IDataRoomRepository {
-  /// Guarda metadatos en SQLite (Offline-First) e inicia sincronización con Supabase.
-  /// El payload encriptado se sube a Cloudflare R2 de forma asíncrona.
-  Future<DataRoomEntity> createEphemeralRoom(
-    DataRoomEntity room,
-    Uint8List encryptedPayload,
-  );
+  // Crear un nuevo data room
+  Future<Either<Failure, DataRoomEntity>> createDataRoom({
+    required String name,
+    required DateTime expiresAt,
+    required String ownerId,
+    int? maxViews,
+    bool? watermarkEnabled,
+    bool? downloadEnabled,
+    List<String>? allowedIPs,
+  });
 
-  /// Recupera los Data Rooms desde la caché local (SQLite) como Stream reactivo.
-  Stream<List<DataRoomEntity>> watchLocalDataRooms();
+  // Obtener todos los data rooms del usuario
+  Future<Either<Failure, List<DataRoomEntity>>> getUserDataRooms(String userId);
 
-  /// Recupera los Data Rooms de forma puntual (lista snapshot).
-  Future<List<DataRoomEntity>> getLocalDataRooms();
+  // Obtener un data room por ID
+  Future<Either<Failure, DataRoomEntity>> getDataRoomById(String id);
 
-  /// Elimina un archivo lógicamente (Revocación inmediata local y encolado asíncrono).
-  Future<void> revokeDataRoom(String roomId);
+  // Actualizar un data room
+  Future<Either<Failure, DataRoomEntity>> updateDataRoom(DataRoomEntity dataRoom);
 
-  /// Sincroniza manualmente la cola de operaciones pendientes con Supabase.
-  Future<void> syncPendingOperations();
+  // Eliminar un data room
+  Future<Either<Failure, void>> deleteDataRoom(String id);
 
-  /// Obtiene un Data Room por ID desde la caché local.
-  Future<DataRoomEntity?> getDataRoomById(String roomId);
+  // Revocar un data room (desactivar)
+  Future<Either<Failure, void>> revokeDataRoom(String id);
+
+  // Agregar archivo a data room
+  Future<Either<Failure, FileEntity>> addFileToRoom({
+    required String roomId,
+    required String fileName,
+    required String mimeType,
+    required int sizeBytes,
+    required String storagePath,
+    required bool isEncrypted,
+    String? encryptionKeyId,
+  });
+
+  // Obtener archivos de un data room
+  Future<Either<Failure, List<FileEntity>>> getRoomFiles(String roomId);
+
+  // Incrementar contador de vistas
+  Future<Either<Failure, void>> incrementViewCount(String roomId);
+
+  // Verificar si un data room está activo y dentro de límites
+  Future<Either<Failure, bool>> isRoomAccessible(String roomId);
+
+  // Sincronización offline
+  Future<Either<Failure, void>> syncOfflineData();
+  Future<Either<Failure, List<DataRoomEntity>>> getLocalDataRooms();
+  Future<Either<Failure, void>> queueOfflineOperation(Map<String, dynamic> operation);
 }

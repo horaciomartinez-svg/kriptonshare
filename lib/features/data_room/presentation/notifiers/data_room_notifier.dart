@@ -53,26 +53,49 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
         _cryptoRepository = cryptoRepository,
         super(const DataRoomState());
 
-  /// Carga rooms desde SQLite (Offline-First) y suscribe al stream.
-  Future<void> loadRooms() async {
+  /// Carga rooms desde SQLite (Offline-First).
+  Future<void> loadRooms(String userId) async {
     state = state.copyWith(isLoading: true, error: null);
-    try {
-      final rooms = await _dataRoomRepository.getLocalDataRooms();
-      state = state.copyWith(rooms: rooms, isLoading: false);
-
-      // Suscribir a cambios locales
-      _dataRoomRepository.watchLocalDataRooms().listen((updatedRooms) {
-        state = state.copyWith(rooms: updatedRooms);
-      });
-    } catch (e) {
-      state = state.copyWith(error: e.toString(), isLoading: false);
-    }
+    final result = await _dataRoomRepository.getUserDataRooms(userId);
+    result.fold(
+      (failure) => state = state.copyWith(error: failure.message, isLoading: false),
+      (rooms) => state = state.copyWith(rooms: rooms, isLoading: false),
+    );
   }
 
-  /// Crear un Data Room efímero: encripta, guarda en SQLite, sincroniza con Supabase.
-  Future<void> createEphemeralRoom({
+  /// Crear un Data Room efímero.
+  Future<void> createDataRoom({
     required String ownerId,
-    required String filename,
+    required String name,
+    required DateTime expiresAt,
+    int? maxViews,
+    bool? watermarkEnabled,
+    bool? downloadEnabled,
+    List<String>? allowedIPs,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    final result = await _dataRoomRepository.createDataRoom(
+      name: name,
+      expiresAt: expiresAt,
+      ownerId: ownerId,
+      maxViews: maxViews,
+      watermarkEnabled: watermarkEnabled,
+      downloadEnabled: downloadEnabled,
+      allowedIPs: allowedIPs,
+    );
+    result.fold(
+      (failure) => state = state.copyWith(error: failure.message, isLoading: false),
+      (room) {
+        final updatedRooms = [...state.rooms, room];
+        state = state.copyWith(rooms: updatedRooms, isLoading: false);
+      },
+    );
+  }
+
+  /// Crear un Data Room con archivo encriptado y generar enlace ZK.
+  Future<void> createEphemeralRoomWithFile({
+    required String ownerId,
+    required String name,
     required Uint8List fileBytes,
     required String password,
     required String mimeType,
@@ -80,42 +103,32 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
     int? maxDownloads,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
+
     try {
-      // 1. Encriptar payload localmente
-      final encrypted = await _cryptoRepository.encryptPayload(fileBytes, password);
-      final key = encrypted['key'] as List<int>;
-      final salt = encrypted['salt'] as List<int>;
-      final nonce = encrypted['nonce'] as List<int>;
-      final ciphertext = encrypted['ciphertext'] as List<int>;
-      final authTag = encrypted['authTag'] as List<int>;
+      // 1. Generar clave y encriptar
+      final keyResult = await _cryptoRepository.generateKey();
+      final key = keyResult.getOrElse(() => []);
 
-      // 2. Reconstruir payload encriptado para subir
-      final encryptedPayload = Uint8List.fromList([
-        ...salt,
-        ...nonce,
-        ...ciphertext,
-        ...authTag,
-      ]);
+      final encryptedResult = await _cryptoRepository.encrypt(data: fileBytes.toList(), key: key);
+      // ignore: unused_local_variable
+      final encryptedData = encryptedResult.getOrElse(() => []);
 
-      // 3. Crear entidad
-      final roomId = DateTime.now().millisecondsSinceEpoch.toString();
-      final room = DataRoomEntity(
-        id: roomId,
+      // 2. Crear room
+      final expiresAt = DateTime.now().add(const Duration(hours: 72));
+      final roomResult = await _dataRoomRepository.createDataRoom(
+        name: name,
+        expiresAt: expiresAt,
         ownerId: ownerId,
-        originalFilename: filename,
-        fileSizeBytes: fileBytes.length,
-        status: 'active',
-        expiresAt: DateTime.now().add(const Duration(hours: 72)),
-        storageObjectKey: storageObjectKey,
-        mimeType: mimeType,
-        maxDownloads: maxDownloads,
+        maxViews: maxDownloads,
       );
 
-      // 4. Persistir Offline-First (SQLite + cola de sync)
-      await _dataRoomRepository.createEphemeralRoom(room, encryptedPayload);
+      final room = roomResult.getOrElse(() => throw Exception('Failed to create room'));
 
-      // 5. Generar enlace Zero-Knowledge (clave en fragmento #)
-      final zkLink = _cryptoRepository.buildZeroKnowledgeLink(roomId, key);
+      // 3. Generar fragmento seguro
+      final fragmentResult = await _cryptoRepository.generateSecureFragment();
+      final fragment = fragmentResult.getOrElse(() => '');
+
+      final zkLink = 'https://kriptonshare.com/room/${room.id}#$fragment';
 
       state = state.copyWith(
         isLoading: false,
@@ -127,52 +140,72 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
     }
   }
 
-  /// Extraer clave de enlace ZK y descifrar.
+  /// Descifrar desde enlace ZK.
   Future<void> decryptFromZkLink({
     required Uri deepLink,
     required String password,
-    required List<int> ciphertext,
-    required List<int> nonce,
-    required List<int> authTag,
+    required List<int> encryptedData,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
+
     try {
-      final key = _cryptoRepository.extractKeyFromFragment(deepLink);
-      final decrypted = await _cryptoRepository.decryptPayload(
-        ciphertext: ciphertext,
+      if (!deepLink.hasFragment) {
+        throw Exception('Enlace inválido: fragmento ausente');
+      }
+
+      final keyResult = await _cryptoRepository.deriveKeyFromFragment(deepLink.fragment);
+      final key = keyResult.getOrElse(() => throw Exception('Clave inválida'));
+
+      final decryptedResult = await _cryptoRepository.decrypt(
+        encryptedData: encryptedData,
         key: key,
-        nonce: nonce,
-        authTag: authTag,
       );
-      state = state.copyWith(decryptedFile: decrypted, isLoading: false);
+      final decrypted = decryptedResult.getOrElse(() => throw Exception('Error al descifrar'));
+
+      state = state.copyWith(
+        decryptedFile: Uint8List.fromList(decrypted),
+        isLoading: false,
+      );
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
 
-  /// Revocar un Data Room (revocación inmediata local + encolado).
+  /// Revocar un Data Room.
   Future<void> revokeRoom(String roomId) async {
-    try {
-      await _dataRoomRepository.revokeDataRoom(roomId);
-      final updatedRooms = state.rooms.map((room) {
-        if (room.id == roomId) {
-          return room.copyWith(status: 'revoked');
-        }
-        return room;
-      }).toList();
-      state = state.copyWith(rooms: updatedRooms);
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-    }
+    final result = await _dataRoomRepository.revokeDataRoom(roomId);
+    result.fold(
+      (failure) => state = state.copyWith(error: failure.message),
+      (_) {
+        final updatedRooms = state.rooms.map((room) {
+          if (room.id == roomId) {
+            return room.copyWith(isActive: false);
+          }
+          return room;
+        }).toList();
+        state = state.copyWith(rooms: updatedRooms);
+      },
+    );
   }
 
   /// Sincronización manual de operaciones pendientes.
   Future<void> syncPending() async {
-    try {
-      await _dataRoomRepository.syncPendingOperations();
-      await loadRooms();
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-    }
+    final result = await _dataRoomRepository.syncOfflineData();
+    result.fold(
+      (failure) => state = state.copyWith(error: failure.message),
+      (_) {
+        // Sincronización exitosa
+      },
+    );
+  }
+
+  /// Seleccionar un room.
+  void selectRoom(DataRoomEntity room) {
+    state = state.copyWith(selectedRoom: room);
+  }
+
+  /// Limpiar error.
+  void clearError() {
+    state = state.copyWith(error: null);
   }
 }

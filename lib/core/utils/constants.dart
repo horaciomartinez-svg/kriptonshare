@@ -1,8 +1,14 @@
 class AppConstants {
   // === SUPABASE CONFIG ===
-  // Reemplazar con tus credenciales reales de Supabase
-  static const String supabaseUrl = 'https://your-project.supabase.co';
-  static const String supabaseAnonKey = 'your-anon-key';
+  static String get supabaseUrl {
+    return const String.fromEnvironment('SUPABASE_URL', 
+      defaultValue: 'https://your-project.supabase.co');
+  }
+  
+  static String get supabaseAnonKey {
+    return const String.fromEnvironment('SUPABASE_ANON_KEY', 
+      defaultValue: 'your-anon-key');
+  }
   
   // === LÍMITES FREEMIUM (Versión Gratuita) ===
   static const int maxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
