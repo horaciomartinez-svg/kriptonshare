@@ -1,3 +1,4 @@
+// lib/screens/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -17,6 +18,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    // Este controlador ahora actúa puramente como nuestro cronómetro de 2000ms
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -72,7 +74,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   ),
                 ),
               )
-                  .animate(controller: _controller)
+                  .animate() // <-- Se remueve el controller, anima por defecto
                   .scale(
                     duration: 800.ms,
                     curve: Curves.easeOutCubic,
@@ -90,7 +92,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       fontSize: 24,
                     ),
               )
-                  .animate(controller: _controller)
+                  .animate() // <-- Independizado
                   .fade(delay: 600.ms, duration: 600.ms)
                   .slideY(
                     begin: 0.3,
@@ -107,7 +109,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       color: KriptonTheme.silver,
                     ),
               )
-                  .animate(controller: _controller)
+                  .animate() // <-- Independizado
                   .fade(delay: 1000.ms, duration: 600.ms),
               const SizedBox(height: 48),
               // Pulse indicator
@@ -119,7 +121,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   borderRadius: BorderRadius.circular(4),
                 ),
               )
-                  .animate(controller: _controller, onPlay: (c) => c.repeat())
+                  // Mantenemos onPlay para que pulse infinitamente con su propio controlador
+                  .animate(onPlay: (c) => c.repeat()) 
                   .scale(
                     duration: 1200.ms,
                     curve: Curves.easeInOut,
