@@ -1,0 +1,141 @@
+# KRIPTONSHARE - Archivos ignorados por Git
+# Este archivo previene que archivos sensibles, temporales y generados
+# sean subidos al repositorio público.
+
+# ===========================================
+# SECRETOS Y CONFIGURACIÓN LOCAL
+# ===========================================
+.env
+.env.local
+.env.development
+.env.production
+*.env.*
+local.properties
+android/local.properties
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+secrets/
+keys/
+*.keystore
+*.jks
+key.properties
+
+# ===========================================
+# FLUTTER / DART
+# ===========================================
+.dart_tool/
+.pub/
+.pub-cache/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+flutter_*.png
+linked_*.ds
+unlinked.ds
+unlinked_spec.ds
+.dart_tool/package_config.json
+
+# ===========================================
+# ANDROID
+# ===========================================
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/key.properties
+android/app/debug
+android/app/profile
+android/app/release
+android/**/*.iml
+android/.idea/
+android/build/
+android/app/*.keystore
+android/app/*.jks
+*.apk
+*.aab
+
+# ===========================================
+# IOS
+# ===========================================
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework/
+ios/Flutter/Flutter.podspec
+ios/Flutter/App.framework/
+ios/Flutter/engine/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+ios/build/
+ios/.idea/
+ios/**/*.iml
+ios/DerivedData/
+ios/.generated/
+ios/.podfile.lock
+ios/Podfile.lock
+
+# ===========================================
+# IDE Y EDITORES
+# ===========================================
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===========================================
+# TESTS Y COVERAGE
+# ===========================================
+coverage/
+*.lcov
+.test_results/
+
+# ===========================================
+# ARCHIVOS GENERADOS POR BUILD RUNNER
+# ===========================================
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+*.config.dart
+lib/generated_plugin_registrant.dart
+
+# ===========================================
+# SUPABASE (si hay archivos locales)
+# ===========================================
+supabase/.temp/
+supabase/config.toml.bak
+
+# ===========================================
+# DOCUMENTOS Y ARCHIVOS TEMPORALES
+# ===========================================
+*.tmp
+*.temp
+*.log
+*.cache
+*.bak
+*.backup
+dump.rdb
+
+# ===========================================
+# SISTEMA OPERATIVO
+# ===========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

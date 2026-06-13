@@ -1,0 +1,94 @@
+name: kriptonshare
+version: 1.0.0+1
+publish_to: none
+description: KRIPTONSHARE - Data Room Efímero con soberanía de datos
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Supabase - Backend, Auth, Storage, Realtime
+  supabase_flutter: ^2.8.0
+  
+  # Crypto - AES-256-GCM via pointycastle
+  pointycastle: ^3.7.4
+  encrypt: ^5.0.3
+  
+  # PDF Viewer - Syncfusion (Enterprise, requiere licencia o evaluación)
+  syncfusion_flutter_pdfviewer: ^26.1.35
+  
+  # State Management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+  
+  # Local DB
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  
+  # Deep Linking
+  app_links: ^6.1.0
+  go_router: ^14.1.0
+  
+  # Biometric Auth
+  local_auth: ^2.2.0
+  
+  # File Picker
+  file_picker: ^8.0.5
+  
+  # HTTP
+  dio: ^5.5.0+1
+  
+  # UI
+  flutter_animate: ^4.5.0
+  shimmer: ^3.0.0
+  flutter_svg: ^2.0.10+1
+  
+  # Utilities
+  uuid: ^4.4.0
+  intl: ^0.19.0
+  crypto: ^3.0.3
+  path_provider: ^2.1.3
+  share_plus: ^9.0.0
+  url_launcher: ^6.2.6
+  image_picker: ^1.1.2
+  permission_handler: ^11.3.1
+  
+  # Web/crypto
+  universal_html: ^2.2.4
+  
+  # JSON
+  json_annotation: ^4.9.0
+  
+  # QR
+  qr_flutter: ^4.1.0
+  
+  # Notifications
+  flutter_local_notifications: ^17.1.2
+  
+  # Work manager (background tasks)
+  workmanager: ^0.5.2
+  
+  # Logger
+  logger: ^2.3.0
+  
+  # Equatable (para entidades y fallas de dominio)
+  equatable: ^2.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # assets:
+  #   - assets/logo/
+  #   - assets/images/
+  #   - assets/icons/
+
+  # Splash screen colors
+  # Color: #0A0A0F (Charcoal Black)
