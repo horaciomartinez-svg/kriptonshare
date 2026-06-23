@@ -17,8 +17,8 @@ dependencies:
   pointycastle: ^3.7.4
   encrypt: ^5.0.3
   
-  # PDF Viewer - Syncfusion (Enterprise, requiere licencia o evaluación)
-  syncfusion_flutter_pdfviewer: ^26.1.35
+  # PDF Viewer nativo para abrir documentos descifrados dentro de la app
+  pdfrx: ^1.1.24
   
   # State Management
   flutter_riverpod: ^2.5.1
@@ -35,8 +35,9 @@ dependencies:
   # Biometric Auth
   local_auth: ^2.2.0
   
-  # File Picker
-  file_picker: ^8.0.5
+  # File Picker (oficial de Flutter, compatible con AGP 9)
+  file_selector: ^1.0.3
+  mime: ^1.0.6
   
   # HTTP
   dio: ^5.5.0+1
@@ -51,7 +52,7 @@ dependencies:
   intl: ^0.19.0
   crypto: ^3.0.3
   path_provider: ^2.1.3
-  share_plus: ^9.0.0
+  share_plus: ^10.1.0
   url_launcher: ^6.2.6
   image_picker: ^1.1.2
   permission_handler: ^11.3.1
@@ -68,8 +69,8 @@ dependencies:
   # Notifications
   flutter_local_notifications: ^17.1.2
   
-  # Work manager (background tasks)
-  workmanager: ^0.5.2
+  # Work manager (background tasks) - TODO: actualizar a ^0.9.0+3 antes de usar en Android
+  # workmanager: ^0.5.2
   
   # Logger
   logger: ^2.3.0
@@ -84,6 +85,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  mocktail: ^1.0.5
 
 flutter:
   uses-material-design: true

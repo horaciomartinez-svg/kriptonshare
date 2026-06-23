@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,6 +9,25 @@ import '../utils/constants.dart';
 import 'auth_provider.dart';
 
 final fileServiceProvider = Provider<FileService>((ref) => FileService(ref));
+
+/// Provider para listar los links del usuario autenticado.
+/// Se auto-descarta cuando ya no se usa.
+final userLinksProvider = FutureProvider.autoDispose<List<ShareLink>>((ref) async {
+  final user = ref.watch(authStateProvider).valueOrNull;
+  if (user == null) throw Exception('Usuario no autenticado');
+
+  final fileService = ref.watch(fileServiceProvider);
+  return fileService.getUserLinks();
+});
+
+/// Provider para listar los archivos recibidos por el usuario autenticado.
+final receivedFilesProvider = FutureProvider.autoDispose<List<KriptonFile>>((ref) async {
+  final user = ref.watch(authStateProvider).valueOrNull;
+  if (user == null) throw Exception('Usuario no autenticado');
+
+  final fileService = ref.watch(fileServiceProvider);
+  return fileService.getReceivedFiles();
+});
 
 class FileService {
   final Ref _ref;
@@ -89,10 +109,13 @@ class FileService {
       'storage_provider': AppConstants.storageProvider,
       'bucket_name': AppConstants.bucketName,
       'storage_object_key': storageKey,
+      'object_path': storageKey,
       'aes_key_encrypted': encrypted['key'] as List<dynamic>,
+      'encryption_salt': base64Encode(encrypted['salt'] as List<int>),
       'salt': encrypted['salt'] as List<dynamic>,
       'nonce': encrypted['nonce'] as List<dynamic>,
       'mac_tag': encrypted['authTag'] as List<dynamic>,
+      'is_deleted': false,
       'expires_at': expiresAt.toIso8601String(),
       'max_downloads': maxDownloads ?? AppConstants.maxDownloadsDefault,
       'status': 'active',
@@ -157,36 +180,40 @@ class FileService {
         .map((json) => ShareLink.fromJson(json))
         .toList();
   }
-  
-  /// Get file by share link ID
-  Future<KriptonFile?> getFileByLinkId(String linkId) async {
-    final linkResponse = await _client
-        .from('share_links')
-        .select('file_id')
-        .eq('id', linkId)
-        .eq('is_active', true)
-        .maybeSingle();
-    
-    if (linkResponse == null) return null;
-    
-    final fileId = linkResponse['file_id'] as String;
-    
-    final fileResponse = await _client
-        .from('files')
-        .select()
-        .eq('id', fileId)
-        .maybeSingle();
-    
-    if (fileResponse == null) return null;
-    
-    return KriptonFile.fromJson(fileResponse);
+
+  /// Get files received by the authenticated user via secure RPC.
+  Future<List<KriptonFile>> getReceivedFiles() async {
+    final response = await _client.rpc('get_received_files');
+
+    if (response == null) return [];
+
+    final rows = response as List<dynamic>;
+    return rows
+        .map((row) => KriptonFile.fromJson(row as Map<String, dynamic>))
+        .toList();
   }
   
-  /// Download and decrypt file
+  /// Get file by share link ID via secure RPC (works for recipients too).
+  Future<KriptonFile?> getFileByLinkId(String linkId) async {
+    final response = await _client.rpc(
+      'get_shared_file_metadata',
+      params: {'p_link_id': linkId},
+    );
+
+    if (response == null) return null;
+
+    final rows = response as List<dynamic>;
+    if (rows.isEmpty) return null;
+
+    return KriptonFile.fromJson(rows.first as Map<String, dynamic>);
+  }
+
+  /// Download and decrypt file. Optionally records access metrics for a share link.
   Future<Uint8List> downloadAndDecryptFile(
     KriptonFile file,
-    String password,
-  ) async {
+    String password, {
+    String? linkId,
+  }) async {
     // Download encrypted file from storage
     final encryptedBytes = await _client.storage
         .from(file.bucketName)
@@ -209,14 +236,34 @@ class FileService {
     // Derive key from password + salt
     final cryptoService = CryptoService();
     final key = cryptoService.deriveKey(password, salt.toList());
-    
+
     // Decrypt
-    return cryptoService.decrypt(
+    final decrypted = cryptoService.decrypt(
       ciphertext: ciphertext.toList(),
       key: key,
       nonce: nonce.toList(),
       authTag: authTag.toList(),
     );
+
+    // Record successful access
+    if (linkId != null) {
+      try {
+        await _client.rpc('increment_link_access_count', params: {
+          'p_link_id': linkId,
+        });
+      } catch (_) {
+        // Non-critical: do not fail decryption if metrics fail
+      }
+    }
+    try {
+      await _client.rpc('increment_file_download_count', params: {
+        'p_file_id': file.id,
+      });
+    } catch (_) {
+      // Non-critical
+    }
+
+    return decrypted;
   }
   
   /// Revoke a link

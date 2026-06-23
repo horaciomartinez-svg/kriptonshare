@@ -147,6 +147,67 @@ class ProfileScreen extends ConsumerWidget {
                     .slideY(begin: 0.2, end: 0),
                 const SizedBox(height: 24),
 
+                // Security
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: KriptonTheme.ink,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: KriptonTheme.cardBorder,
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Seguridad',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: KriptonTheme.electricLime.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.fingerprint,
+                            color: KriptonTheme.electricLime,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          'Biometría',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: KriptonTheme.platinum,
+                                fontWeight: FontWeight.w500,
+                              ),
+                        ),
+                        subtitle: Text(
+                          'Configura huella o Face ID',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: KriptonTheme.silver,
+                              ),
+                        ),
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: KriptonTheme.silver,
+                        ),
+                        onTap: () => context.push('/biometric'),
+                      ),
+                    ],
+                  ),
+                )
+                    .animate()
+                    .fade(delay: 300.ms, duration: 400.ms)
+                    .slideY(begin: 0.2, end: 0),
+                const SizedBox(height: 24),
+
                 // Upgrade CTA
                 Container(
                   padding: const EdgeInsets.all(20),

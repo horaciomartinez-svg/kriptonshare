@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class KriptonFile {
   final String id;
   final String ownerId;
@@ -17,6 +19,12 @@ class KriptonFile {
   final int downloadsCount;
   final String status;
 
+  // Campos opcionales del share_link (contexto de recepción)
+  final String? linkId;
+  final DateTime? linkExpiresAt;
+  final String? recipientEmail;
+  final bool? linkIsActive;
+
   KriptonFile({
     required this.id,
     required this.ownerId,
@@ -26,15 +34,19 @@ class KriptonFile {
     required this.storageProvider,
     required this.bucketName,
     required this.storageObjectKey,
-    required this.aesKeyEncrypted,
-    required this.salt,
-    required this.nonce,
-    required this.macTag,
+    this.aesKeyEncrypted = const [],
+    this.salt = const [],
+    this.nonce = const [],
+    this.macTag = const [],
     required this.createdAt,
     required this.expiresAt,
     this.maxDownloads,
     this.downloadsCount = 0,
     this.status = 'active',
+    this.linkId,
+    this.linkExpiresAt,
+    this.recipientEmail,
+    this.linkIsActive,
   });
 
   factory KriptonFile.fromJson(Map<String, dynamic> json) {
@@ -47,15 +59,21 @@ class KriptonFile {
       storageProvider: json['storage_provider'] as String,
       bucketName: json['bucket_name'] as String,
       storageObjectKey: json['storage_object_key'] as String,
-      aesKeyEncrypted: (json['aes_key_encrypted'] as List<dynamic>).cast<int>(),
-      salt: (json['salt'] as List<dynamic>).cast<int>(),
-      nonce: (json['nonce'] as List<dynamic>).cast<int>(),
-      macTag: (json['mac_tag'] as List<dynamic>).cast<int>(),
+      aesKeyEncrypted: _parseBytea(json['aes_key_encrypted']),
+      salt: _parseBytea(json['salt']),
+      nonce: _parseBytea(json['nonce']),
+      macTag: _parseBytea(json['mac_tag']),
       createdAt: DateTime.parse(json['created_at'] as String),
       expiresAt: DateTime.parse(json['expires_at'] as String),
       maxDownloads: json['max_downloads'] as int?,
       downloadsCount: json['downloads_count'] as int? ?? 0,
       status: json['status'] as String? ?? 'active',
+      linkId: json['link_id'] as String?,
+      linkExpiresAt: json['link_expires_at'] != null
+          ? DateTime.parse(json['link_expires_at'] as String)
+          : null,
+      recipientEmail: json['recipient_email'] as String?,
+      linkIsActive: json['is_active'] as bool?,
     );
   }
 
@@ -78,7 +96,52 @@ class KriptonFile {
       'max_downloads': maxDownloads,
       'downloads_count': downloadsCount,
       'status': status,
+      'link_id': linkId,
+      'link_expires_at': linkExpiresAt?.toIso8601String(),
+      'recipient_email': recipientEmail,
+      'is_active': linkIsActive,
     };
+  }
+
+  /// Interpreta un campo BYTEA de Supabase que puede llegar en varios formatos:
+  /// - `List<dynamic>` de enteros (JSON nativo)
+  /// - `String` con un array JSON (ej. "[76, ...]")
+  /// - `String` con hex `"\\x..."`
+  /// - `String` base64
+  static List<int> _parseBytea(dynamic value) {
+    if (value == null) return const <int>[];
+    if (value is List<dynamic>) return value.cast<int>();
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return const <int>[];
+
+      // Formato JSON array literal: "[76, ...]"
+      if (trimmed.startsWith('[')) {
+        final parsed = jsonDecode(trimmed) as List<dynamic>;
+        return parsed.cast<int>();
+      }
+
+      // Formato hex PostgreSQL: "\\xDEADBEEF"
+      if (trimmed.startsWith(r'\x')) {
+        final hex = trimmed.substring(2);
+        if (hex.length.isOdd) {
+          throw FormatException('Hex BYTEA con longitud impar: $trimmed');
+        }
+        final bytes = <int>[];
+        for (var i = 0; i < hex.length; i += 2) {
+          bytes.add(int.parse(hex.substring(i, i + 2), radix: 16));
+        }
+        return bytes;
+      }
+
+      // Base64
+      try {
+        return base64Decode(trimmed);
+      } catch (_) {
+        // Fall through to descriptive exception.
+      }
+    }
+    throw FormatException('Formato BYTEA no soportado: $value (${value.runtimeType})');
   }
 }
 

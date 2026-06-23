@@ -98,7 +98,7 @@ class KriptonTheme {
           letterSpacing: -0.02,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: ink,
         elevation: 0,
         shape: RoundedRectangleBorder(

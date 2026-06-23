@@ -1,15 +1,17 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
+import 'package:mime/mime.dart' show lookupMimeType;
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/file_provider.dart';
-import '../../utils/theme.dart';
-import '../../utils/constants.dart';
+import '../../../../core/utils/theme.dart';
+import '../../../../providers/auth_provider.dart';
+import '../../../../providers/file_provider.dart';
+import '../../../../utils/constants.dart';
+import '../../upload_providers.dart';
+import '../notifiers/upload_notifier.dart';
 
 class UploadScreen extends ConsumerStatefulWidget {
   const UploadScreen({super.key});
@@ -19,12 +21,8 @@ class UploadScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
-  PlatformFile? _selectedFile;
-  bool _isEncrypting = false;
-  bool _isUploading = false;
-  String? _shareLink;
-  String? _errorMessage;
-  double _progress = 0;
+  XFile? _selectedFile;
+  int? _selectedFileSize;
   final _passwordController = TextEditingController();
   final _recipientController = TextEditingController();
 
@@ -37,101 +35,90 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-        withData: true,
-      );
+      // file_selector usa el selector nativo del SO y devuelve un XFile
+      // que funciona en Android, iOS, Web y Desktop.
+      final file = await openFile();
 
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        
+      if (file != null) {
+        final length = await file.length();
+
         // Validate size (10MB limit for free tier)
-        if (file.size > AppConstants.maxFileSizeBytes) {
+        if (length > AppConstants.maxFileSizeBytes) {
           setState(() {
-            _errorMessage = 'Archivo excede el límite de 10 MB del plan gratuito';
             _selectedFile = null;
+            _selectedFileSize = null;
           });
+          ref.read(uploadNotifierProvider.notifier).setError(
+                'Archivo excede el límite de 10 MB del plan gratuito',
+              );
           return;
         }
 
         setState(() {
           _selectedFile = file;
-          _errorMessage = null;
+          _selectedFileSize = length;
         });
+        ref.read(uploadNotifierProvider.notifier).reset();
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Error al seleccionar archivo');
+      ref.read(uploadNotifierProvider.notifier).setError(
+            'Error al seleccionar archivo',
+          );
     }
   }
 
   Future<void> _uploadAndEncrypt() async {
-    if (_selectedFile == null || _selectedFile!.bytes == null) return;
+    if (_selectedFile == null) return;
     if (_passwordController.text.isEmpty) {
-      setState(() => _errorMessage = 'Ingresa una contraseña de cifrado');
+      ref.read(uploadNotifierProvider.notifier).setError(
+            'Ingresa una contraseña de cifrado',
+          );
       return;
     }
 
     final user = ref.read(authStateProvider).valueOrNull;
     if (user == null) {
-      setState(() => _errorMessage = 'Sesión expirada');
+      ref.read(uploadNotifierProvider.notifier).setError(
+            'Sesión expirada',
+          );
       return;
     }
 
     if (!user.canCreateLink) {
-      setState(() => _errorMessage = 'Has alcanzado el límite de 50 links/mes del plan gratuito');
+      ref.read(uploadNotifierProvider.notifier).setError(
+            'Has alcanzado el límite de 50 links/mes del plan gratuito',
+          );
       return;
     }
 
-    setState(() {
-      _isEncrypting = true;
-      _errorMessage = null;
-      _progress = 0.2;
-    });
+    final fileBytes = await _selectedFile!.readAsBytes();
+    final mimeType = _selectedFile!.mimeType ??
+        lookupMimeType(_selectedFile!.name) ??
+        'application/octet-stream';
 
-    await Future.delayed(const Duration(milliseconds: 500)); // UX delay
-
-    setState(() {
-      _isEncrypting = false;
-      _isUploading = true;
-      _progress = 0.6;
-    });
-
-    try {
-      final fileService = ref.read(fileServiceProvider);
-      final link = await fileService.uploadAndCreateLink(
-        fileBytes: Uint8List.fromList(_selectedFile!.bytes!),
-        fileName: _selectedFile!.name,
-        mimeType: _selectedFile!.extension ?? 'application/octet-stream',
-        userPassword: _passwordController.text,
-        recipientEmail: _recipientController.text.isEmpty
-            ? null
-            : _recipientController.text,
-      );
-
-      setState(() {
-        _progress = 1.0;
-        _isUploading = false;
-        _shareLink = 'https://kriptonshare.com/room/${link.id}';
-      });
-    } catch (e) {
-      setState(() {
-        _isUploading = false;
-        _errorMessage = e.toString();
-      });
-    }
+    await ref.read(uploadNotifierProvider.notifier).uploadFile(
+          ownerId: user.id,
+          fileBytes: fileBytes,
+          fileName: _selectedFile!.name,
+          mimeType: mimeType,
+          password: _passwordController.text,
+          recipientEmail: _recipientController.text.isEmpty
+              ? null
+              : _recipientController.text,
+        );
   }
 
-  void _shareLinkToExternal() {
-    if (_shareLink == null) return;
+  void _shareLinkToExternal(String shareUrl) {
+    ref.invalidate(userLinksProvider);
     Share.share(
       'Documento seguro via KRIPTONSHARE\n\n'
-      '$_shareLink\n\n'
+      '$shareUrl\n\n'
       'Este enlace expira en ${AppConstants.maxDurationHours}h.',
     );
   }
 
-  void _copyLink() {
-    if (_shareLink == null) return;
+  void _copyLink(String shareUrl) {
+    ref.invalidate(userLinksProvider);
     // Clipboard implementation would go here
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -143,7 +130,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isComplete = _shareLink != null;
+    final uploadState = ref.watch(uploadNotifierProvider);
+    final isComplete = uploadState.isSuccess;
+    final isLoading = uploadState.isLoading;
+    final errorMessage = uploadState.errorMessage;
+    final shareUrl = uploadState.result?.shareUrl;
 
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
@@ -160,15 +151,16 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Progress indicator
-            if (_isEncrypting || _isUploading) ...[
+            if (isLoading) ...[
               LinearProgressIndicator(
-                value: _progress,
+                value: uploadState.progress,
                 backgroundColor: KriptonTheme.inkDeep,
-                valueColor: const AlwaysStoppedAnimation(KriptonTheme.electricLime),
+                valueColor:
+                    const AlwaysStoppedAnimation(KriptonTheme.electricLime),
               ),
               const SizedBox(height: 16),
               Text(
-                _isEncrypting
+                uploadState.step == UploadStep.encrypting
                     ? 'Cifrado AES-256-GCM en proceso...'
                     : 'Subiendo a nube transitoria...',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -181,7 +173,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             ],
 
             // Error message
-            if (_errorMessage != null) ...[
+            if (errorMessage != null) ...[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -192,11 +184,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                   ),
                 ),
                 child: Text(
-                  _errorMessage!,
+                  errorMessage,
                   style: const TextStyle(color: KriptonTheme.alertRed),
                   textAlign: TextAlign.center,
                 ),
-              ),
+              )
+                  .animate()
+                  .shake(),
               const SizedBox(height: 16),
             ],
 
@@ -216,9 +210,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                           ? KriptonTheme.cardBorder
                           : KriptonTheme.electricLime.withOpacity(0.5),
                       width: _selectedFile == null ? 1 : 2,
-                      style: _selectedFile == null
-                          ? BorderStyle.solid
-                          : BorderStyle.solid,
                     ),
                   ),
                   child: Column(
@@ -247,13 +238,14 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (_selectedFile != null) ...[
+                      if (_selectedFile != null && _selectedFileSize != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          '${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: KriptonTheme.silver,
-                              ),
+                          '${(_selectedFileSize! / 1024).toStringAsFixed(1)} KB',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: KriptonTheme.silver,
+                                  ),
                         ),
                       ],
                       const SizedBox(height: 8),
@@ -277,7 +269,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               TextFormField(
                 controller: _passwordController,
                 obscureText: true,
-                enabled: !_isEncrypting && !_isUploading,
+                enabled: !isLoading,
                 style: const TextStyle(color: KriptonTheme.platinum),
                 decoration: const InputDecoration(
                   labelText: 'Contraseña de cifrado',
@@ -299,7 +291,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               TextFormField(
                 controller: _recipientController,
                 keyboardType: TextInputType.emailAddress,
-                enabled: !_isEncrypting && !_isUploading,
+                enabled: !isLoading,
                 style: const TextStyle(color: KriptonTheme.platinum),
                 decoration: const InputDecoration(
                   labelText: 'Email del receptor (opcional)',
@@ -330,9 +322,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                           ),
                           Text(
                             'Plan gratuito: duración fija',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: KriptonTheme.graphite,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: KriptonTheme.graphite,
+                                    ),
                           ),
                         ],
                       ),
@@ -345,16 +338,17 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
               // Upload button
               ElevatedButton(
-                onPressed: (_selectedFile == null || _isEncrypting || _isUploading)
+                onPressed: (_selectedFile == null || isLoading)
                     ? null
                     : _uploadAndEncrypt,
-                child: _isEncrypting || _isUploading
+                child: isLoading
                     ? const SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(KriptonTheme.charcoalBlack),
+                          valueColor: AlwaysStoppedAnimation(
+                              KriptonTheme.charcoalBlack),
                         ),
                       )
                     : const Text('Cifrar y generar enlace'),
@@ -362,7 +356,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             ],
 
             // Success state - Share link
-            if (isComplete) ...[
+            if (isComplete && shareUrl != null) ...[
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -403,7 +397,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: QrImageView(
-                        data: _shareLink!,
+                        data: shareUrl,
                         version: QrVersions.auto,
                         size: 160,
                         backgroundColor: KriptonTheme.platinum,
@@ -424,7 +418,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        _shareLink!,
+                        shareUrl,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               fontFamily: 'SFMono',
                               color: KriptonTheme.cyanTelemetry,
@@ -437,7 +431,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: _shareLinkToExternal,
+                            onPressed: () => _shareLinkToExternal(shareUrl),
                             icon: const Icon(Icons.share),
                             label: const Text('Compartir'),
                           ),
@@ -445,7 +439,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _copyLink,
+                            onPressed: () => _copyLink(shareUrl),
                             icon: const Icon(Icons.copy),
                             label: const Text('Copiar'),
                           ),

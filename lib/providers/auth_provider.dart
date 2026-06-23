@@ -65,13 +65,22 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
         password: password,
       );
 
-      if (response.user != null) {
+      if (response.user == null) {
+        throw const AuthException('No se pudo iniciar sesión');
+      }
+
+      try {
         final userData = await client
             .from('users')
             .select()
             .eq('id', response.user!.id)
             .single();
         state = AsyncValue.data(KriptonUser.fromJson(userData));
+      } catch (e) {
+        throw Exception(
+          'Usuario autenticado pero no encontrado en la tabla users. '
+          'Asegúrate de ejecutar test_users_setup.sql con el UUID correcto.',
+        );
       }
     } catch (e, st) {
       state = AsyncValue.error(e, st);

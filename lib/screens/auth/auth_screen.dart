@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/theme.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
-  const AuthScreen({super.key});
+  final String? redirectPath;
+
+  const AuthScreen({super.key, this.redirectPath});
 
   @override
   ConsumerState<AuthScreen> createState() => _AuthScreenState();
@@ -44,17 +47,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
 
   Future<void> _login() async {
     if (!_loginFormKey.currentState!.validate()) return;
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-    
+
     try {
       await ref.read(authStateProvider.notifier).signIn(
         _loginEmailController.text.trim(),
         _loginPasswordController.text,
       );
+
+      final currentState = ref.read(authStateProvider);
+      if (mounted && currentState.hasError) {
+        final error = currentState.error;
+        setState(() {
+          _errorMessage = error is Exception
+              ? error.toString().replaceFirst('Exception: ', '')
+              : 'Credenciales inválidas. Intenta de nuevo.';
+        });
+        return;
+      }
+
+      if (mounted && widget.redirectPath != null) {
+        context.go(widget.redirectPath!);
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Credenciales inválidas. Intenta de nuevo.';
@@ -66,24 +84,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
 
   Future<void> _register() async {
     if (!_registerFormKey.currentState!.validate()) return;
-    
+
     if (_registerPasswordController.text != _registerConfirmController.text) {
       setState(() {
         _errorMessage = 'Las contraseñas no coinciden';
       });
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-    
+
     try {
       await ref.read(authStateProvider.notifier).signUp(
         _registerEmailController.text.trim(),
         _registerPasswordController.text,
       );
+
+      if (mounted && widget.redirectPath != null) {
+        context.go(widget.redirectPath!);
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Error al crear cuenta. Intenta con otro email.';

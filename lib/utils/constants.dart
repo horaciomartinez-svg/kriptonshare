@@ -1,8 +1,8 @@
 class AppConstants {
   // === SUPABASE CONFIG ===
   // Reemplazar con tus credenciales reales de Supabase
-  static const String supabaseUrl = 'https://your-project.supabase.co';
-  static const String supabaseAnonKey = 'your-anon-key';
+  static const String supabaseUrl = 'https://olskjkbyzpowxlhjhovu.supabase.co';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sc2tqa2J5enBvd3hsaGpob3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDQ2NzMsImV4cCI6MjA5NjQyMDY3M30.Q5YAMmsZdc9EZuh-f6FyAsiegE4ZSYcuAtS2HsTM1Xg';
   
   // === LÍMITES FREEMIUM (Versión Gratuita) ===
   static const int maxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
@@ -28,6 +28,9 @@ class AppConstants {
   static const String appDomain = 'kriptonshare.com';
   static const String deepLinkScheme = 'kriptonshare';
   static const String roomPath = '/room';
+
+  static String shareUrl(String linkId) => 'https://$appDomain$roomPath/$linkId';
+  static String appLinkUrl(String linkId) => '$deepLinkScheme://room/$linkId';
   
   // === STORAGE PROVIDER ===
   static const String storageProvider = 'r2'; // 'r2', 's3', 'supabase'

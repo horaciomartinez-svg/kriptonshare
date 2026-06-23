@@ -24,7 +24,7 @@ class KriptonTheme {
         error: ember,
         surface: cardBackground,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
