@@ -13,6 +13,7 @@ abstract class IUploadRepository {
     required String fileName,
     required String mimeType,
     required String password,
+    DateTime? expiresAt,
     int? maxDownloads,
     String? recipientEmail,
   });

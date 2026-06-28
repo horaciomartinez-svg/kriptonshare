@@ -1,118 +1,170 @@
-import 'dart:convert';
-import 'dart:typed_data';
+// lib/providers/file_provider.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:dio/dio.dart';
+import 'package:crypto/crypto.dart';
 import '../models/kripton_file.dart';
 import '../services/crypto_service.dart';
+import '../services/r2_signature_service.dart';
 import '../utils/constants.dart';
 import 'auth_provider.dart';
 
 final fileServiceProvider = Provider<FileService>((ref) => FileService(ref));
 
-/// Provider para listar los links del usuario autenticado.
-/// Se auto-descarta cuando ya no se usa.
 final userLinksProvider = FutureProvider.autoDispose<List<ShareLink>>((ref) async {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) throw Exception('Usuario no autenticado');
-
-  final fileService = ref.watch(fileServiceProvider);
-  return fileService.getUserLinks();
+  return ref.watch(fileServiceProvider).getUserLinks();
 });
 
-/// Provider para listar los archivos recibidos por el usuario autenticado.
 final receivedFilesProvider = FutureProvider.autoDispose<List<KriptonFile>>((ref) async {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) throw Exception('Usuario no autenticado');
-
-  final fileService = ref.watch(fileServiceProvider);
-  return fileService.getReceivedFiles();
+  return ref.watch(fileServiceProvider).getReceivedFiles();
 });
 
 class FileService {
   final Ref _ref;
   final _uuid = const Uuid();
-  
-  FileService(this._ref);
-  
+  final _dio = Dio();
+  late final R2SignatureService _r2Signer;
+
+  FileService(this._ref) {
+    _r2Signer = const R2SignatureService(
+      accessKeyId: AppConstants.r2AccessKeyId,
+      secretAccessKey: AppConstants.r2SecretAccessKey,
+      endpoint: AppConstants.r2Endpoint,
+    );
+  }
+
   SupabaseClient get _client => _ref.read(supabaseClientProvider);
-  
-  /// Check if user can upload (free tier limits)
-  Future<bool> canUpload(int fileSizeBytes) async {
+
+  String _objectPath(String storageKey) => '/${AppConstants.bucketName}/$storageKey';
+
+  /// Prueba temporal de conectividad contra R2. Devuelve el status code o relanza el error.
+  Future<int> testR2Connection() async {
+    final testPath = '/${AppConstants.bucketName}/test-connection-${DateTime.now().millisecondsSinceEpoch}';
+    final testUrl = '${AppConstants.r2Endpoint}$testPath';
+    debugPrint('[R2 DIAGNOSTIC] Test URL: $testUrl');
+    debugPrint('[R2 DIAGNOSTIC] Endpoint constant: ${AppConstants.r2Endpoint}');
+    debugPrint('[R2 DIAGNOSTIC] Bucket: ${AppConstants.bucketName}');
+
+    final signedHeaders = _r2Signer.signRequest(
+      method: 'PUT',
+      path: testPath,
+      payloadHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      headers: {'Content-Type': 'application/octet-stream'},
+    );
+    debugPrint('[R2 DIAGNOSTIC] Signed headers: ${signedHeaders.keys.toList()}');
+
+    final response = await _dio.put(
+      testUrl,
+      data: Uint8List(0),
+      options: Options(headers: signedHeaders),
+    );
+    debugPrint('[R2 DIAGNOSTIC] Test response status: ${response.statusCode}');
+    return response.statusCode ?? 0;
+  }
+
+  Future<bool> canUpload(int fileSizeBytes, String userId) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) return false;
-    
     if (user.isPremium) return true;
+
     if (fileSizeBytes > AppConstants.maxFileSizeBytes) return false;
     if (user.monthlyLinksGenerated >= AppConstants.maxLinksPerMonth) return false;
-    
+
+    // Evaluar la regla de concurrencia freemium (máximo 3 activos)
+    final activeLinksRes = await _client
+        .from('share_links')
+        .select('id')
+        .eq('created_by', userId)
+        .eq('is_active', true)
+        .gte('expires_at', DateTime.now().toIso8601String());
+
+    if ((activeLinksRes as List).length >= AppConstants.maxActiveLinks) return false;
+
     return true;
   }
-  
-  /// Upload and encrypt a file, then create share link
+
   Future<ShareLink> uploadAndCreateLink({
     required Uint8List fileBytes,
     required String fileName,
     required String mimeType,
     required String userPassword,
+    required int selectedDurationHours,
     int? maxDownloads,
     String? recipientEmail,
   }) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) throw Exception('Usuario no autenticado');
-    
-    // Validate limits
-    if (!await canUpload(fileBytes.length)) {
-      throw Exception('Límite de plan gratuito excedido: máximo 10MB, 50 links/mes');
+
+    if (!await canUpload(fileBytes.length, user.id)) {
+      throw Exception('Límites excedidos: Máx 10MB, 20 links/mes, 3 links activos.');
     }
-    
-    // 1. Encrypt file locally
+
+    // Prueba temporal de conectividad R2
+    await testR2Connection();
+
+    // 1. Encriptación local Zero-Knowledge (AES-256-GCM)
     final cryptoService = CryptoService();
     final encrypted = await cryptoService.encryptFile(
       fileBytes: fileBytes,
       password: userPassword,
     );
-    
-    // 2. Generate storage key
+
     final storageKey = _uuid.v4();
-    
-    // 3. Upload to Supabase Storage (encrypted payload)
+    final fileId = _uuid.v4();
+    final linkId = _uuid.v4();
+
     final encryptedBytes = Uint8List.fromList([
       ...(encrypted['salt'] as List<int>),
       ...(encrypted['nonce'] as List<int>),
       ...(encrypted['ciphertext'] as List<int>),
       ...(encrypted['authTag'] as List<int>),
     ]);
-    
-    await _client.storage.from(AppConstants.bucketName).uploadBinary(
-      storageKey,
-      encryptedBytes,
-      fileOptions: const FileOptions(
-        contentType: 'application/octet-stream',
-        upsert: false,
-      ),
+
+    // 2. SUBIDA DIRECTA A CLOUDFLARE R2 REST ENDPOINT (S3-compatible, firmada SigV4)
+    final objectPath = _objectPath(storageKey);
+    final uploadUrl = '${AppConstants.r2Endpoint}$objectPath';
+    final payloadHash = sha256.convert(encryptedBytes).toString();
+    debugPrint('[R2 UPLOAD] URL: $uploadUrl');
+    debugPrint('[R2 UPLOAD] Payload size: ${encryptedBytes.length} bytes');
+    debugPrint('[R2 UPLOAD] Payload hash: $payloadHash');
+
+    final signedHeaders = _r2Signer.signRequest(
+      method: 'PUT',
+      path: objectPath,
+      payloadHash: payloadHash,
+      headers: {'Content-Type': 'application/octet-stream'},
     );
-    
-    // 4. Calculate expiration (max 72h for free)
-    final expiresAt = DateTime.now().add(
-      const Duration(hours: AppConstants.maxDurationHours),
+    debugPrint('[R2 UPLOAD] Authorization header: ${signedHeaders['Authorization']?.substring(0, signedHeaders['Authorization']!.length > 80 ? 80 : signedHeaders['Authorization']!.length)}...');
+
+    await _dio.put(
+      uploadUrl,
+      data: encryptedBytes,
+      options: Options(headers: signedHeaders),
     );
-    
-    // 5. Create file record in database
-    final fileId = _uuid.v4();
+
+    // 3. Temporalidad dinámica inyectada desde el Slider
+    final expiresAt = DateTime.now().add(Duration(hours: selectedDurationHours));
+
+    // 4. Inserción de metadatos estructurales (Almacenamiento liviano en Supabase)
     await _client.from('files').insert({
       'id': fileId,
       'owner_id': user.id,
       'original_filename': fileName,
       'file_size_bytes': fileBytes.length,
       'mime_type': mimeType,
-      'storage_provider': AppConstants.storageProvider,
+      'storage_provider': 'r2',
       'bucket_name': AppConstants.bucketName,
       'storage_object_key': storageKey,
       'object_path': storageKey,
       'aes_key_encrypted': encrypted['key'] as List<dynamic>,
-      'encryption_salt': base64Encode(encrypted['salt'] as List<int>),
       'salt': encrypted['salt'] as List<dynamic>,
+      'encryption_salt': encrypted['salt'] as List<dynamic>,
       'nonce': encrypted['nonce'] as List<dynamic>,
       'mac_tag': encrypted['authTag'] as List<dynamic>,
       'is_deleted': false,
@@ -120,9 +172,7 @@ class FileService {
       'max_downloads': maxDownloads ?? AppConstants.maxDownloadsDefault,
       'status': 'active',
     });
-    
-    // 6. Create share link
-    final linkId = _uuid.v4();
+
     await _client.from('share_links').insert({
       'id': linkId,
       'file_id': fileId,
@@ -131,15 +181,13 @@ class FileService {
       'recipient_email': recipientEmail,
       'is_active': true,
     });
-    
-    // 7. Increment monthly links count
+
     await _client.from('users').update({
       'monthly_links_generated': user.monthlyLinksGenerated + 1,
     }).eq('id', user.id);
-    
-    // 8. Refresh user data
+
     await _ref.read(authStateProvider.notifier).refreshUser();
-    
+
     return ShareLink(
       id: linkId,
       fileId: fileId,
@@ -148,96 +196,54 @@ class FileService {
       createdAt: DateTime.now(),
     );
   }
-  
-  /// Get user's files
-  Future<List<KriptonFile>> getUserFiles() async {
-    final user = _ref.read(authStateProvider).valueOrNull;
-    if (user == null) throw Exception('Usuario no autenticado');
-    
-    final response = await _client
-        .from('files')
-        .select()
-        .eq('owner_id', user.id)
-        .order('created_at', ascending: false);
-    
-    return (response as List)
-        .map((json) => KriptonFile.fromJson(json))
-        .toList();
-  }
-  
-  /// Get user's share links
+
   Future<List<ShareLink>> getUserLinks() async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) throw Exception('Usuario no autenticado');
-    
-    final response = await _client
-        .from('share_links')
-        .select()
-        .eq('created_by', user.id)
-        .order('created_at', ascending: false);
-    
-    return (response as List)
-        .map((json) => ShareLink.fromJson(json))
-        .toList();
+    final response = await _client.from('share_links').select().eq('created_by', user.id).order('created_at', ascending: false);
+    return (response as List).map((json) => ShareLink.fromJson(json)).toList();
   }
 
-  /// Get files received by the authenticated user via secure RPC.
   Future<List<KriptonFile>> getReceivedFiles() async {
     final response = await _client.rpc('get_received_files');
-
     if (response == null) return [];
-
-    final rows = response as List<dynamic>;
-    return rows
-        .map((row) => KriptonFile.fromJson(row as Map<String, dynamic>))
-        .toList();
+    return (response as List<dynamic>).map((row) => KriptonFile.fromJson(row as Map<String, dynamic>)).toList();
   }
-  
-  /// Get file by share link ID via secure RPC (works for recipients too).
+
   Future<KriptonFile?> getFileByLinkId(String linkId) async {
-    final response = await _client.rpc(
-      'get_shared_file_metadata',
-      params: {'p_link_id': linkId},
-    );
-
-    if (response == null) return null;
-
-    final rows = response as List<dynamic>;
-    if (rows.isEmpty) return null;
-
-    return KriptonFile.fromJson(rows.first as Map<String, dynamic>);
+    final response = await _client.rpc('get_shared_file_metadata', params: {'p_link_id': linkId});
+    if (response == null || (response as List).isEmpty) return null;
+    return KriptonFile.fromJson(response.first as Map<String, dynamic>);
   }
 
-  /// Download and decrypt file. Optionally records access metrics for a share link.
-  Future<Uint8List> downloadAndDecryptFile(
-    KriptonFile file,
-    String password, {
-    String? linkId,
-  }) async {
-    // Download encrypted file from storage
-    final encryptedBytes = await _client.storage
-        .from(file.bucketName)
-        .download(file.storageObjectKey);
-    
-    // Parse encrypted payload
+  Future<Uint8List> downloadAndDecryptFile(KriptonFile file, String password, {String? linkId}) async {
+    // DESCARGA FLUIDA DESDE CLOUDFLARE R2 (S3-compatible, firmada SigV4)
+    final objectPath = '/${file.bucketName}/${file.storageObjectKey}';
+    final downloadUrl = '${AppConstants.r2Endpoint}$objectPath';
+    debugPrint('[R2 DOWNLOAD] URL: $downloadUrl');
+
+    final signedHeaders = _r2Signer.signRequest(
+      method: 'GET',
+      path: objectPath,
+    );
+
+    final response = await _dio.get<List<int>>(
+      downloadUrl,
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: signedHeaders,
+      ),
+    );
+    debugPrint('[R2 DOWNLOAD] Response size: ${response.data?.length ?? 0} bytes');
+
+    final encryptedBytes = Uint8List.fromList(response.data!);
     final salt = encryptedBytes.sublist(0, AppConstants.saltSize);
-    final nonce = encryptedBytes.sublist(
-      AppConstants.saltSize,
-      AppConstants.saltSize + AppConstants.aesNonceSize,
-    );
-    final ciphertext = encryptedBytes.sublist(
-      AppConstants.saltSize + AppConstants.aesNonceSize,
-      encryptedBytes.length - AppConstants.aesTagSize,
-    );
-    final authTag = encryptedBytes.sublist(
-      encryptedBytes.length - AppConstants.aesTagSize,
-    );
-    
-    // Derive key from password + salt
+    final nonce = encryptedBytes.sublist(AppConstants.saltSize, AppConstants.saltSize + AppConstants.aesNonceSize);
+    final ciphertext = encryptedBytes.sublist(AppConstants.saltSize + AppConstants.aesNonceSize, encryptedBytes.length - AppConstants.aesTagSize);
+    final authTag = encryptedBytes.sublist(encryptedBytes.length - AppConstants.aesTagSize);
+
     final cryptoService = CryptoService();
     final key = cryptoService.deriveKey(password, salt.toList());
-
-    // Decrypt
     final decrypted = cryptoService.decrypt(
       ciphertext: ciphertext.toList(),
       key: key,
@@ -245,62 +251,38 @@ class FileService {
       authTag: authTag.toList(),
     );
 
-    // Record successful access
     if (linkId != null) {
-      try {
-        await _client.rpc('increment_link_access_count', params: {
-          'p_link_id': linkId,
-        });
-      } catch (_) {
-        // Non-critical: do not fail decryption if metrics fail
-      }
+      try { await _client.rpc('increment_link_access_count', params: {'p_link_id': linkId}); } catch (_) {}
     }
-    try {
-      await _client.rpc('increment_file_download_count', params: {
-        'p_file_id': file.id,
-      });
-    } catch (_) {
-      // Non-critical
-    }
+    try { await _client.rpc('increment_file_download_count', params: {'p_file_id': file.id}); } catch (_) {}
 
     return decrypted;
   }
-  
-  /// Revoke a link
+
   Future<void> revokeLink(String linkId) async {
-    await _client.from('share_links').update({
-      'is_active': false,
-    }).eq('id', linkId);
+    await _client.from('share_links').update({'is_active': false}).eq('id', linkId);
   }
-  
-  /// Delete a file and its links
+
   Future<void> deleteFile(String fileId) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) return;
-    
-    // Get file info
-    final file = await _client
-        .from('files')
-        .select()
-        .eq('id', fileId)
-        .eq('owner_id', user.id)
-        .maybeSingle();
-    
+    final file = await _client.from('files').select().eq('id', fileId).eq('owner_id', user.id).maybeSingle();
     if (file == null) return;
-    
-    // Delete from storage
+
     try {
-      await _client.storage
-          .from(AppConstants.bucketName)
-          .remove([file['storage_object_key'] as String]);
+      final objectPath = _objectPath(file['storage_object_key'] as String);
+      final deleteUrl = '${AppConstants.r2Endpoint}$objectPath';
+      debugPrint('[R2 DELETE] URL: $deleteUrl');
+      final signedHeaders = _r2Signer.signRequest(
+        method: 'DELETE',
+        path: objectPath,
+      );
+      await _dio.delete(deleteUrl, options: Options(headers: signedHeaders));
     } catch (e) {
-      // Storage may already be cleaned up
+      debugPrint('[R2 DELETE] Error: $e');
     }
-    
-    // Delete links
+
     await _client.from('share_links').delete().eq('file_id', fileId);
-    
-    // Delete file record
     await _client.from('files').delete().eq('id', fileId);
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/network/network_info.dart';
@@ -53,6 +54,9 @@ final qnaRepositoryProvider = Provider<IQnaRepository>((ref) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Google Mobile Ads SDK (AdMob)
+  await MobileAds.instance.initialize();
   
   // Lock orientation to portrait for security
   await SystemChrome.setPreferredOrientations([

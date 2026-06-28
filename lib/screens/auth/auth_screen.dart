@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/constants.dart';
 import '../../utils/theme.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
@@ -74,11 +75,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
         context.go(widget.redirectPath!);
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Credenciales inválidas. Intenta de nuevo.';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Credenciales inválidas. Intenta de nuevo.';
+        });
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -107,11 +112,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
         context.go(widget.redirectPath!);
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Error al crear cuenta. Intenta con otro email.';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error al crear cuenta. Intenta con otro email.';
+        });
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -294,7 +303,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
           ),
           const SizedBox(height: 16),
           Text(
-            'Plan gratuito: 10 MB máximo · 50 links/mes · 72h de duración',
+            'Plan gratuito: 10 MB máximo · ${AppConstants.maxLinksPerMonth} links/mes · ${AppConstants.maxDurationHours}h de duración',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: KriptonTheme.graphite,
                   fontSize: 11,

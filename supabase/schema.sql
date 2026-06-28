@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS files (
     storage_object_key UUID NOT NULL UNIQUE,
     aes_key_encrypted BYTEA NOT NULL,
     salt BYTEA NOT NULL,
+    encryption_salt BYTEA NOT NULL,
     nonce BYTEA NOT NULL,
     mac_tag BYTEA NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),

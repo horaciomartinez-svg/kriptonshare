@@ -75,6 +75,9 @@ dependencies:
   # Logger
   logger: ^2.3.0
   
+  # Google Mobile Ads (AdMob)
+  google_mobile_ads: ^7.0.0
+  
   # Functional programming (Either, Option, etc.)
   dartz: ^0.10.1
 
@@ -86,6 +89,8 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   mocktail: ^1.0.5
+  flutter_native_splash: ^2.4.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -97,3 +102,21 @@ flutter:
 
   # Splash screen colors
   # Color: #0A0A0F (Charcoal Black)
+
+flutter_native_splash:
+  color: "#0A0A0F"
+  image: assets/KRIPTONSHARE_App_Icon.png
+  android: true
+  ios: true
+  web: false
+  android_12:
+    image: assets/KRIPTONSHARE_App_Icon.png
+    icon_background_color: "#0A0A0F"
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/KRIPTONSHARE_App_Icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0A0A0F"
+  adaptive_icon_foreground: "assets/KRIPTONSHARE_App_Icon.png"

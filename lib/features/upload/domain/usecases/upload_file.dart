@@ -16,6 +16,7 @@ class UploadFileUseCase {
     required String fileName,
     required String mimeType,
     required String password,
+    DateTime? expiresAt,
     int? maxDownloads,
     String? recipientEmail,
   }) async {
@@ -25,6 +26,7 @@ class UploadFileUseCase {
       fileName: fileName,
       mimeType: mimeType,
       password: password,
+      expiresAt: expiresAt,
       maxDownloads: maxDownloads,
       recipientEmail: recipientEmail,
     );

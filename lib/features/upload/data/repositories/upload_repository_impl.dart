@@ -37,6 +37,7 @@ class UploadRepositoryImpl implements IUploadRepository {
     required String fileName,
     required String mimeType,
     required String password,
+    DateTime? expiresAt,
     int? maxDownloads,
     String? recipientEmail,
   }) async {
@@ -71,7 +72,7 @@ class UploadRepositoryImpl implements IUploadRepository {
       final storageKey = _uuid.v4();
       final fileId = _uuid.v4();
       final linkId = _uuid.v4();
-      final expiresAt = DateTime.now().add(
+      final effectiveExpiresAt = expiresAt ?? DateTime.now().add(
         const Duration(hours: AppConstants.maxDurationHours),
       );
 
@@ -99,7 +100,7 @@ class UploadRepositoryImpl implements IUploadRepository {
         'nonce': nonce,
         'mac_tag': authTag,
         'is_deleted': false,
-        'expires_at': expiresAt.toIso8601String(),
+        'expires_at': effectiveExpiresAt.toIso8601String(),
         'max_downloads': maxDownloads ?? AppConstants.maxDownloadsDefault,
         'status': 'active',
       });
@@ -109,7 +110,7 @@ class UploadRepositoryImpl implements IUploadRepository {
         'id': linkId,
         'file_id': fileId,
         'created_by': ownerId,
-        'expires_at': expiresAt.toIso8601String(),
+        'expires_at': effectiveExpiresAt.toIso8601String(),
         'recipient_email': recipientEmail,
         'is_active': true,
       });
@@ -119,7 +120,7 @@ class UploadRepositoryImpl implements IUploadRepository {
           linkId: linkId,
           fileId: fileId,
           createdBy: ownerId,
-          expiresAt: expiresAt,
+          expiresAt: effectiveExpiresAt,
           createdAt: DateTime.now(),
           shareUrl: AppConstants.shareUrl(linkId),
           recipientEmail: recipientEmail,

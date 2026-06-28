@@ -106,29 +106,34 @@ class CircularGaugePainter extends CustomPainter {
     canvas.drawCircle(center, radius, bgPaint);
 
     // Progress arc
-    final progressPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..shader = SweepGradient(
-        colors: [
-          color.withOpacity(0.5),
-          color,
-        ],
-        startAngle: 0,
-        endAngle: math.pi * 2 * percentage,
-      ).createShader(
-        Rect.fromCircle(center: center, radius: radius),
-      );
+    final safePercentage = percentage.clamp(0.0, 1.0);
+    final arcAngle = math.pi * 2 * safePercentage;
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      math.pi * 2 * percentage,
-      false,
-      progressPaint,
-    );
+    if (arcAngle > 0.001) {
+      final progressPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..shader = SweepGradient(
+          colors: [
+            color.withOpacity(0.5),
+            color,
+          ],
+          startAngle: 0,
+          endAngle: arcAngle,
+        ).createShader(
+          Rect.fromCircle(center: center, radius: radius),
+        );
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        arcAngle,
+        false,
+        progressPaint,
+      );
+    }
 
     // Center text
     final textPainter = TextPainter(

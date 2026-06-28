@@ -12,7 +12,7 @@
     <application
         android:label="KRIPTONSHARE"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/launcher_icon"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:usesCleartextTraffic="false">
@@ -60,5 +60,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        
+        <!-- AdMob Application ID (reemplazar con el ID real en producción) -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
     </application>
 </manifest>

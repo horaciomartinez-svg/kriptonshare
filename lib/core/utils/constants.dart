@@ -12,9 +12,11 @@ class AppConstants {
   
   // === LÍMITES FREEMIUM (Versión Gratuita) ===
   static const int maxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
-  static const int maxLinksPerMonth = 50;
-  static const int maxDurationHours = 72; // 72 horas máximo
-  static const int maxDurationSeconds = 72 * 3600; // 259200 segundos
+  static const int maxLinksPerMonth = 20; // Reducido de 50 a 20
+  static const int maxActiveLinks = 3; // Límite de concurrencia
+  static const int maxDurationHours = 48; // Reducido de 72 a 48
+  static const int defaultDurationHours = 24; // Valor por defecto
+  static const int maxDurationSeconds = 48 * 3600; // 172800 segundos
   static const int maxDownloadsDefault = 5; // Límite default descargas
   
   // === CRYPTO CONFIG ===

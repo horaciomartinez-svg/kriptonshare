@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 /// Entidad pura de mensaje de chat (Q&A Contextual).
-/// Agnóstica de frameworks. Purga automática a las 72h en Supabase.
+/// Agnóstica de frameworks. Purga automática a las 48h en Supabase.
 class ChatMessageEntity extends Equatable {
   final String id;
   final String linkId;
