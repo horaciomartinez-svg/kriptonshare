@@ -1,164 +1,78 @@
-# Configuración de Cloudflare Pages para KRIPTONSHARE
+# Configuración de Cloudflare para KRIPTONSHARE
 
-Esta guía configura una landing page mínima en **Cloudflare Pages** para que los links `https://kriptonshare.com/room/<id>`:
+Esta guía configura:
 
-1. Abran la app Android/iOS si está instalada.
-2. Muestren una página de fallback si la app no está instalada.
-3. Sirvan el `assetlinks.json` necesario para Android App Links.
+1. **Dominio `kriptonshare.com`** apuntando a Cloudflare (nameservers).
+2. **Landing page** en `kriptonshare.com` para deep links `/room/<id>` y App Links de Android.
+3. **App Flutter web** en `app.kriptonshare.com`.
+4. **Cloudflare R2 CORS** para permitir peticiones desde la app web.
 
 ---
 
-## 1. Estructura de archivos
+## 1. Apuntar el dominio de Namecheap a Cloudflare
 
-Crea una carpeta en tu computadora con esta estructura:
+### En Cloudflare
+1. Ve a [dash.cloudflare.com](https://dash.cloudflare.com/) → **Add a Site**.
+2. Escribe `kriptonshare.com` y selecciona el plan **Free**.
+3. Cloudflare escaneará tus registros DNS actuales. Revisa que estén correctos.
+4. Cloudflare te dará dos **nameservers**, por ejemplo:
+   ```text
+   greg.ns.cloudflare.com
+   zara.ns.cloudflare.com
+   ```
 
-```
-kriptonshare-web/
+### En Namecheap
+1. Ve a **Domain List** → selecciona `kriptonshare.com`.
+2. En la pestaña **Domain** → **Nameservers**, selecciona **Custom DNS**.
+3. Pega los dos nameservers que te dio Cloudflare.
+4. Guarda. La propagación puede tardar de minutos a horas.
+
+---
+
+## 2. Estructura de proyectos en Cloudflare Pages
+
+| Proyecto | Dominio | Propósito |
+|----------|---------|-----------|
+| `kriptonshare-landing` | `kriptonshare.com` | Landing page estática + App Links |
+| `kriptonshare-web` | `app.kriptonshare.com` | App Flutter web completa |
+
+---
+
+## 3. Landing page (`kriptonshare.com`)
+
+Los archivos de la landing están en `web_landing/` de este repositorio.
+
+```text
+web_landing/
 ├── index.html
 ├── _routes.json
 └── .well-known/
     └── assetlinks.json
 ```
 
-(El archivo `apple-app-site-association` para iOS es opcional para esta prueba; si más adelante quieres soportar iOS, avísame.)
+### `_routes.json`
 
----
-
-## 2. Contenido de `index.html`
-
-```html
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KRIPTONSHARE — Documento seguro</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0A0A0F;
-      color: #E8E8E8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 24px;
-      text-align: center;
-    }
-    .container {
-      max-width: 420px;
-      width: 100%;
-    }
-    .logo {
-      width: 72px;
-      height: 72px;
-      background: linear-gradient(135deg, #39FF14, #4E9B47);
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 24px;
-      font-size: 32px;
-      font-weight: 700;
-      color: #0A0A0F;
-    }
-    h1 { font-size: 24px; margin-bottom: 8px; }
-    p { color: #A0A0A0; line-height: 1.5; margin-bottom: 24px; }
-    .btn {
-      display: block;
-      width: 100%;
-      padding: 16px;
-      border-radius: 12px;
-      text-decoration: none;
-      font-weight: 600;
-      margin-bottom: 12px;
-      border: none;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    .btn-primary {
-      background: #39FF14;
-      color: #0A0A0F;
-    }
-    .btn-secondary {
-      background: transparent;
-      color: #E8E8E8;
-      border: 1px solid #3A3A3A;
-    }
-    .footer {
-      margin-top: 32px;
-      font-size: 12px;
-      color: #6B6B6B;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="logo">K</div>
-    <h1>Documento seguro</h1>
-    <p>
-      Has recibido un documento cifrado a través de KRIPTONSHARE.
-      Ábrelo en la app para descifrarlo.
-    </p>
-    <a id="openAppBtn" class="btn btn-primary" href="#">Abrir en KRIPTONSHARE</a>
-    <a class="btn btn-secondary" href="https://play.google.com/store/apps/details?id=com.kriptonshare.app">
-      Descargar para Android
-    </a>
-    <div class="footer">
-      Si no tienes la app instalada, descárgala desde la tienda.
-    </div>
-  </div>
-
-  <script>
-    // Extrae el linkId de la URL, ej: /room/abc-123
-    const pathParts = window.location.pathname.split('/').filter(Boolean);
-    const linkId = pathParts.length >= 2 && pathParts[0] === 'room' ? pathParts[1] : null;
-
-    const openAppBtn = document.getElementById('openAppBtn');
-
-    if (linkId) {
-      const appLink = `kriptonshare://room/${linkId}`;
-      openAppBtn.href = appLink;
-
-      // Intenta abrir la app automáticamente al cargar la página
-      window.location.href = appLink;
-
-      // Si después de 1.5 segundos seguimos aquí, probablemente la app no esté instalada.
-      setTimeout(() => {
-        // No hacemos nada; el usuario puede tocar el botón o descargar la app.
-      }, 1500);
-    } else {
-      openAppBtn.style.display = 'none';
-      document.querySelector('p').textContent = 'Enlace inválido o expirado.';
-    }
-  </script>
-</body>
-</html>
-```
-
----
-
-## 3. Contenido de `_routes.json`
-
-Este archivo hace que Cloudflare Pages sirva `index.html` para cualquier ruta `/room/*`, funcionando como una SPA.
+Sirve `index.html` para cualquier ruta, funcionando como SPA:
 
 ```json
 {
   "version": 1,
   "include": ["/*"],
-  "exclude": ["/well-known/*"]
+  "exclude": ["/.well-known/*"]
 }
 ```
 
----
+### `.well-known/assetlinks.json`
 
-## 4. Contenido de `.well-known/assetlinks.json`
+Obligatorio para Android App Links. Debes reemplazar `<SHA256_DEBUG>` por la huella SHA-256 de tu certificado de firma.
 
-Este archivo es obligatorio para que Android abra la app directamente desde `https://kriptonshare.com/room/<id>`.
+#### Obtener fingerprint SHA-256 de debug (Windows)
 
-Debes reemplazar `<SHA256_DEBUG>` y `<SHA256_RELEASE>` por las huellas SHA-256 de tu certificado de firma.
+```bash
+keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android
+```
+
+Busca la línea **SHA256:**, quita los dos puntos y pégala en el JSON:
 
 ```json
 [{
@@ -167,72 +81,95 @@ Debes reemplazar `<SHA256_DEBUG>` y `<SHA256_RELEASE>` por las huellas SHA-256 d
     "namespace": "android_app",
     "package_name": "com.kriptonshare.app",
     "sha256_cert_fingerprints": [
-      "<SHA256_DEBUG>",
-      "<SHA256_RELEASE>"
+      "<SHA256_DEBUG>"
     ]
   }
 }]
 ```
 
-### Cómo obtener el fingerprint SHA-256
+> Cuando publiques en Play Store, agrega también el SHA-256 de tu keystore de producción.
 
-#### Para debug (el que usas ahora en desarrollo)
+### Desplegar landing page
+
+1. Cloudflare Dashboard → **Pages** → **Create a project** → **Upload assets**.
+2. Sube la carpeta `web_landing/`.
+3. Ve a **Custom domains** → agrega `kriptonshare.com`.
+4. Cloudflare creará automáticamente los registros DNS necesarios.
+
+---
+
+## 4. App Flutter web (`app.kriptonshare.com`)
+
+### Compilar
 
 ```bash
-keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android
+flutter build web --release
 ```
 
-Busca la línea **SHA256:** y copia el valor, por ejemplo:
+El resultado queda en `build/web/`.
 
-```
-SHA256: A1:B2:C3:...:FF
-```
+### `_routes.json` para Flutter web
 
-Quita los dos puntos y ponlo en mayúsculas/minúsculas (no importa) en `assetlinks.json`:
+Crea `build/web/_routes.json` con:
 
 ```json
-"sha256_cert_fingerprints": [
-  "A1B2C3...FF"
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": ["/assets/*", "/.well-known/*"]
+}
+```
+
+Esto permite que GoRouter maneje rutas como `/room/<id>`.
+
+### Desplegar
+
+1. Crea otro proyecto en **Cloudflare Pages**.
+2. Sube la carpeta `build/web/` (drag & drop).
+3. Ve a **Custom domains** → agrega `app.kriptonshare.com`.
+4. Si no se crea automáticamente, agrega el registro DNS:
+   - Tipo: `CNAME`
+   - Name: `app`
+   - Target: `kriptonshare-web.pages.dev`
+
+---
+
+## 5. DNS esperado en Cloudflare
+
+| Tipo | Name | Target |
+|------|------|--------|
+| CNAME | `@` | `kriptonshare-landing.pages.dev` |
+| CNAME | `www` | `kriptonshare-landing.pages.dev` |
+| CNAME | `app` | `kriptonshare-web.pages.dev` |
+
+---
+
+## 6. Configurar CORS en Cloudflare R2
+
+Desde el dashboard de Cloudflare R2:
+
+1. Ve a tu bucket `kriptonshare-ephemeral`.
+2. Ve a la pestaña **CORS**.
+3. Agrega una regla:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://app.kriptonshare.com"],
+    "AllowedMethods": ["GET", "PUT", "DELETE"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 3000
+  }
 ]
 ```
 
-#### Para release (cuando publiques en Play Store)
-
-Usa el keystore de producción:
-
-```bash
-keytool -list -v -keystore ruta\a\tu\keystore.jks -alias tu_alias -storepass tu_password
-```
-
 ---
 
-## 5. Desplegar en Cloudflare Pages
-
-1. Ve a [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Pages**.
-2. Crea un nuevo proyecto.
-3. Sube la carpeta `kriptonshare-web` arrastrándola (drag & drop).
-4. Cloudflare te dará una URL temporal como `https://kriptonshare.pages.dev`.
-5. Ve a **Custom domains** y agrega `kriptonshare.com`.
-6. Sigue las instrucciones de Cloudflare para actualizar los DNS en Namecheap.
-
-### DNS en Namecheap (ejemplo)
-
-En el panel de Namecheap, para el dominio `kriptonshare.com`, configura:
-
-| Tipo | Host | Valor |
-|------|------|-------|
-| CNAME | @ | `kriptonshare.pages.dev` |
-| CNAME | www | `kriptonshare.pages.dev` |
-
-(O usa los registros que Cloudflare te indique exactamente.)
-
----
-
-## 6. Verificar Android App Links
+## 7. Verificar Android App Links
 
 Una vez desplegado, abre en el navegador del móvil:
 
-```
+```text
 https://kriptonshare.com/.well-known/assetlinks.json
 ```
 
@@ -240,7 +177,7 @@ Debe mostrar el JSON correctamente.
 
 Luego prueba tocar un link como:
 
-```
+```text
 https://kriptonshare.com/room/abc-123
 ```
 
@@ -248,12 +185,14 @@ Si todo está configurado, Android debería abrir KRIPTONSHARE directamente.
 
 ---
 
-## 7. Nota importante para la prueba actual
+## 8. Notas importantes
 
-Mientras configuras Cloudflare, puedes seguir probando el flujo con el link directo a la app:
-
-```
-kriptonshare://room/<id>
-```
-
-Ese link se incluye en el mensaje compartido y no requiere servidor web.
+- Mientras configuras Cloudflare, puedes seguir probando el flujo con el link directo a la app:
+  ```text
+  kriptonshare://room/<id>
+  ```
+- Para reemplazar el favicon y los iconos de la app web, sobreescribe los archivos en `web/icons/` y `web/favicon.png` con versiones redimensionadas de `assets/KRIPTONSHARE_App_Icon.png`.
+- Si usas `--dart-define` para credenciales de R2/Supabase, asegúrate de pasarlos también al build web:
+  ```bash
+  flutter build web --release --dart-define=R2_ENDPOINT=... --dart-define=R2_ACCESS_KEY_ID=... --dart-define=R2_SECRET_ACCESS_KEY=...
+  ```

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 import 'core/network/network_info.dart';
 import 'core/utils/theme.dart';
@@ -56,7 +57,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Initialize Google Mobile Ads SDK (AdMob)
-  await MobileAds.instance.initialize();
+  if (!kIsWeb) {
+    await MobileAds.instance.initialize();
+  }
   
   // Lock orientation to portrait for security
   await SystemChrome.setPreferredOrientations([

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
 import '../models/user_model.dart';
+import '../utils/constants.dart';
 
 final loggerProvider = Provider<Logger>((ref) => Logger());
 
@@ -104,6 +105,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
           'subscription_tier': 'free',
           'monthly_links_generated': 0,
           'monthly_links_reset_at': DateTime.now().toIso8601String(),
+          'total_storage_used_bytes': 0,
+          'max_storage_premium_bytes': AppConstants.premiumMaxStorageBytes,
         });
 
         final userData = await client

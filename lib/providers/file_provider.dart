@@ -71,12 +71,34 @@ class FileService {
   Future<bool> canUpload(int fileSizeBytes, String userId) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) return false;
-    if (user.isPremium) return true;
 
-    if (fileSizeBytes > AppConstants.maxFileSizeBytes) return false;
+    // 1. Validación autoritativa vía RPC (evita evasión desde clientes modificados)
+    try {
+      final result = await _client.rpc(
+        'check_upload_limits',
+        params: {'p_user_id': userId, 'p_file_size': fileSizeBytes},
+      );
+      if (result is List && result.isNotEmpty) {
+        final row = result.first as Map<String, dynamic>;
+        final allowed = row['can_upload'] as bool;
+        final message = row['message'] as String? ?? 'Límite de cuotas excedido';
+        if (!allowed) throw Exception(message);
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[canUpload] RPC error, fallback a validación cliente: $e');
+    }
+
+    // 2. Fallback cliente si la RPC no está disponible o falla
+    if (user.isPremium) {
+      if (fileSizeBytes > AppConstants.premiumMaxFileSizeBytes) return false;
+      if ((user.totalStorageUsedBytes + fileSizeBytes) > user.maxStoragePremiumBytes) return false;
+      return true;
+    }
+
+    if (fileSizeBytes > AppConstants.freeMaxFileSizeBytes) return false;
     if (user.monthlyLinksGenerated >= AppConstants.maxLinksPerMonth) return false;
 
-    // Evaluar la regla de concurrencia freemium (máximo 3 activos)
     final activeLinksRes = await _client
         .from('share_links')
         .select('id')
@@ -101,8 +123,9 @@ class FileService {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) throw Exception('Usuario no autenticado');
 
-    if (!await canUpload(fileBytes.length, user.id)) {
-      throw Exception('Límites excedidos: Máx 10MB, 20 links/mes, 3 links activos.');
+    final allowed = await canUpload(fileBytes.length, user.id);
+    if (!allowed) {
+      throw Exception('No se puede completar la subida. Verifica los límites de tu plan.');
     }
 
     // Prueba temporal de conectividad R2

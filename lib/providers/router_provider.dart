@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/splash_screen.dart';
+import '../screens/onboarding_screen.dart';
 import '../screens/auth/auth_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../features/upload/presentation/screens/upload_screen.dart';
@@ -16,7 +18,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/',
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final isAuthenticated = authState.valueOrNull != null;
       final isAuthRoute = state.matchedLocation == '/auth';
       final isSplash = state.matchedLocation == '/';
@@ -33,6 +35,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (isAuthenticated && isAuthRoute) {
+        final prefs = await SharedPreferences.getInstance();
+        final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+        if (!onboardingCompleted) return '/onboarding';
+
         final redirect = state.uri.queryParameters['redirect'];
         if (redirect != null && redirect.isNotEmpty) {
           return redirect;
@@ -52,6 +58,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => AuthScreen(
           redirectPath: state.uri.queryParameters['redirect'],
         ),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/dashboard',

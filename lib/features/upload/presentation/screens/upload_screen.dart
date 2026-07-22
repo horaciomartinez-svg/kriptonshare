@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:file_selector/file_selector.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart' show lookupMimeType;
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -42,15 +43,19 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   }
 
   Future<void> _pickFile() async {
+    final user = ref.read(authStateProvider).valueOrNull;
+    final isPremium = user?.isPremium ?? false;
+    final int maxLimit = user?.maxFileSizeBytes ?? AppConstants.freeMaxFileSizeBytes;
+
     try {
       final file = await openFile();
       if (file != null) {
         final length = await file.length();
-        if (length > AppConstants.maxFileSizeBytes) {
+        if (length > maxLimit) {
           setState(() {
             _selectedFile = null;
             _selectedFileSize = null;
-            _errorMessage = 'El archivo excede el límite de 10 MB del plan gratuito';
+            _errorMessage = 'El archivo excede el límite de ${isPremium ? "100 MB" : "10 MB"} de tu plan';
           });
           return;
         }
@@ -62,6 +67,35 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       }
     } catch (e) {
       setState(() => _errorMessage = 'Error al seleccionar archivo');
+    }
+  }
+
+  // FEATURE CRÍTICO DEL MVP: CÁMARA DIRECTA A BÓVEDA SIN TRANSITAR POR GALERÍA PÚBLICA
+  Future<void> _captureSecurePhoto() async {
+    final user = ref.read(authStateProvider).valueOrNull;
+    final isPremium = user?.isPremium ?? false;
+    final int maxLimit = user?.maxFileSizeBytes ?? AppConstants.freeMaxFileSizeBytes;
+
+    try {
+      final XFile? photo = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.rear,
+      );
+      if (photo != null) {
+        final length = await photo.length();
+        if (length > maxLimit) {
+          setState(() => _errorMessage = 'La captura excede el límite de ${isPremium ? "100 MB" : "10 MB"} de tu plan');
+          return;
+        }
+        setState(() {
+          _selectedFile = photo;
+          _selectedFileSize = length;
+          _errorMessage = null;
+        });
+      }
+    } catch (_) {
+      setState(() => _errorMessage = 'Acceso a la cámara cancelado o denegado');
     }
   }
 
@@ -120,19 +154,27 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     }
   }
 
+  // FEATURE CRÍTICO DEL MVP: SHARE SHEET NATIVO UNIFICADO MULTIPLATAFORMA
   void _shareLinkToExternal(String url) {
     ref.invalidate(userLinksProvider);
-    Share.share('Documento seguro via KRIPTONSHARE\n\n$url\n\nEste enlace expira en ${_selectedDurationHours.toInt()}h.');
+    Share.share(
+      '🔒 KRIPTONSHARE - Sala de Datos Efímera Asegurada\n\nAccede al documento protegido bajo el siguiente enlace:\n$url\n\nNota: Este canal opera bajo Conocimiento Cero (Zero-Knowledge) y es autodestructivo.',
+      subject: 'Data Room Confidencial Compartido',
+    );
   }
 
-  // === COMPONENTE COMPACTO DEL SLIDER INTERACTIVO ===
-  Widget _buildInteractiveDurationSlider() {
+  // === COMPONENTE COMPACTO DEL SLIDER INTERACTIVO (ADAPTATIVO POR TIER) ===
+  Widget _buildInteractiveDurationSlider(bool isPremium) {
+    final double maxRange = isPremium
+        ? AppConstants.premiumMaxDurationHours.toDouble() // 720h (30 días)
+        : AppConstants.freeMaxDurationHours.toDouble();   // 48h (2 días)
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: KriptonTheme.inkDeep,
         borderRadius: BorderRadius.circular(AppConstants.cardBorderRadius.toDouble()),
-        border: Border.all(color: KriptonTheme.cardBorder),
+        border: Border.all(color: isPremium ? KriptonTheme.electricLime.withOpacity(0.3) : KriptonTheme.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,8 +182,24 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text('Expiración:', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 14)),
+              Row(
+                children: [
+                  Text('Expiración:', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 14)),
+                  if (isPremium) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: KriptonTheme.electricLime.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'PREMIUM',
+                        style: TextStyle(color: KriptonTheme.electricLime, fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -151,7 +209,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                   border: Border.all(color: KriptonTheme.electricLime.withOpacity(0.5)),
                 ),
                 child: Text(
-                  '${_selectedDurationHours.toInt()}h',
+                  _selectedDurationHours >= 24
+                      ? '${(_selectedDurationHours / 24).toInt()} Días'
+                      : '${_selectedDurationHours.toInt()} Horas',
                   style: const TextStyle(color: KriptonTheme.electricLime, fontFamily: 'SFMono', fontWeight: FontWeight.bold),
                 ),
               ),
@@ -166,11 +226,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               overlayColor: KriptonTheme.electricLime.withOpacity(0.12),
             ),
             child: Slider(
-              value: _selectedDurationHours,
+              value: _selectedDurationHours.clamp(1.0, maxRange),
               min: 1.0,
-              max: AppConstants.maxDurationHours.toDouble(), // 48.0 Estricto
-              divisions: 47,
-              label: '${_selectedDurationHours.toInt()}h',
+              max: maxRange,
+              divisions: isPremium ? 29 : 47, // Días (30) o horas exactas (48)
+              label: _selectedDurationHours >= 24 ? '${(_selectedDurationHours / 24).toInt()}d' : '${_selectedDurationHours.toInt()}h',
               onChanged: (_isEncrypting || _isUploading) ? null : (value) {
                 setState(() => _selectedDurationHours = value);
               },
@@ -180,8 +240,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('1 hora', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite)),
-              Text('24h (Defecto)', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontSize: 10)),
-              Text('48 horas (Máx)', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite)),
+              if (isPremium)
+                Text('Máx 30 días', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontWeight: FontWeight.bold))
+              else ...[
+                Text('24h (Defecto)', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontSize: 10)),
+                Text('48 horas (Máx)', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite)),
+              ],
             ],
           ),
         ],
@@ -301,6 +365,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   @override
   Widget build(BuildContext context) {
     final isComplete = _shareLink != null;
+    final user = ref.watch(authStateProvider).valueOrNull;
+    final isPremium = user?.isPremium ?? false;
+
     if (_isEncrypting || _isUploading) {
       return Scaffold(body: _buildProcessingAdOverlay());
     }
@@ -329,31 +396,71 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               const SizedBox(height: 16),
             ],
             if (!isComplete) ...[
-              GestureDetector(
-                onTap: _pickFile,
-                child: Container(
-                  height: 140,
-                  decoration: BoxDecoration(
-                    color: _selectedFile == null ? KriptonTheme.inkDeep : KriptonTheme.ink,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _selectedFile == null ? KriptonTheme.cardBorder : KriptonTheme.electricLime.withOpacity(0.5)),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(_selectedFile == null ? Icons.cloud_upload_outlined : Icons.insert_drive_file, size: 40, color: _selectedFile == null ? KriptonTheme.silver : KriptonTheme.electricLime),
-                      const SizedBox(height: 8),
-                      Text(_selectedFile == null ? 'Toca para seleccionar archivo' : _selectedFile!.name, style: TextStyle(color: _selectedFile == null ? KriptonTheme.silver : KriptonTheme.platinum), textAlign: TextAlign.center),
-                      if (_selectedFile != null && _selectedFileSize != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '${(_selectedFileSize! / 1024).toStringAsFixed(1)} KB',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.silver),
+              // PANEL DUAL: SELECCIONAR ARCHIVO O CAPTURAR DESDE CÁMARA VAULT
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _pickFile,
+                      child: Container(
+                        height: 140,
+                        decoration: BoxDecoration(
+                          color: _selectedFile == null ? KriptonTheme.inkDeep : KriptonTheme.ink,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _selectedFile == null ? KriptonTheme.cardBorder : KriptonTheme.electricLime.withOpacity(0.5)),
                         ),
-                      ],
-                    ],
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(_selectedFile == null ? Icons.cloud_upload_outlined : Icons.insert_drive_file, size: 32, color: _selectedFile == null ? KriptonTheme.silver : KriptonTheme.electricLime),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                _selectedFile == null ? 'Adjuntar Archivo' : _selectedFile!.name,
+                                style: TextStyle(color: _selectedFile == null ? KriptonTheme.silver : KriptonTheme.platinum, fontSize: 12),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (_selectedFile != null && _selectedFileSize != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '${(_selectedFileSize! / 1024).toStringAsFixed(1)} KB',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.silver, fontSize: 10),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _captureSecurePhoto,
+                      child: Container(
+                        height: 140,
+                        decoration: BoxDecoration(
+                          color: KriptonTheme.inkDeep,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: KriptonTheme.cardBorder),
+                        ),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.photo_camera_outlined, size: 32, color: KriptonTheme.silver),
+                            SizedBox(height: 8),
+                            Text('Cámara a Vault', style: TextStyle(color: KriptonTheme.platinum, fontSize: 12)),
+                            SizedBox(height: 4),
+                            Text('Sin galería pública', style: TextStyle(color: KriptonTheme.graphite, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ).animate().fade(),
               const SizedBox(height: 20),
               TextFormField(
@@ -370,7 +477,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               const SizedBox(height: 20),
               
               // INYECCIÓN DEL SLIDER DINÁMICO REFACTORIZADO
-              _buildInteractiveDurationSlider(),
+              _buildInteractiveDurationSlider(isPremium),
               
               const SizedBox(height: 24),
               ElevatedButton(

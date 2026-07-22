@@ -1,5 +1,40 @@
 # KRIPTONSHARE — Memoria de sesión
 
+## 2026-07-11
+
+### Tarea
+Integrar Sprint 5 MVP (Must Have) + Plan Premium con bóveda acumulada de 2 GB, validación autoritativa en PostgreSQL y componentes UI no invasivos.
+
+### Decisiones clave
+- Validación de límites se centraliza en Supabase mediante RPC `check_upload_limits` para evitar evasión desde clientes modificados.
+- Plan Premium: 100 MB/archivo, 2 GB de bóveda acumulada, 30 días de expiración máxima.
+- Plan Free: 10 MB/archivo, 20 links/mes, 3 links activos concurrentes, 48 h máximas.
+- Se alinean usuarios Free existentes a `max_links_monthly = 20`.
+- Se agregan columnas `total_storage_used_bytes` y `max_storage_premium_bytes` a `public.users` con trigger automático de recálculo.
+- Se mantiene el esqueleto visual actual; los cambios en UploadScreen son inyecciones quirúrgicas (panel dual, slider adaptativo, share sheet mejorado).
+- Onboarding se implementa con `SharedPreferences` local y aparece una sola vez tras el primer login.
+
+### Cambios realizados
+- `supabase/migrations/20260712000000_must_have_and_premium.sql`: migración con columnas Premium, trigger de storage y función RPC `check_upload_limits` multi-tier.
+- `pubspec.yaml`: agregada dependencia `shared_preferences`.
+- `lib/utils/constants.dart` y `lib/core/utils/constants.dart`: sincronizados con constantes Free/Premium y aliases de compatibilidad.
+- `lib/models/user_model.dart`: parseo de `total_storage_used_bytes`/`max_storage_premium_bytes`, getters `maxFileSizeBytes`, `maxDurationHours`, `remainingPremiumStorageBytes`; corrección de `linksRemaining` y `canCreateLink` para usar `AppConstants.maxLinksPerMonth`.
+- `lib/providers/auth_provider.dart`: inicialización de nuevas columnas en signUp.
+- `lib/providers/file_provider.dart`: `canUpload` ahora invoca RPC `check_upload_limits` y tiene fallback cliente multi-tier.
+- `lib/features/upload/presentation/screens/upload_screen.dart`:
+  - Panel dual: seleccionar archivo + Cámara a Vault.
+  - `_captureSecurePhoto()` con `ImagePicker`, sin pasar por galería pública.
+  - `_pickFile()` adaptado por tier (10 MB / 100 MB).
+  - Slider adaptativo: Free 1–48 h, Premium 1–720 h con badge y etiquetas en días.
+  - `_shareLinkToExternal()` con mensaje corporativo Zero-Knowledge.
+- `lib/screens/onboarding_screen.dart`: pantalla de 3 slides con `PageController` y persistencia en `SharedPreferences`.
+- `lib/providers/router_provider.dart`: ruta `/onboarding` y redirect post-auth condicionado a la flag local.
+
+### Pendiente
+- Ejecutar `flutter pub get`, `flutter analyze` y `flutter build apk --debug` en el entorno Windows del usuario.
+- Aplicar migración SQL en Supabase.
+- Validar flujos E2E: Free/Premium, Cámara, Share Sheet y Onboarding.
+
 ## 2026-06-27
 
 ### Interacción
