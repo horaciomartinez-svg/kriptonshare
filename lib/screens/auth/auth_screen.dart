@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/biometric_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme.dart';
 
@@ -71,8 +72,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
         return;
       }
 
-      if (mounted && widget.redirectPath != null) {
+      if (!mounted) return;
+
+      // Si el desbloqueo biométrico está habilitado, pedirlo como segundo paso.
+      final biometricService = await BiometricService.create();
+      final biometricEnabled = biometricService.isBiometricEnabled;
+      final biometricAvailable = await biometricService.isBiometricAvailable();
+
+      if (biometricEnabled && biometricAvailable) {
+        final didAuthenticate = await biometricService.authenticate(
+          localizedReason:
+              'Verifica tu identidad para completar el inicio de sesión',
+        );
+        if (!didAuthenticate) {
+          // Si cancela la huella, cerramos la sesión recién iniciada para
+          // evitar dejar la app desbloqueada.
+          await ref.read(authStateProvider.notifier).signOut();
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Autenticación biométrica cancelada.';
+            });
+          }
+          return;
+        }
+      }
+
+      if (!mounted) return;
+
+      if (widget.redirectPath != null) {
         context.go(widget.redirectPath!);
+      } else {
+        context.go('/dashboard');
       }
     } catch (e) {
       if (mounted) {

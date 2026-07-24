@@ -1,34 +1,54 @@
 // lib/screens/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import '../../utils/theme.dart';
+import '../providers/auth_provider.dart';
+import '../utils/theme.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends ConsumerState<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    // Este controlador ahora actúa puramente como nuestro cronómetro de 2000ms
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     );
 
-    _controller.forward().then((_) {
-      Future.delayed(const Duration(milliseconds: 400), () {
-        if (mounted) context.go('/auth');
-      });
-    });
+    _controller.forward().then((_) => _resolveNextRoute());
+  }
+
+  Future<void> _resolveNextRoute() async {
+    if (!mounted) return;
+
+    // Esperar a que el provider de autenticación termine de inicializarse.
+    var authValue = ref.read(authStateProvider);
+    while (authValue is AsyncLoading) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+      authValue = ref.read(authStateProvider);
+    }
+
+    final session = authValue.valueOrNull;
+    final isAuthenticated = session != null;
+
+    if (!isAuthenticated) {
+      context.go('/auth');
+      return;
+    }
+
+    context.go('/dashboard');
   }
 
   @override
@@ -47,7 +67,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo cristalino K
               Container(
                 width: 80,
                 height: 80,
@@ -74,7 +93,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   ),
                 ),
               )
-                  .animate() // <-- Se remueve el controller, anima por defecto
+                  .animate()
                   .scale(
                     duration: 800.ms,
                     curve: Curves.easeOutCubic,
@@ -84,7 +103,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     delay: 200.ms,
                   ),
               const SizedBox(height: 32),
-              // Wordmark
               Text(
                 'KRIPTONSHARE',
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
@@ -92,7 +110,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       fontSize: 24,
                     ),
               )
-                  .animate() // <-- Independizado
+                  .animate()
                   .fade(delay: 600.ms, duration: 600.ms)
                   .slideY(
                     begin: 0.3,
@@ -102,17 +120,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     curve: Curves.easeOutCubic,
                   ),
               const SizedBox(height: 16),
-              // Tagline
               Text(
                 'Data Room Efímero',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: KriptonTheme.silver,
                     ),
               )
-                  .animate() // <-- Independizado
+                  .animate()
                   .fade(delay: 1000.ms, duration: 600.ms),
               const SizedBox(height: 48),
-              // Pulse indicator
               Container(
                 width: 8,
                 height: 8,
@@ -121,8 +137,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   borderRadius: BorderRadius.circular(4),
                 ),
               )
-                  // Mantenemos onPlay para que pulse infinitamente con su propio controlador
-                  .animate(onPlay: (c) => c.repeat()) 
+                  .animate(onPlay: (c) => c.repeat())
                   .scale(
                     duration: 1200.ms,
                     curve: Curves.easeInOut,

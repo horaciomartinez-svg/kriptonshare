@@ -98,6 +98,17 @@ CREATE POLICY file_owner_access ON files
     USING (owner_id = auth.uid())
     WITH CHECK (owner_id = auth.uid());
 
+-- Policy: Recipients can read file metadata via their share_links
+CREATE POLICY file_recipient_access ON files
+    FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM share_links
+            WHERE share_links.file_id = files.id
+              AND LOWER(share_links.recipient_email) = LOWER(auth.email())
+        )
+    );
+
 -- Index for expiry cleanup
 CREATE INDEX idx_files_expiry ON files(expires_at, status);
 CREATE INDEX idx_files_owner ON files(owner_id, created_at DESC);
@@ -127,6 +138,11 @@ CREATE POLICY link_owner_access ON share_links
     FOR ALL
     USING (created_by = auth.uid())
     WITH CHECK (created_by = auth.uid());
+
+-- Policy: Recipients can see links sent to them (fallback for direct queries)
+CREATE POLICY link_recipient_access ON share_links
+    FOR SELECT
+    USING (LOWER(recipient_email) = LOWER(auth.email()));
 
 -- Index
 CREATE INDEX idx_links_owner ON share_links(created_by, created_at DESC);
@@ -263,6 +279,60 @@ BEGIN
     RETURN QUERY SELECT TRUE, 'OK'::TEXT;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ==========================================================
+-- FUNCTION: List files received by the authenticated user
+-- ==========================================================
+CREATE OR REPLACE FUNCTION get_received_files()
+RETURNS TABLE (
+    id UUID,
+    owner_id UUID,
+    original_filename TEXT,
+    file_size_bytes INTEGER,
+    mime_type TEXT,
+    storage_provider TEXT,
+    bucket_name TEXT,
+    storage_object_key UUID,
+    created_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    max_downloads INTEGER,
+    downloads_count INTEGER,
+    status TEXT,
+    link_id UUID,
+    link_expires_at TIMESTAMPTZ,
+    recipient_email TEXT,
+    is_active BOOLEAN
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        f.id,
+        f.owner_id,
+        f.original_filename,
+        f.file_size_bytes,
+        f.mime_type,
+        f.storage_provider,
+        f.bucket_name,
+        f.storage_object_key,
+        f.created_at,
+        f.expires_at,
+        f.max_downloads,
+        f.downloads_count,
+        f.status,
+        sl.id AS link_id,
+        sl.expires_at AS link_expires_at,
+        sl.recipient_email,
+        sl.is_active
+    FROM share_links sl
+    JOIN files f ON f.id = sl.file_id
+    WHERE LOWER(sl.recipient_email) = LOWER(auth.email())
+      AND sl.is_active = TRUE
+      AND sl.expires_at > NOW()
+      AND f.status = 'active'
+      AND f.expires_at > NOW()
+    ORDER BY sl.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ==========================================================
 -- CRON: Mantenimiento autónomo diario (pg_cron + pg_partman)

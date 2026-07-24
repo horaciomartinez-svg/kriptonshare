@@ -228,9 +228,68 @@ class FileService {
   }
 
   Future<List<KriptonFile>> getReceivedFiles() async {
-    final response = await _client.rpc('get_received_files');
-    if (response == null) return [];
-    return (response as List<dynamic>).map((row) => KriptonFile.fromJson(row as Map<String, dynamic>)).toList();
+    final user = _ref.read(authStateProvider).valueOrNull;
+    debugPrint('[getReceivedFiles] Current user email: ${user?.email}');
+
+    // 1. Intentar la RPC preferida (SECURITY DEFINER, case-insensitive)
+    try {
+      final response = await _client.rpc('get_received_files');
+      debugPrint('[getReceivedFiles] RPC response: ${response ?? "null"}');
+      if (response != null) {
+        final list = (response as List<dynamic>)
+            .map((row) => KriptonFile.fromJson(row as Map<String, dynamic>))
+            .toList();
+        debugPrint('[getReceivedFiles] RPC returned ${list.length} files');
+        if (list.isNotEmpty) return list;
+      }
+    } catch (e, st) {
+      debugPrint('[getReceivedFiles] RPC failed: $e\n$st');
+    }
+
+    // 2. Fallback directo a tablas (requiere políticas RLS de receptor)
+    debugPrint('[getReceivedFiles] Falling back to direct table query');
+    try {
+      final now = DateTime.now().toIso8601String();
+      final response = await _client
+          .from('share_links')
+          .select(
+            'id, '
+            'expires_at, '
+            'recipient_email, '
+            'is_active, '
+            'files!inner(id, owner_id, original_filename, file_size_bytes, mime_type, storage_provider, bucket_name, storage_object_key, created_at, expires_at, max_downloads, downloads_count, status)',
+          )
+          .eq('is_active', true)
+          .gte('expires_at', now)
+          .filter('files.status', 'eq', 'active')
+          .filter('files.expires_at', 'gte', now)
+          .order('created_at', ascending: false);
+
+      debugPrint('[getReceivedFiles] Fallback response: ${(response as List).length} rows');
+      return response.map((row) {
+        final link = row as Map<String, dynamic>;
+        final filesValue = link['files'];
+        final Map<String, dynamic> file;
+        if (filesValue is List && filesValue.isNotEmpty) {
+          file = filesValue.first as Map<String, dynamic>;
+        } else if (filesValue is Map<String, dynamic>) {
+          file = filesValue;
+        } else {
+          file = {};
+        }
+        return KriptonFile.fromJson({
+          ...file,
+          'link_id': link['id'],
+          'link_expires_at': link['expires_at'],
+          'recipient_email': link['recipient_email'],
+          'is_active': link['is_active'],
+        });
+      }).toList();
+    } catch (e, st) {
+      debugPrint('[getReceivedFiles] Fallback failed: $e\n$st');
+    }
+
+    return [];
   }
 
   Future<KriptonFile?> getFileByLinkId(String linkId) async {

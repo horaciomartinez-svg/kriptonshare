@@ -3,9 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import 'package:local_auth/local_auth.dart';
-import 'package:local_auth/error_codes.dart' as auth_error;
 import '../../core/utils/theme.dart';
+import '../../services/biometric_service.dart';
 
 /// Pantalla de configuración de biometría (huella / Face ID).
 class BiometricSettingsScreen extends ConsumerStatefulWidget {
@@ -18,7 +17,7 @@ class BiometricSettingsScreen extends ConsumerStatefulWidget {
 
 class _BiometricSettingsScreenState
     extends ConsumerState<BiometricSettingsScreen> {
-  final LocalAuthentication _localAuth = LocalAuthentication();
+  BiometricService? _biometricService;
 
   bool _isLoading = true;
   bool _canCheckBiometrics = false;
@@ -34,13 +33,20 @@ class _BiometricSettingsScreenState
   }
 
   Future<void> _initialize() async {
+    _biometricService = await BiometricService.create();
+    _isBiometricEnabled = _biometricService?.isBiometricEnabled ?? false;
     await _checkBiometrics();
   }
 
   Future<void> _checkBiometrics() async {
+    if (_biometricService == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
     try {
-      final canCheck = await _localAuth.canCheckBiometrics;
-      final available = await _localAuth.getAvailableBiometrics();
+      final canCheck = await _biometricService!.canCheckBiometrics();
+      final available = await _biometricService!.getAvailableBiometrics();
 
       setState(() {
         _canCheckBiometrics = canCheck;
@@ -59,49 +65,31 @@ class _BiometricSettingsScreenState
   }
 
   Future<void> _authenticate() async {
+    if (_biometricService == null) return;
     if (!_canCheckBiometrics || _availableBiometrics.isEmpty) {
-      _showStatus('No hay biometría disponible en este dispositivo.', isError: true);
+      _showStatus('No hay biometría disponible en este dispositivo.',
+          isError: true);
       return;
     }
 
     try {
-      final didAuthenticate = await _localAuth.authenticate(
-        localizedReason: 'Verifica tu identidad para acceder a KRIPTONSHARE',
-        options: const AuthenticationOptions(
-          biometricOnly: false,
-          stickyAuth: true,
-          useErrorDialogs: true,
-        ),
-      );
+      final didAuthenticate = await _biometricService!.authenticate();
 
       if (didAuthenticate) {
         _showStatus('Autenticación biométrica exitosa.', isError: false);
       } else {
         _showStatus('Autenticación cancelada.', isError: true);
       }
-    } on PlatformException catch (e) {
-      String message;
-      switch (e.code) {
-        case auth_error.notAvailable:
-          message = 'La biometría no está disponible.';
-          break;
-        case auth_error.notEnrolled:
-          message = 'No hay biometría configurada en el dispositivo.';
-          break;
-        case auth_error.passcodeNotSet:
-          message = 'No hay PIN/patrón configurado.';
-          break;
-        case auth_error.lockedOut:
-          message = 'Demasiados intentos fallidos. Intenta más tarde.';
-          break;
-        default:
-          message = 'Error de autenticación: ${e.message}';
-      }
-      _showStatus(message, isError: true);
+    } catch (e) {
+      _showStatus(
+        e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
     }
   }
 
   void _showStatus(String message, {required bool isError}) {
+    if (!mounted) return;
     setState(() {
       _statusMessage = message;
       _statusIsError = isError;
@@ -116,17 +104,47 @@ class _BiometricSettingsScreenState
     });
   }
 
-  void _toggleBiometric(bool value) {
-    setState(() {
-      _isBiometricEnabled = value;
-    });
+  Future<void> _toggleBiometric(bool value) async {
+    if (_biometricService == null) return;
 
-    _showStatus(
-      value
-          ? 'Desbloqueo biométrico activado para KRIPTONSHARE.'
-          : 'Desbloqueo biométrico desactivado.',
-      isError: false,
-    );
+    if (value) {
+      // Antes de activar el desbloqueo biométrico, exige una autenticación
+      // exitosa para confirmar que el usuario controla el dispositivo.
+      if (!_canCheckBiometrics || _availableBiometrics.isEmpty) {
+        _showStatus('No hay biometría disponible en este dispositivo.',
+            isError: true);
+        return;
+      }
+
+      try {
+        final didAuthenticate = await _biometricService!.authenticate(
+          localizedReason:
+              'Confirma tu huella o rostro para activar el desbloqueo biométrico',
+        );
+
+        if (!didAuthenticate) {
+          _showStatus('No se pudo activar: autenticación cancelada.',
+              isError: true);
+          return;
+        }
+
+        await _biometricService!.setBiometricEnabled(true);
+        setState(() => _isBiometricEnabled = true);
+        _showStatus(
+          'Desbloqueo biométrico activado. Se pedirá después de iniciar sesión.',
+          isError: false,
+        );
+      } catch (e) {
+        _showStatus(
+          e.toString().replaceFirst('Exception: ', ''),
+          isError: true,
+        );
+      }
+    } else {
+      await _biometricService!.setBiometricEnabled(false);
+      setState(() => _isBiometricEnabled = false);
+      _showStatus('Desbloqueo biométrico desactivado.', isError: false);
+    }
   }
 
   IconData _biometricIcon() {

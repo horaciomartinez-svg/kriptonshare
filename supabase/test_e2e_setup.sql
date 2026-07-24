@@ -197,7 +197,7 @@ BEGIN
         sl.is_active
     FROM share_links sl
     JOIN files f ON f.id = sl.file_id
-    WHERE sl.recipient_email = auth.email()
+    WHERE LOWER(sl.recipient_email) = LOWER(auth.email())
       AND sl.is_active = TRUE
       AND sl.expires_at > NOW()
       AND f.status = 'active'
@@ -205,6 +205,39 @@ BEGIN
     ORDER BY sl.created_at DESC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ------------------------------------------------------------
+-- 5b. Políticas RLS para que receptores puedan listar archivos recibidos
+-- ------------------------------------------------------------
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public' AND tablename = 'share_links' AND policyname = 'link_recipient_access'
+    ) THEN
+        CREATE POLICY "link_recipient_access"
+        ON share_links FOR SELECT
+        USING (LOWER(recipient_email) = LOWER(auth.email()));
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public' AND tablename = 'files' AND policyname = 'file_recipient_access'
+    ) THEN
+        CREATE POLICY "file_recipient_access"
+        ON files FOR SELECT
+        USING (
+            EXISTS (
+                SELECT 1 FROM share_links
+                WHERE share_links.file_id = files.id
+                  AND LOWER(share_links.recipient_email) = LOWER(auth.email())
+            )
+        );
+    END IF;
+END $$;
 
 -- ------------------------------------------------------------
 -- 6. Tabla de telemetría de interacción con documentos

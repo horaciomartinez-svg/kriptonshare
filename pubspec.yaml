@@ -19,6 +19,7 @@ dependencies:
   
   # PDF Viewer nativo para abrir documentos descifrados dentro de la app
   pdfrx: ^1.1.24
+  open_filex: ^4.6.0
   
   # State Management
   flutter_riverpod: ^2.5.1

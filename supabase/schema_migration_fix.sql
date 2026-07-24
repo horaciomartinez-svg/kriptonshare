@@ -209,6 +209,93 @@ BEGIN
     END IF;
 END $$;
 
+-- ------------------------------------------------------------
+-- 6. Políticas RLS para que receptores puedan ver links y metadatos de archivos
+-- ------------------------------------------------------------
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public' AND tablename = 'share_links' AND policyname = 'link_recipient_access'
+    ) THEN
+        CREATE POLICY "link_recipient_access"
+        ON public.share_links FOR SELECT
+        USING (LOWER(recipient_email) = LOWER(auth.email()));
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public' AND tablename = 'files' AND policyname = 'file_recipient_access'
+    ) THEN
+        CREATE POLICY "file_recipient_access"
+        ON public.files FOR SELECT
+        USING (
+            EXISTS (
+                SELECT 1 FROM public.share_links
+                WHERE public.share_links.file_id = public.files.id
+                  AND LOWER(public.share_links.recipient_email) = LOWER(auth.email())
+            )
+        );
+    END IF;
+END $$;
+
+-- ------------------------------------------------------------
+-- 7. Función RPC para listar archivos recibidos (case-insensitive)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_received_files()
+RETURNS TABLE (
+    id UUID,
+    owner_id UUID,
+    original_filename TEXT,
+    file_size_bytes INTEGER,
+    mime_type TEXT,
+    storage_provider TEXT,
+    bucket_name TEXT,
+    storage_object_key UUID,
+    created_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    max_downloads INTEGER,
+    downloads_count INTEGER,
+    status TEXT,
+    link_id UUID,
+    link_expires_at TIMESTAMPTZ,
+    recipient_email TEXT,
+    is_active BOOLEAN
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        f.id,
+        f.owner_id,
+        f.original_filename,
+        f.file_size_bytes,
+        f.mime_type,
+        f.storage_provider,
+        f.bucket_name,
+        f.storage_object_key,
+        f.created_at,
+        f.expires_at,
+        f.max_downloads,
+        f.downloads_count,
+        f.status,
+        sl.id AS link_id,
+        sl.expires_at AS link_expires_at,
+        sl.recipient_email,
+        sl.is_active
+    FROM public.share_links sl
+    JOIN public.files f ON f.id = sl.file_id
+    WHERE LOWER(sl.recipient_email) = LOWER(auth.email())
+      AND sl.is_active = TRUE
+      AND sl.expires_at > NOW()
+      AND f.status = 'active'
+      AND f.expires_at > NOW()
+    ORDER BY sl.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Verificación rápida
 SELECT 'files columns:' AS info, column_name, data_type
 FROM information_schema.columns

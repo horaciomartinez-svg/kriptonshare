@@ -1,5 +1,28 @@
 # KRIPTONSHARE — Memoria de sesión
 
+## 2026-07-23
+
+### Problema
+El receptor no ve archivos recibidos en el Dashboard aunque el link no haya caducado.
+
+### Causas
+- `get_received_files()` no estaba en `schema.sql` ni en `schema_migration_fix.sql`; solo en `test_e2e_setup.sql`.
+- La comparación `recipient_email = auth.email()` era case-sensitive.
+- Faltaban políticas RLS que permitan al receptor leer `share_links` y `files`.
+
+### Cambios
+- Función `get_received_files()` case-insensitive agregada a `schema.sql` y `schema_migration_fix.sql`.
+- Políticas `link_recipient_access` y `file_recipient_access` agregadas a los tres archivos SQL.
+- `lib/providers/file_provider.dart`: logs de diagnóstico y fallback directo a tablas si la RPC falla.
+
+### Acción pendiente del usuario
+Aplicar `supabase/schema_migration_fix.sql` en Supabase SQL Editor y recompilar/probar en Android.
+
+### Soporte de imágenes y Office (2026-07-23)
+- Imágenes: sí, se visualizan dentro de la app.
+- Office (Word/Excel/PowerPoint): no; el visor muestra "Formato protegido" y recomienda convertir a PDF.
+- Seguridad reforzada: se eliminaron los botones de "Abrir con otra aplicación" para PDF y se bloqueó el menú contextual de guardar en imágenes.
+
 ## 2026-07-11
 
 ### Tarea

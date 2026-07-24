@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +36,10 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   final _passwordController = TextEditingController();
   final _pdfController = PdfViewerController();
 
+  // Fallback si pdfrx no logra renderizar el PDF.
+  bool _pdfRenderFailed = false;
+  Timer? _pdfLoadTimer;
+
   // Tracking de telemetría por página.
   int? _currentPage;
   DateTime? _pageStartTime;
@@ -52,6 +58,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
   @override
   void dispose() {
+    _pdfLoadTimer?.cancel();
     _flushPageView();
     _pdfController.removeListener(_onPdfPageChanged);
     ScreenshotService.disableSecureView();
@@ -121,25 +128,60 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     final linkId = widget.linkId!;
 
     try {
+      debugPrint('[VIEWER] Iniciando descarga y descifrado para linkId=$linkId');
+      debugPrint('[VIEWER] Archivo: ${_file!.originalFilename} (${_file!.mimeType})');
+
       final decrypted = await fileService.downloadAndDecryptFile(
         _file!,
         _passwordController.text,
         linkId: linkId,
       );
 
+      debugPrint('[VIEWER] Descifrado exitoso: ${decrypted.length} bytes');
+
+      if (!mounted) return;
+
+      setState(() {
+        _decryptedBytes = decrypted;
+        _pdfRenderFailed = false;
+        _status = _ViewerStatus.viewing;
+      });
+
+      // Si el PDF no se renderiza en 3 segundos, ofrecer fallback externo.
+      if (_file!.mimeType == 'application/pdf') {
+        _pdfLoadTimer?.cancel();
+        _pdfLoadTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted && !_pdfController.isReady) {
+            debugPrint('[VIEWER] El PDF no se renderizó a tiempo, activando fallback');
+            setState(() => _pdfRenderFailed = true);
+          }
+        });
+      }
+
+      // Reforzar FLAG_SECURE justo antes de mostrar contenido sensible.
+      await ScreenshotService.enableSecureView();
+      // Registrar que el receptor descifró el archivo.
+      await _logEvent('download_complete');
+      // Iniciar tracking de la primera página/vista.
+      _startPageTracking(1);
+    } on FormatException catch (e) {
+      debugPrint('[VIEWER] Error de formato al descifrar: $e');
       if (mounted) {
         setState(() {
-          _decryptedBytes = decrypted;
-          _status = _ViewerStatus.viewing;
+          _status = _ViewerStatus.password;
+          _errorMessage = 'El archivo descifrado no es válido. Verifica la contraseña.';
         });
-        // Reforzar FLAG_SECURE justo antes de mostrar contenido sensible.
-        await ScreenshotService.enableSecureView();
-        // Registrar que el receptor descifró el archivo.
-        await _logEvent('download_complete');
-        // Iniciar tracking de la primera página/vista.
-        _startPageTracking(1);
+      }
+    } on ArgumentError catch (e) {
+      debugPrint('[VIEWER] Error de argumentos al descifrar: $e');
+      if (mounted) {
+        setState(() {
+          _status = _ViewerStatus.password;
+          _errorMessage = 'Datos de archivo incompletos o corruptos.';
+        });
       }
     } catch (e) {
+      debugPrint('[VIEWER] Error general al descifrar: $e');
       if (mounted) {
         setState(() {
           _status = _ViewerStatus.password;
@@ -194,6 +236,14 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     final page = _pdfController.pageNumber;
     if (page != null && page > 0) {
       _changePage(page);
+    }
+    // Si el PDF ya renderizó, cancelamos el timer de fallback.
+    if (_pdfController.isReady) {
+      _pdfLoadTimer?.cancel();
+      _pdfLoadTimer = null;
+      if (_pdfRenderFailed && mounted) {
+        setState(() => _pdfRenderFailed = false);
+      }
     }
   }
 
@@ -376,11 +426,17 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
     Widget content;
     if (mimeType.startsWith('image/')) {
+      // El GestureDetector con onLongPressStart vacío intercepta el menú
+      // contextual nativo de guardar/compartir imagen.
       content = InteractiveViewer(
-        child: Center(
-          child: Image.memory(
-            _decryptedBytes!,
-            fit: BoxFit.contain,
+        child: GestureDetector(
+          onLongPressStart: (_) {},
+          behavior: HitTestBehavior.opaque,
+          child: Center(
+            child: Image.memory(
+              _decryptedBytes!,
+              fit: BoxFit.contain,
+            ),
           ),
         ),
       );
@@ -398,17 +454,43 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         ),
       );
     } else if (mimeType == 'application/pdf') {
-      // PDF: visor nativo dentro de la app; no se permite compartir ni descargar.
-      content = PdfViewer.data(
-        _decryptedBytes!,
-        sourceName: _file!.originalFilename,
-        controller: _pdfController,
-        params: const PdfViewerParams(
-          backgroundColor: KriptonTheme.charcoalBlack,
+      // PDF: visor nativo dentro de la app; no se permite compartir, descargar
+      // ni abrir con aplicaciones externas.
+      final pdfParams = PdfViewerParams(
+        backgroundColor: KriptonTheme.charcoalBlack,
+        errorBannerBuilder: (context, error, stackTrace, documentRef) {
+          debugPrint('[VIEWER] Error renderizando PDF: $error');
+          return _buildPdfFallback(
+            'No se pudo abrir el PDF:\n${error.toString()}',
+          );
+        },
+        loadingBannerBuilder: (context, bytesDownloaded, totalBytes) =>
+            const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation(KriptonTheme.electricLime),
+          ),
         ),
       );
+
+      if (_pdfRenderFailed) {
+        content = _buildPdfFallback(
+          'El visor nativo no pudo mostrar este PDF. Por seguridad no se permite abrirlo fuera de la app.',
+        );
+      } else {
+        // Usamos PdfViewer.data para evitar problemas de URI de archivo
+        // en algunos dispositivos Android.
+        content = PdfViewer.data(
+          key: ValueKey(_file!.id),
+          _decryptedBytes!,
+          sourceName: _file!.originalFilename,
+          controller: _pdfController,
+          useProgressiveLoading: false,
+          params: pdfParams,
+        );
+      }
     } else {
-      // Otros formatos: solo confirmación de descifrado, sin opciones de exportación.
+      // Formatos no visualizables de forma segura (Word, Excel, PowerPoint, etc.)
+      // No se ofrece abrir con app externa para evitar fugas de confidencialidad.
       content = Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -416,13 +498,13 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Icon(
-              Icons.check_circle,
+              Icons.lock_outline,
               size: 64,
-              color: KriptonTheme.cryptoGreen,
+              color: KriptonTheme.electricLime,
             ),
             const SizedBox(height: 24),
             Text(
-              'Documento descifrado',
+              'Formato protegido',
               style: Theme.of(context).textTheme.displayLarge,
               textAlign: TextAlign.center,
             ),
@@ -443,16 +525,19 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            const Icon(
-              Icons.lock_outline,
-              color: KriptonTheme.electricLime,
-              size: 32,
+            Text(
+              'Los documentos de Microsoft Office y otros formatos no se visualizan directamente dentro de la app por seguridad.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: KriptonTheme.silver,
+                  ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             Text(
-              'Este documento no puede ser compartido ni descargado.',
+              'Para compartir este contenido de forma segura, conviértelo a PDF antes de subirlo.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: KriptonTheme.silver,
+                    color: KriptonTheme.platinum,
+                    fontWeight: FontWeight.w600,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -463,7 +548,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
     return Stack(
       children: [
-        content,
+        // El visor debe ocupar todo el espacio disponible.
+        Positioned.fill(child: content),
         // Watermark overlay
         Positioned.fill(
           child: IgnorePointer(
@@ -474,7 +560,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               child: CustomPaint(
                 painter: WatermarkPainter(
                   text: 'KRIPTONSHARE | CONFIDENCIAL',
-                  opacity: 0.12,
+                  opacity: 0.18,
                 ),
               ),
             ),
@@ -515,6 +601,36 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPdfFallback(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Icon(
+              Icons.picture_as_pdf_outlined,
+              size: 64,
+              color: KriptonTheme.alertRed,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: KriptonTheme.silver),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => context.go('/dashboard'),
+              child: const Text('Volver al inicio'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

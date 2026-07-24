@@ -17,7 +17,8 @@ android {
 
     defaultConfig {
         applicationId = "com.kriptonshare.app"
-        minSdk = flutter.minSdkVersion
+        // local_auth requiere minSdk 23 para biometric nativo estable.
+        minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
