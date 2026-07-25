@@ -167,6 +167,18 @@ class _AnalyticsDashboardScreenState
                 .animate()
                 .fade(delay: 300.ms, duration: 400.ms),
           ],
+
+          const SizedBox(height: 32),
+
+          // Link to expired links
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => context.push('/expired-links'),
+              icon: const Icon(Icons.timer_off),
+              label: const Text('Ver enlaces expirados'),
+            ),
+          ),
         ],
       ),
     );

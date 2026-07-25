@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/network/network_info.dart';
-import '../../services/crypto_service.dart';
 import 'data/datasources/supabase_upload_datasource.dart';
 import 'data/repositories/upload_repository_impl.dart';
 import 'domain/repositories/i_upload_repository.dart';
@@ -17,7 +16,6 @@ final uploadDataSourceProvider = Provider<SupabaseUploadDataSource>((ref) {
 final uploadRepositoryProvider = Provider<IUploadRepository>((ref) {
   return UploadRepositoryImpl(
     dataSource: ref.watch(uploadDataSourceProvider),
-    cryptoService: CryptoService(),
     networkInfo: NetworkInfoImpl(),
   );
 });

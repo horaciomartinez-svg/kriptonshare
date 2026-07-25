@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:dartz/dartz.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +10,7 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../services/crypto_service.dart';
 import '../../../../utils/constants.dart';
+
 import '../../domain/entities/upload_result_entity.dart';
 import '../../domain/repositories/i_upload_repository.dart';
 import '../datasources/supabase_upload_datasource.dart';
@@ -16,17 +18,14 @@ import '../datasources/supabase_upload_datasource.dart';
 /// Implementación del repositorio de subida con cifrado local y Supabase.
 class UploadRepositoryImpl implements IUploadRepository {
   final SupabaseUploadDataSource _dataSource;
-  final CryptoService _cryptoService;
   final NetworkInfo _networkInfo;
   final Uuid _uuid;
 
   UploadRepositoryImpl({
     required SupabaseUploadDataSource dataSource,
-    required CryptoService cryptoService,
     required NetworkInfo networkInfo,
     Uuid? uuid,
   })  : _dataSource = dataSource,
-        _cryptoService = cryptoService,
         _networkInfo = networkInfo,
         _uuid = uuid ?? const Uuid();
 
@@ -48,11 +47,12 @@ class UploadRepositoryImpl implements IUploadRepository {
     }
 
     try {
-      // 2. Cifrar archivo localmente
-      final encrypted = await _cryptoService.encryptFile(
-        fileBytes: fileBytes,
-        password: password,
-      );
+      // 2. Cifrar archivo localmente en un Isolate para no bloquear la UI
+      //    con archivos grandes (p. ej. video).
+      final encrypted = await Isolate.run(() => encryptFileInIsolate({
+        'fileBytes': fileBytes,
+        'password': password,
+      }));
 
       final salt = encrypted['salt'] as List<int>;
       final nonce = encrypted['nonce'] as List<int>;

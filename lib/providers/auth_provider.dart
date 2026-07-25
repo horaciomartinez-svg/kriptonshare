@@ -66,7 +66,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
         password: password,
       );
 
-      if (response.user == null) {
+      final user = response.user;
+      if (user == null) {
         throw const AuthException('No se pudo iniciar sesión');
       }
 
@@ -74,9 +75,24 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
         final userData = await client
             .from('users')
             .select()
-            .eq('id', response.user!.id)
+            .eq('id', user.id)
             .single();
         state = AsyncValue.data(KriptonUser.fromJson(userData));
+      } on PostgrestException catch (e) {
+        // Si el registro no existe, intentar crearlo automáticamente.
+        // Esto suele ocurrir cuando el UUID en public.users no coincide
+        // con auth.users (p. ej. usuario recreado en Auth).
+        if (e.code == 'PGRST116') {
+          await _ensureUserRecord(client, user.id, email);
+          final userData = await client
+              .from('users')
+              .select()
+              .eq('id', user.id)
+              .single();
+          state = AsyncValue.data(KriptonUser.fromJson(userData));
+        } else {
+          rethrow;
+        }
       } catch (e) {
         throw Exception(
           'Usuario autenticado pero no encontrado en la tabla users. '
@@ -142,6 +158,45 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
       state = AsyncValue.data(KriptonUser.fromJson(userData));
     } catch (e) {
       // Silently fail refresh
+    }
+  }
+
+  /// Crea el registro de usuario en public.users si no existe.
+  /// Útil cuando el UUID en auth.users no coincide con public.users.
+  Future<void> _ensureUserRecord(SupabaseClient client, String userId, String email) async {
+    try {
+      await client.from('users').insert({
+        'id': userId,
+        'email': email,
+        'subscription_tier': 'free',
+        'monthly_links_generated': 0,
+        'monthly_links_reset_at': DateTime.now().toIso8601String(),
+        'total_storage_used_bytes': 0,
+        'max_storage_premium_bytes': AppConstants.premiumMaxStorageBytes,
+        'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
+      });
+    } on PostgrestException catch (e) {
+      // Si ya existe (por race condition), ignorar.
+      if (e.code != '23505') rethrow;
+    }
+  }
+
+  /// Modo prueba Premium: activa/desactiva tier premium directamente en Supabase
+  /// sin pasar por RevenueCat. Solo disponible en debug builds.
+  Future<void> setPremiumSimulation(bool enabled) async {
+    try {
+      final client = _ref.read(supabaseClientProvider);
+      final currentUser = client.auth.currentUser;
+      if (currentUser == null) return;
+
+      await client.from('users').update({
+        'subscription_tier': enabled ? 'premium' : 'free',
+        'max_storage_bytes': enabled ? PremiumLimits.premiumBaseStorageBytes : 0,
+      }).eq('id', currentUser.id);
+
+      await refreshUser();
+    } catch (e) {
+      // Silently fail
     }
   }
 }

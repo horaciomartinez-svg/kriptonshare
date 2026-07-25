@@ -15,10 +15,6 @@ class SecureCredentialService {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
-      keyCipherAlgorithm:
-          KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
-      storageCipherAlgorithm:
-          StorageCipherAlgorithm.AES_GCM_NoPadding,
     ),
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock_this_device,

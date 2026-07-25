@@ -1,5 +1,35 @@
 # KRIPTONSHARE — Memoria de sesión
 
+## 2026-07-24
+
+### Tarea
+1. Optimizar cifrado/subida moviéndolo a un Isolate para archivos grandes (video).
+2. Eliminar recuadros de enlaces expirados del Dashboard.
+3. Agregar pantalla aparte de enlaces expirados accesible desde Analytics.
+
+### Cambios realizados
+- `lib/services/crypto_service.dart`: función top-level `encryptFileInIsolate()` para ejecutar AES-256-GCM + PBKDF2 fuera del hilo de UI.
+- `lib/providers/file_provider.dart` y `lib/features/upload/data/repositories/upload_repository_impl.dart`: cifrado movido a `Isolate.run()` en ambos flujos de subida.
+- `lib/screens/dashboard/dashboard_screen.dart`: filtro `isActive && !expired` en "Enlaces activos".
+- `lib/features/links/presentation/screens/expired_links_screen.dart`: lista básica de enlaces expirados (nombre, tamaño, fecha).
+- `lib/providers/file_provider.dart`: `ExpiredLinkItem`, `expiredLinksProvider` y `getExpiredLinksWithMetadata()`.
+- `lib/providers/router_provider.dart`: ruta `/expired-links`.
+- `lib/features/analytics/presentation/screens/analytics_dashboard_screen.dart`: botón "Ver enlaces expirados" al final.
+- `pubspec.yaml`: agregada `flutter_secure_storage: ^9.2.2`.
+- `lib/services/secure_credential_service.dart`: ajustado a API de `flutter_secure_storage` v8 y cambiado `const` a `final`.
+- `lib/features/data_room/presentation/screens/data_room_lobby_screen.dart`: llaves en `if` de `_iconForMime`.
+- `lib/features/data_room/presentation/screens/storage_management_screen.dart`: `mounted` check separado antes de usar `BuildContext`.
+- `lib/providers/file_provider.dart`: cast innecesario eliminado.
+- `lib/widgets/video_player_screen.dart`: llaves innecesarias eliminadas en string interpolation.
+- `lib/screens/biometric/biometric_lock_screen.dart`: agregado import de `secure_credential_service.dart`.
+- `android/app/build.gradle.kts`: `compileSdk` fijado a 36 para `flutter_secure_storage`.
+- `lib/providers/auth_provider.dart`: fallback en `signIn` para crear registro en `public.users` si falta.
+- `lib/providers/file_provider.dart`: fallback de `getReceivedFiles` filtra por `recipient_email ilike user.email`.
+
+### Pendiente
+- Ejecutar `flutter pub get`, `flutter analyze` y `flutter run` en el entorno del usuario.
+- Validar subida de video grande sin congelamiento de UI.
+
 ## 2026-07-23
 
 ### Problema
@@ -30,6 +60,10 @@ Aplicar `supabase/schema_migration_fix.sql` en Supabase SQL Editor y recompilar/
 - Lazy Decryption en `FolderNotifier` y método `decryptFileBytes` en `CryptoService`.
 - Rutas `/storage-management` y `/folder-room/:folderLinkId` agregadas al router.
 - FLAG_SECURE ahora es global para toda la app.
+- Modo prueba Premium (debug) activable desde StorageManagementScreen sin RevenueCat.
+- Corrección: eliminado `dispose()` de `PdfViewerController` por incompatibilidad con `pdfrx ^1.3.5`.
+- Soporte de video: `video_player` + `SecureVideoPlayerScreen`; reproducir MP4 y formatos comunes dentro de la app.
+- Timeouts de Dio aumentados para descargas de archivos grandes.
 - Pendiente: configuración de RevenueCat (API keys, productos, webhook) y pruebas E2E.
 
 ## 2026-07-11

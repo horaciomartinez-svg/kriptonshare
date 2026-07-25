@@ -56,7 +56,13 @@ class FolderNotifier extends StateNotifier<FolderScreenState> {
     CryptoService? cryptoService,
   })  : _folderRepository = folderRepository,
         _cryptoService = cryptoService ?? CryptoService(),
-        _dio = Dio(),
+        _dio = Dio(
+          BaseOptions(
+            connectTimeout: const Duration(seconds: 30),
+            receiveTimeout: const Duration(minutes: 5),
+            sendTimeout: const Duration(minutes: 5),
+          ),
+        ),
         _r2Signer = const R2SignatureService(
           accessKeyId: AppConstants.r2AccessKeyId,
           secretAccessKey: AppConstants.r2SecretAccessKey,

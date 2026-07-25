@@ -10,6 +10,7 @@ import '../../../../models/user_model.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/screenshot_service.dart';
 import '../../../../utils/theme.dart';
+import '../../../../widgets/video_player_screen.dart';
 import '../../domain/repositories/i_folder_repository.dart';
 import '../../folder_providers.dart';
 import '../notifiers/folder_notifier.dart';
@@ -57,8 +58,8 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
   @override
   void dispose() {
     _passwordController.dispose();
-    _pdfController.dispose();
-    ScreenshotService.disableSecureView();
+    // No deshabilitamos FLAG_SECURE: ahora es global para toda la app.
+    // PdfViewerController no requiere dispose() en esta versión de pdfrx.
     super.dispose();
   }
 
@@ -69,13 +70,17 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
 
   IconData _iconForMime(String mime) {
     if (mime.startsWith('image/')) return Icons.image;
+    if (mime.startsWith('video/')) return Icons.videocam;
     if (mime == 'application/pdf') return Icons.picture_as_pdf;
-    if (mime.contains('spreadsheet') || mime.contains('excel'))
+    if (mime.contains('spreadsheet') || mime.contains('excel')) {
       return Icons.table_chart;
-    if (mime.contains('presentation') || mime.contains('powerpoint'))
+    }
+    if (mime.contains('presentation') || mime.contains('powerpoint')) {
       return Icons.slideshow;
-    if (mime.contains('word') || mime.contains('document'))
+    }
+    if (mime.contains('word') || mime.contains('document')) {
       return Icons.description;
+    }
     return Icons.insert_drive_file;
   }
 
@@ -285,6 +290,39 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
             color: KriptonTheme.platinum,
             fontSize: 14,
             height: 1.5,
+          ),
+        ),
+      );
+    }
+
+    if (mime.startsWith('video/')) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.videocam,
+                size: 64,
+                color: KriptonTheme.electricLime,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SecureVideoPlayerScreen(
+                        videoBytes: bytes,
+                        fileName: file.originalFilename,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Reproducir video'),
+              ),
+            ],
           ),
         ),
       );

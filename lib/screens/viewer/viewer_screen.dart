@@ -14,6 +14,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/file_provider.dart';
 import '../../services/screenshot_service.dart';
 import '../../utils/theme.dart';
+import '../../widgets/video_player_screen.dart';
 
 /// Estados del visor seguro.
 enum _ViewerStatus { loading, password, decrypting, viewing, error }
@@ -488,6 +489,45 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           params: pdfParams,
         );
       }
+    } else if (mimeType.startsWith('video/')) {
+      // Video: se reproduce dentro de la app; el archivo temporal se elimina al cerrar.
+      content = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(
+                Icons.videocam,
+                size: 64,
+                color: KriptonTheme.electricLime,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Video descifrado',
+                style: Theme.of(context).textTheme.displayLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SecureVideoPlayerScreen(
+                        videoBytes: _decryptedBytes!,
+                        fileName: _file!.originalFilename,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Reproducir video'),
+              ),
+            ],
+          ),
+        ),
+      );
     } else {
       // Formatos no visualizables de forma segura (Word, Excel, PowerPoint, etc.)
       // No se ofrece abrir con app externa para evitar fugas de confidencialidad.

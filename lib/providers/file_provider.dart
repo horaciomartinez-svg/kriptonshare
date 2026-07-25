@@ -1,4 +1,5 @@
 // lib/providers/file_provider.dart
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -25,6 +26,27 @@ final receivedFilesProvider = FutureProvider.autoDispose<List<KriptonFile>>((ref
   return ref.watch(fileServiceProvider).getReceivedFiles();
 });
 
+final expiredLinksProvider = FutureProvider.autoDispose<List<ExpiredLinkItem>>((ref) async {
+  final user = ref.watch(authStateProvider).valueOrNull;
+  if (user == null) throw Exception('Usuario no autenticado');
+  return ref.watch(fileServiceProvider).getExpiredLinksWithMetadata();
+});
+
+/// Item resumido de un enlace expirado para la lista de Analytics.
+class ExpiredLinkItem {
+  final String linkId;
+  final String fileName;
+  final int fileSizeBytes;
+  final DateTime expiredAt;
+
+  const ExpiredLinkItem({
+    required this.linkId,
+    required this.fileName,
+    required this.fileSizeBytes,
+    required this.expiredAt,
+  });
+}
+
 class FileService {
   final Ref _ref;
   final _uuid = const Uuid();
@@ -37,6 +59,9 @@ class FileService {
       secretAccessKey: AppConstants.r2SecretAccessKey,
       endpoint: AppConstants.r2Endpoint,
     );
+    _dio.options.connectTimeout = const Duration(seconds: 30);
+    _dio.options.receiveTimeout = const Duration(minutes: 5);
+    _dio.options.sendTimeout = const Duration(minutes: 5);
   }
 
   SupabaseClient get _client => _ref.read(supabaseClientProvider);
@@ -131,22 +156,28 @@ class FileService {
     // Prueba temporal de conectividad R2
     await testR2Connection();
 
-    // 1. Encriptación local Zero-Knowledge (AES-256-GCM)
-    final cryptoService = CryptoService();
-    final encrypted = await cryptoService.encryptFile(
-      fileBytes: fileBytes,
-      password: userPassword,
-    );
+    // 1. Encriptación local Zero-Knowledge (AES-256-GCM) en Isolate
+    //    para no bloquear el hilo de UI con archivos grandes.
+    final encrypted = await Isolate.run(() => encryptFileInIsolate({
+      'fileBytes': fileBytes,
+      'password': userPassword,
+    }));
+
+    final salt = (encrypted['salt'] as Uint8List).toList();
+    final nonce = (encrypted['nonce'] as Uint8List).toList();
+    final ciphertext = (encrypted['ciphertext'] as Uint8List).toList();
+    final authTag = (encrypted['authTag'] as Uint8List).toList();
+    final key = (encrypted['key'] as Uint8List).toList();
 
     final storageKey = _uuid.v4();
     final fileId = _uuid.v4();
     final linkId = _uuid.v4();
 
     final encryptedBytes = Uint8List.fromList([
-      ...(encrypted['salt'] as List<int>),
-      ...(encrypted['nonce'] as List<int>),
-      ...(encrypted['ciphertext'] as List<int>),
-      ...(encrypted['authTag'] as List<int>),
+      ...salt,
+      ...nonce,
+      ...ciphertext,
+      ...authTag,
     ]);
 
     // 2. SUBIDA DIRECTA A CLOUDFLARE R2 REST ENDPOINT (S3-compatible, firmada SigV4)
@@ -185,11 +216,11 @@ class FileService {
       'bucket_name': AppConstants.bucketName,
       'storage_object_key': storageKey,
       'object_path': storageKey,
-      'aes_key_encrypted': encrypted['key'] as List<dynamic>,
-      'salt': encrypted['salt'] as List<dynamic>,
-      'encryption_salt': encrypted['salt'] as List<dynamic>,
-      'nonce': encrypted['nonce'] as List<dynamic>,
-      'mac_tag': encrypted['authTag'] as List<dynamic>,
+      'aes_key_encrypted': key,
+      'salt': salt,
+      'encryption_salt': salt,
+      'nonce': nonce,
+      'mac_tag': authTag,
       'is_deleted': false,
       'expires_at': expiresAt.toIso8601String(),
       'max_downloads': maxDownloads ?? AppConstants.maxDownloadsDefault,
@@ -227,6 +258,36 @@ class FileService {
     return (response as List).map((json) => ShareLink.fromJson(json)).toList();
   }
 
+  /// Obtiene los enlaces expirados o revocados del usuario con metadata
+  /// básica del archivo (nombre, tamaño y fecha de expiración).
+  Future<List<ExpiredLinkItem>> getExpiredLinksWithMetadata() async {
+    final user = _ref.read(authStateProvider).valueOrNull;
+    if (user == null) throw Exception('Usuario no autenticado');
+
+    final now = DateTime.now().toIso8601String();
+    final response = await _client
+        .from('share_links')
+        .select(
+          'id, expires_at, is_active, created_at, '
+          'files(original_filename, file_size_bytes)',
+        )
+        .eq('created_by', user.id)
+        .or('expires_at.lt.$now, is_active.eq.false')
+        .order('expires_at', ascending: false);
+
+    return (response as List).map((row) {
+      final file = row['files'] as Map<String, dynamic>?;
+      return ExpiredLinkItem(
+        linkId: row['id'] as String,
+        fileName: (file?['original_filename'] as String?)?.isNotEmpty == true
+            ? file!['original_filename'] as String
+            : 'Documento sin nombre',
+        fileSizeBytes: file?['file_size_bytes'] as int? ?? 0,
+        expiredAt: DateTime.parse(row['expires_at'] as String),
+      );
+    }).toList();
+  }
+
   Future<List<KriptonFile>> getReceivedFiles() async {
     final user = _ref.read(authStateProvider).valueOrNull;
     debugPrint('[getReceivedFiles] Current user email: ${user?.email}');
@@ -259,6 +320,7 @@ class FileService {
             'is_active, '
             'files!inner(id, owner_id, original_filename, file_size_bytes, mime_type, storage_provider, bucket_name, storage_object_key, created_at, expires_at, max_downloads, downloads_count, status)',
           )
+          .filter('recipient_email', 'ilike', user.email)
           .eq('is_active', true)
           .gte('expires_at', now)
           .filter('files.status', 'eq', 'active')
@@ -266,8 +328,7 @@ class FileService {
           .order('created_at', ascending: false);
 
       debugPrint('[getReceivedFiles] Fallback response: ${(response as List).length} rows');
-      return response.map((row) {
-        final link = row as Map<String, dynamic>;
+      return (response as List).cast<Map<String, dynamic>>().map((link) {
         final filesValue = link['files'];
         final Map<String, dynamic> file;
         if (filesValue is List && filesValue.isNotEmpty) {

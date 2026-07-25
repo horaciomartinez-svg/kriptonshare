@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/biometric_service.dart';
+import '../../services/secure_credential_service.dart';
 import '../../utils/theme.dart';
 
 /// Pantalla de bloqueo biométrico.

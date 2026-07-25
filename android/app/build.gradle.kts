@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.kriptonshare.app"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_secure_storage y sus dependencias de AndroidX requieren compileSdk >= 36.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

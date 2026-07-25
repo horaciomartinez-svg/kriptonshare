@@ -1,5 +1,4 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../models/kripton_file.dart';
 
 /// Fuente de datos remota para carpetas virtuales (Data Rooms) en Supabase.
 class FolderRemoteDataSource {

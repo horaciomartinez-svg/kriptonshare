@@ -1,9 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../../../core/services/revenue_cat_service.dart';
-import '../../../../models/user_model.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../utils/theme.dart';
 import '../notifiers/storage_upsell_notifier.dart';
@@ -168,6 +168,38 @@ class _StorageManagementScreenState
                         .restorePurchases(),
                 child: const Text('Restaurar Compras'),
               ),
+              if (kDebugMode) ...[
+                const SizedBox(height: 32),
+                const Divider(color: KriptonTheme.cardBorder),
+                const SizedBox(height: 16),
+                Text(
+                  'MODO PRUEBA (debug)',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: KriptonTheme.amber,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Activa Premium sin RevenueCat ni Google Cloud para evaluar la interfaz.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () => _togglePremiumSimulation(!isPremium),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isPremium
+                        ? KriptonTheme.alertRed
+                        : KriptonTheme.electricLime,
+                    foregroundColor: KriptonTheme.charcoalBlack,
+                  ),
+                  child: Text(
+                    isPremium
+                        ? 'Desactivar Premium de prueba'
+                        : 'Activar Premium de prueba',
+                  ),
+                ),
+              ],
               if (upsell.isLoading) ...[
                 const SizedBox(height: 24),
                 const Center(child: CircularProgressIndicator()),
@@ -177,6 +209,21 @@ class _StorageManagementScreenState
         ),
       ),
     );
+  }
+
+  Future<void> _togglePremiumSimulation(bool enable) async {
+    await ref.read(authStateProvider.notifier).setPremiumSimulation(enable);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            enable
+                ? 'Premium de prueba activado'
+                : 'Premium de prueba desactivado',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _buySubscription(Offerings? offerings) async {
@@ -190,8 +237,9 @@ class _StorageManagementScreenState
     final ok = await ref
         .read(storageUpsellNotifierProvider.notifier)
         .purchasePackage(package);
-    if (ok && mounted) {
+    if (ok) {
       await ref.read(authStateProvider.notifier).refreshUser();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Suscripción activada')),
       );
@@ -213,8 +261,9 @@ class _StorageManagementScreenState
     final ok = await ref
         .read(storageUpsellNotifierProvider.notifier)
         .purchaseAddon(package);
-    if (ok && mounted) {
+    if (ok) {
       await ref.read(authStateProvider.notifier).refreshUser();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Almacenamiento ampliado')),
       );

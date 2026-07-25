@@ -5,6 +5,33 @@ import 'package:pointycastle/export.dart';
 
 import '../utils/constants.dart';
 
+/// Función top-level para ejecutar el cifrado de archivos en un Isolate
+/// vía [compute]. Recibe [fileBytes] y [password] en un mapa y devuelve
+/// un mapa con [salt], [nonce], [ciphertext], [authTag] y [key] como
+/// [Uint8List], listos para ser enviados de vuelta al hilo principal.
+///
+/// Mover el cifrado a un Isolate evita que el trabajo intensivo de
+/// AES-256-GCM + PBKDF2 bloquee el hilo de UI, reduciendo los tiempos
+/// percibidos de cifrado/subida para archivos grandes (p. ej. video).
+Future<Map<String, dynamic>> encryptFileInIsolate(Map<String, dynamic> params) async {
+  final fileBytes = params['fileBytes'] as Uint8List;
+  final password = params['password'] as String;
+
+  final cryptoService = CryptoService();
+  final result = await cryptoService.encryptFile(
+    fileBytes: fileBytes,
+    password: password,
+  );
+
+  return {
+    'salt': Uint8List.fromList(result['salt']! as List<int>),
+    'nonce': Uint8List.fromList(result['nonce']! as List<int>),
+    'ciphertext': Uint8List.fromList(result['ciphertext']! as List<int>),
+    'authTag': Uint8List.fromList(result['authTag']! as List<int>),
+    'key': Uint8List.fromList(result['key']! as List<int>),
+  };
+}
+
 /// Servicio de cifrado local con AES-256-GCM + PBKDF2.
 ///
 /// ### Modelo de amenaza

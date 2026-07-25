@@ -12,6 +12,7 @@ import '../screens/profile/profile_screen.dart';
 import '../screens/biometric/biometric_settings_screen.dart';
 import '../features/analytics/presentation/screens/analytics_dashboard_screen.dart';
 import '../features/data_room/presentation/screens/storage_management_screen.dart';
+import '../features/links/presentation/screens/expired_links_screen.dart';
 import '../features/data_room/presentation/screens/data_room_lobby_screen.dart';
 import '../providers/auth_provider.dart';
 
@@ -99,6 +100,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/analytics',
         builder: (context, state) => const AnalyticsDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/expired-links',
+        builder: (context, state) => const ExpiredLinksScreen(),
       ),
       GoRoute(
         path: '/biometric',

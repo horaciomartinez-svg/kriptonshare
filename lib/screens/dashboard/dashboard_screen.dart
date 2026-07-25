@@ -230,7 +230,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
                   linksAsync.when(
                     data: (links) {
-                      if (links.isEmpty) {
+                      final now = DateTime.now();
+                      final activeLinks = links
+                          .where((l) => l.isActive && l.expiresAt.isAfter(now))
+                          .toList();
+
+                      if (activeLinks.isEmpty) {
                         return Container(
                           padding: const EdgeInsets.all(32),
                           decoration: BoxDecoration(
@@ -268,9 +273,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       return ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: links.take(5).length,
+                        itemCount: activeLinks.take(5).length,
                         itemBuilder: (context, index) {
-                          final link = links[index];
+                          final link = activeLinks[index];
                           return DataRoomCard(link: link)
                               .animate()
                               .fade(delay: Duration(milliseconds: 300 + index * 100))
