@@ -107,6 +107,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
           'monthly_links_reset_at': DateTime.now().toIso8601String(),
           'total_storage_used_bytes': 0,
           'max_storage_premium_bytes': AppConstants.premiumMaxStorageBytes,
+          'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
         });
 
         final userData = await client

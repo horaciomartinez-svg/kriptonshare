@@ -107,8 +107,17 @@ class ProfileScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
                       _buildPlanRow(
                         context,
-                        'Almacenamiento máximo',
+                        'Tamaño máximo por archivo',
                         '${AppConstants.maxFileSizeBytes ~/ (1024 * 1024)} MB',
+                        Icons.file_present,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildPlanRow(
+                        context,
+                        'Almacenamiento Data Room',
+                        user.isPremium
+                            ? '${(user.maxStorageBytes / 1024 / 1024 / 1024).toStringAsFixed(0)} GB'
+                            : 'No disponible',
                         Icons.storage,
                       ),
                       const SizedBox(height: 12),
@@ -233,14 +242,12 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: () {
-                          // TODO: Implement IAP
-                        },
+                        onPressed: () => context.push('/storage-management'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: KriptonTheme.platinum,
                           foregroundColor: KriptonTheme.charcoalBlack,
                         ),
-                        child: const Text('Upgrade a Premium'),
+                        child: const Text('Gestionar Bóveda Premium'),
                       ),
                     ],
                   ),

@@ -23,6 +23,15 @@ Aplicar `supabase/schema_migration_fix.sql` en Supabase SQL Editor y recompilar/
 - Office (Word/Excel/PowerPoint): no; el visor muestra "Formato protegido" y recomienda convertir a PDF.
 - Seguridad reforzada: se eliminaron los botones de "Abrir con otra aplicación" para PDF y se bloqueó el menú contextual de guardar en imágenes.
 
+### Módulo Premium y Data Room (2026-07-23)
+- Migración SQL `20260725000000_premium_dataroom.sql` con tablas `folders`, `journey_telemetry`, columnas de storage y RLS.
+- Edge Function `revenuecat-webhook` para sincronizar compras con `max_storage_bytes`.
+- Servicio `RevenueCatServiceImpl`, pantallas `StorageManagementScreen` y `DataRoomLobbyScreen`.
+- Lazy Decryption en `FolderNotifier` y método `decryptFileBytes` en `CryptoService`.
+- Rutas `/storage-management` y `/folder-room/:folderLinkId` agregadas al router.
+- FLAG_SECURE ahora es global para toda la app.
+- Pendiente: configuración de RevenueCat (API keys, productos, webhook) y pruebas E2E.
+
 ## 2026-07-11
 
 ### Tarea

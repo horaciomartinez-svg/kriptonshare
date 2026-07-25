@@ -71,9 +71,10 @@ void main() async {
       publishableKey: AppConstants.supabaseAnonKey,
     );
   
-  // Initialize screenshot blocker on Android
+  // Initialize screenshot blocker on Android and enable secure view globally
   await ScreenshotService.initialize();
-  
+  await ScreenshotService.enableSecureView();
+
   runApp(
     const ProviderScope(
       child: KriptonShareApp(),
@@ -130,10 +131,15 @@ class _KriptonShareAppState extends ConsumerState<KriptonShareApp> {
 
     // Supported paths:
     //   https://kriptonshare.com/room/<id>
+    //   https://kriptonshare.com/folder-room/<id>
     //   kriptonshare://room/<id>
     if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'room') {
       final linkId = uri.pathSegments[1];
       router.go('/room/$linkId');
+    } else if (uri.pathSegments.length >= 2 &&
+        uri.pathSegments[0] == 'folder-room') {
+      final folderLinkId = uri.pathSegments[1];
+      router.go('/folder-room/$folderLinkId');
     }
   }
 

@@ -61,7 +61,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     _pdfLoadTimer?.cancel();
     _flushPageView();
     _pdfController.removeListener(_onPdfPageChanged);
-    ScreenshotService.disableSecureView();
+    // No deshabilitamos FLAG_SECURE aquí: ahora es global para toda la app.
     _passwordController.dispose();
     super.dispose();
   }

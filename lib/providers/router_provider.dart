@@ -11,6 +11,8 @@ import '../screens/viewer/viewer_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/biometric/biometric_settings_screen.dart';
 import '../features/analytics/presentation/screens/analytics_dashboard_screen.dart';
+import '../features/data_room/presentation/screens/storage_management_screen.dart';
+import '../features/data_room/presentation/screens/data_room_lobby_screen.dart';
 import '../providers/auth_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -23,12 +25,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = state.matchedLocation == '/auth';
       final isSplash = state.matchedLocation == '/';
       final isRoomRoute = state.matchedLocation.startsWith('/room/');
+      final isFolderRoomRoute = state.matchedLocation.startsWith('/folder-room/');
 
       if (isSplash) return null;
 
       if (!isAuthenticated && !isAuthRoute) {
-        if (isRoomRoute) {
-          // Preserve the room link so we can return after login.
+        if (isRoomRoute || isFolderRoomRoute) {
+          // Preserve the deep link so we can return after login.
           return '/auth?redirect=${Uri.encodeComponent(state.matchedLocation)}';
         }
         return '/auth';
@@ -100,6 +103,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/biometric',
         builder: (context, state) => const BiometricSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/storage-management',
+        builder: (context, state) => const StorageManagementScreen(),
+      ),
+      GoRoute(
+        path: '/folder-room/:folderLinkId',
+        builder: (context, state) {
+          final folderLinkId = state.pathParameters['folderLinkId']!;
+          return DataRoomLobbyScreen(folderLinkId: folderLinkId);
+        },
       ),
     ],
   );

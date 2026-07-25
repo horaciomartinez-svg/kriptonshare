@@ -79,7 +79,10 @@ dependencies:
   
   # Google Mobile Ads (AdMob)
   google_mobile_ads: ^7.0.0
-  
+
+  # RevenueCat SDK — suscripciones y add-ons IAP
+  purchases_flutter: ^8.0.0
+
   # Functional programming (Either, Option, etc.)
   dartz: ^0.10.1
 

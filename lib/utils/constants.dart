@@ -77,3 +77,22 @@ class AppConstants {
   static const double watermarkFontSize = 10;
   static const double watermarkRotationAngle = -45 * 3.14159265359 / 180; // -45 degrees in radians
 }
+
+/// Límites y capacidades por tier de suscripción.
+class PremiumLimits {
+  static const int freemiumMaxFileBytes = 10485760;      // 10 MB
+  static const int premiumMaxFileBytes = 104857600;      // 100 MB
+  static const int premiumBaseStorageBytes = 1073741824; // 1 GB
+  static const int gigabyteBytes = 1073741824;           // incremento por add-on
+  static const int freemiumLinkTtlHours = 48;
+  static const int premiumLinkTtlHours = 720;            // 30 días
+  static const int freemiumMonthlyLinkQuota = 20;
+  static const int freemiumMaxActiveLinks = 3;
+}
+
+/// Precios públicos de suscripción y add-ons.
+class Pricing {
+  static const double monthlyUsd = 19.0;
+  static const double yearlyUsd = 189.0;   // ahorro $39/año (~17%)
+  static const double addonPerGbMonthlyUsd = 5.0;
+}

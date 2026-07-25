@@ -239,6 +239,43 @@ class CryptoService {
     );
   }
 
+  /// Descifra un payload completo `salt || nonce || ciphertext || authTag`
+  /// usando únicamente la contraseña del usuario.
+  ///
+  /// Útil para Lazy Decryption en el Data Room Lobby.
+  Future<Uint8List> decryptFileBytes({
+    required Uint8List encryptedBytes,
+    required String password,
+  }) async {
+    if (encryptedBytes.length <
+        AppConstants.saltSize +
+            AppConstants.aesNonceSize +
+            AppConstants.aesTagSize) {
+      throw ArgumentError('Payload cifrado incompleto');
+    }
+
+    final salt = encryptedBytes.sublist(0, AppConstants.saltSize);
+    final nonce = encryptedBytes.sublist(
+      AppConstants.saltSize,
+      AppConstants.saltSize + AppConstants.aesNonceSize,
+    );
+    final ciphertext = encryptedBytes.sublist(
+      AppConstants.saltSize + AppConstants.aesNonceSize,
+      encryptedBytes.length - AppConstants.aesTagSize,
+    );
+    final authTag = encryptedBytes.sublist(
+      encryptedBytes.length - AppConstants.aesTagSize,
+    );
+
+    final key = deriveKey(password, salt.toList());
+    return decrypt(
+      ciphertext: ciphertext.toList(),
+      key: key,
+      nonce: nonce.toList(),
+      authTag: authTag.toList(),
+    );
+  }
+
   // ─────────────────────────────── Validaciones ───────────────────────────────
 
   void _validateKey(List<int> key) {

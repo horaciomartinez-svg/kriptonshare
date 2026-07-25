@@ -12,6 +12,7 @@ class KriptonUser {
   final DateTime? lastLoginAt;
   final int totalStorageUsedBytes;
   final int maxStoragePremiumBytes;
+  final int maxStorageBytes;
 
   KriptonUser({
     required this.id,
@@ -25,9 +26,14 @@ class KriptonUser {
     this.lastLoginAt,
     this.totalStorageUsedBytes = 0,
     this.maxStoragePremiumBytes = 2147483648,
+    this.maxStorageBytes = 1073741824,
   });
 
   factory KriptonUser.fromJson(Map<String, dynamic> json) {
+    final used = json['total_storage_used_bytes'] as int? ?? 0;
+    final legacyMax = json['max_storage_premium_bytes'] as int?;
+    final currentMax = json['max_storage_bytes'] as int? ?? legacyMax ?? 1073741824;
+
     return KriptonUser(
       id: json['id'] as String,
       email: json['email'] as String,
@@ -42,8 +48,9 @@ class KriptonUser {
       lastLoginAt: json['last_login_at'] != null
           ? DateTime.parse(json['last_login_at'] as String)
           : null,
-      totalStorageUsedBytes: json['total_storage_used_bytes'] as int? ?? 0,
-      maxStoragePremiumBytes: json['max_storage_premium_bytes'] as int? ?? 2147483648,
+      totalStorageUsedBytes: used,
+      maxStoragePremiumBytes: legacyMax ?? currentMax,
+      maxStorageBytes: currentMax,
     );
   }
 
@@ -60,6 +67,7 @@ class KriptonUser {
       'last_login_at': lastLoginAt?.toIso8601String(),
       'total_storage_used_bytes': totalStorageUsedBytes,
       'max_storage_premium_bytes': maxStoragePremiumBytes,
+      'max_storage_bytes': maxStorageBytes,
     };
   }
 
@@ -78,6 +86,9 @@ class KriptonUser {
       : AppConstants.freeMaxDurationHours;
 
   int get remainingPremiumStorageBytes => isPremium
-      ? (maxStoragePremiumBytes - totalStorageUsedBytes).clamp(0, maxStoragePremiumBytes)
+      ? (maxStorageBytes - totalStorageUsedBytes).clamp(0, maxStorageBytes)
       : 0;
+
+  double get storageUsageRatio =>
+      maxStorageBytes > 0 ? totalStorageUsedBytes / maxStorageBytes : 0.0;
 }
