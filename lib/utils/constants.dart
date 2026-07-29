@@ -67,6 +67,17 @@ class AppConstants {
   static const int heartbeatIntervalSeconds = 30;
   static const int maxTelemetryBufferSize = 50;
 
+  // === CONVERSIÓN OFFICE → PDF (FASE 1) ===
+  static const String conversionServiceUrl = String.fromEnvironment(
+      'CONVERSION_SERVICE_URL',
+      defaultValue: 'https://convert.kriptonshare.com');
+  static const Duration conversionTimeout = Duration(seconds: 120);
+
+  // Límite de conversión por plan: REUTILIZA los topes ya definidos para upload.
+  // Free: freeMaxFileSizeBytes (10 MB) · Premium: premiumMaxFileSizeBytes (100 MB).
+  static int conversionMaxBytesFor({required bool isPremium}) =>
+      isPremium ? premiumMaxFileSizeBytes : freeMaxFileSizeBytes;
+
   // === SUBSCRIPTION TIERS ===
   static const String tierFree = 'free';
   static const String tierPremium = 'premium';

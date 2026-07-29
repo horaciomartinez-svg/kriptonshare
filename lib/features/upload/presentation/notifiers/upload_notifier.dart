@@ -1,10 +1,11 @@
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../utils/office_formats.dart';
 import '../../domain/entities/upload_result_entity.dart';
 import '../../domain/usecases/upload_file.dart';
 
 /// Estados del proceso de subida.
-enum UploadStep { idle, encrypting, uploading, success, error }
+enum UploadStep { idle, encrypting, converting, uploading, success, error }
 
 /// Estado de subida para la capa de presentación.
 class UploadState {
@@ -12,12 +13,14 @@ class UploadState {
   final double progress;
   final UploadResultEntity? result;
   final String? errorMessage;
+  final bool conversionFailed;
 
   const UploadState({
     this.step = UploadStep.idle,
     this.progress = 0.0,
     this.result,
     this.errorMessage,
+    this.conversionFailed = false,
   });
 
   UploadState copyWith({
@@ -25,17 +28,21 @@ class UploadState {
     double? progress,
     UploadResultEntity? result,
     String? errorMessage,
+    bool? conversionFailed,
   }) {
     return UploadState(
       step: step ?? this.step,
       progress: progress ?? this.progress,
       result: result ?? this.result,
       errorMessage: errorMessage ?? this.errorMessage,
+      conversionFailed: conversionFailed ?? this.conversionFailed,
     );
   }
 
   bool get isLoading =>
-      step == UploadStep.encrypting || step == UploadStep.uploading;
+      step == UploadStep.encrypting ||
+      step == UploadStep.converting ||
+      step == UploadStep.uploading;
   bool get isSuccess => step == UploadStep.success;
   bool get isError => step == UploadStep.error;
 }
@@ -71,19 +78,35 @@ class UploadNotifier extends StateNotifier<UploadState> {
     int? maxDownloads,
     String? recipientEmail,
   }) async {
+    final needsConversion = OfficeFormats.isConvertible(
+      mimeType: mimeType,
+      fileName: fileName,
+    );
+
     state = state.copyWith(
       step: UploadStep.encrypting,
       progress: 0.2,
       errorMessage: null,
       result: null,
+      conversionFailed: false,
     );
 
     // Pequeña pausa UX para que el usuario perciba el cifrado
     await Future.delayed(const Duration(milliseconds: 500));
 
+    if (needsConversion) {
+      state = state.copyWith(
+        step: UploadStep.converting,
+        progress: 0.45,
+      );
+      // La conversión real ocurre dentro del usecase/repositorio.
+      // La pausa UX ayuda a que el indicador sea visible.
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+
     state = state.copyWith(
       step: UploadStep.uploading,
-      progress: 0.6,
+      progress: 0.7,
     );
 
     final result = await _uploadFile(

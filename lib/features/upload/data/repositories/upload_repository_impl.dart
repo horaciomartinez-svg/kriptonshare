@@ -2,14 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
 import 'package:dartz/dartz.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../services/conversion_service.dart';
 import '../../../../services/crypto_service.dart';
 import '../../../../utils/constants.dart';
+import '../../../../utils/office_formats.dart';
 
 import '../../domain/entities/upload_result_entity.dart';
 import '../../domain/repositories/i_upload_repository.dart';
@@ -20,13 +22,16 @@ class UploadRepositoryImpl implements IUploadRepository {
   final SupabaseUploadDataSource _dataSource;
   final NetworkInfo _networkInfo;
   final Uuid _uuid;
+  final SupabaseClient _supabase;
 
   UploadRepositoryImpl({
     required SupabaseUploadDataSource dataSource,
     required NetworkInfo networkInfo,
+    required SupabaseClient supabase,
     Uuid? uuid,
   })  : _dataSource = dataSource,
         _networkInfo = networkInfo,
+        _supabase = supabase,
         _uuid = uuid ?? const Uuid();
 
   @override
@@ -83,7 +88,56 @@ class UploadRepositoryImpl implements IUploadRepository {
         encryptedBytes: encryptedBytes,
       );
 
-      // 6. Registrar metadata en tabla 'files'
+      // 6. Conversión Office → PDF (Fase 1). Paridad funcional con FileService.
+      // TODO(Fase1): en producción el preview debe subirse a R2 (igual que el original
+      // en FileService). Mientras el flujo Clean Architecture use Supabase Storage,
+      // se almacena aquí para no romper la inyección de datasource.
+      String? viewerStorageKey;
+      int? viewerSizeBytes;
+      String conversionStatus = 'none';
+
+      if (OfficeFormats.isConvertible(mimeType: mimeType, fileName: fileName)) {
+        conversionStatus = 'pending';
+        try {
+          final accessToken = _supabase.auth.currentSession?.accessToken;
+          if (accessToken == null) {
+            throw const ConversionException('unauthorized', 'Sin sesión');
+          }
+          final user = _supabase.auth.currentUser!;
+          final isPremium = user.appMetadata['subscription_tier'] == 'premium' ||
+              user.appMetadata['subscription_tier'] == 'enterprise';
+          final result = await ConversionService().convertOfficeToPdf(
+            fileBytes: fileBytes,
+            fileName: fileName,
+            accessToken: accessToken,
+            maxBytes: AppConstants.conversionMaxBytesFor(isPremium: isPremium),
+          );
+          final encPreview = await Isolate.run(() => encryptFileInIsolate({
+            'fileBytes': result.pdfBytes,
+            'password': password,
+          }));
+          viewerStorageKey = _uuid.v4();
+          final previewPayload = Uint8List.fromList([
+            ...(encPreview['salt'] as Uint8List),
+            ...(encPreview['nonce'] as Uint8List),
+            ...(encPreview['ciphertext'] as Uint8List),
+            ...(encPreview['authTag'] as Uint8List),
+          ]);
+          await _dataSource.uploadEncryptedFile(
+            bucket: AppConstants.bucketName,
+            storageKey: viewerStorageKey,
+            encryptedBytes: previewPayload,
+          );
+          viewerSizeBytes = result.pdfBytes.length;
+          conversionStatus = 'ready';
+        } on ConversionException catch (e) {
+          debugPrint('[CONVERSION clean] Falló (${e.code}): ${e.message}. Continúa sin preview.');
+          conversionStatus = 'failed';
+          viewerStorageKey = null;
+        }
+      }
+
+      // 7. Registrar metadata en tabla 'files'
       await _dataSource.createFileRecord({
         'id': fileId,
         'owner_id': ownerId,
@@ -94,6 +148,9 @@ class UploadRepositoryImpl implements IUploadRepository {
         'bucket_name': AppConstants.bucketName,
         'storage_object_key': storageKey,
         'object_path': storageKey,
+        'viewer_object_key': viewerStorageKey,
+        'viewer_file_size_bytes': viewerSizeBytes,
+        'conversion_status': conversionStatus,
         'aes_key_encrypted': key,
         'encryption_salt': base64Encode(salt),
         'salt': salt,
@@ -105,7 +162,7 @@ class UploadRepositoryImpl implements IUploadRepository {
         'status': 'active',
       });
 
-      // 7. Generar link temporal en tabla 'share_links'
+      // 8. Generar link temporal en tabla 'share_links'
       await _dataSource.createShareLinkRecord({
         'id': linkId,
         'file_id': fileId,

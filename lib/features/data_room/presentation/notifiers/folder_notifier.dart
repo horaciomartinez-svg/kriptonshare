@@ -1,11 +1,6 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
-import '../../../../models/kripton_file.dart';
-import '../../../../services/crypto_service.dart';
-import '../../../../services/r2_signature_service.dart';
-import '../../../../utils/constants.dart';
+import '../../domain/entities/file_entity.dart';
 import '../../domain/entities/folder_entity.dart';
 import '../../domain/entities/journey_telemetry_entity.dart';
 import '../../domain/repositories/i_folder_repository.dart';
@@ -19,7 +14,7 @@ class FolderScreenState {
   final bool isLoading;
   final String? error;
   final FolderEntity? folder;
-  final KriptonFile? selectedFile;
+  final FileEntity? selectedFile;
 
   const FolderScreenState({
     this.isLoading = false,
@@ -32,7 +27,7 @@ class FolderScreenState {
     bool? isLoading,
     String? error,
     FolderEntity? folder,
-    KriptonFile? selectedFile,
+    FileEntity? selectedFile,
   }) {
     return FolderScreenState(
       isLoading: isLoading ?? this.isLoading,
@@ -43,31 +38,14 @@ class FolderScreenState {
   }
 }
 
-/// Notifier de carpeta con Lazy Decryption: solo descarga y descifra el archivo
-/// que el usuario selecciona, y evapora la RAM al salir del visor.
+/// Notifier de carpeta: carga metadatos, selecciona archivo y registra telemetría.
+/// El descifrado perezoso vive en LazyDecryptionNotifier.
 class FolderNotifier extends StateNotifier<FolderScreenState> {
   final IFolderRepository _folderRepository;
-  final CryptoService _cryptoService;
-  final Dio _dio;
-  final R2SignatureService _r2Signer;
 
   FolderNotifier({
     required IFolderRepository folderRepository,
-    CryptoService? cryptoService,
   })  : _folderRepository = folderRepository,
-        _cryptoService = cryptoService ?? CryptoService(),
-        _dio = Dio(
-          BaseOptions(
-            connectTimeout: const Duration(seconds: 30),
-            receiveTimeout: const Duration(minutes: 5),
-            sendTimeout: const Duration(minutes: 5),
-          ),
-        ),
-        _r2Signer = const R2SignatureService(
-          accessKeyId: AppConstants.r2AccessKeyId,
-          secretAccessKey: AppConstants.r2SecretAccessKey,
-          endpoint: AppConstants.r2Endpoint,
-        ),
         super(const FolderScreenState());
 
   Future<void> loadFolderByShareLink(String shareLinkId) async {
@@ -88,39 +66,11 @@ class FolderNotifier extends StateNotifier<FolderScreenState> {
     );
   }
 
-  /// Descarga y descifra ÚNICAMENTE el archivo seleccionado.
-  Future<Uint8List?> decryptSingleFile(KriptonFile file, String password) async {
-    state = state.copyWith(isLoading: true, error: null, selectedFile: file);
-    try {
-      final objectPath = '/${file.bucketName}/${file.storageObjectKey}';
-      final downloadUrl = '${AppConstants.r2Endpoint}$objectPath';
-
-      final signedHeaders = _r2Signer.signRequest(method: 'GET', path: objectPath);
-      final response = await _dio.get<List<int>>(
-        downloadUrl,
-        options: Options(
-          responseType: ResponseType.bytes,
-          headers: signedHeaders,
-        ),
-      );
-      final encryptedBytes = Uint8List.fromList(response.data!);
-
-      // Lazy decryption en Isolate (si el motor lo soporta) o main thread.
-      final decrypted = await _cryptoService.decryptFileBytes(
-        encryptedBytes: encryptedBytes,
-        password: password,
-      );
-
-      state = state.copyWith(isLoading: false);
-      return decrypted;
-    } catch (e) {
-      state = state.copyWith(error: 'Error descifrando: $e', isLoading: false);
-      return null;
-    }
+  void selectFile(FileEntity file) {
+    state = state.copyWith(selectedFile: file);
   }
 
-  /// Evapora explícitamente los bytes descifrados de la RAM.
-  void purgeRAM() {
+  void clearSelectedFile() {
     state = state.copyWith(selectedFile: null);
   }
 

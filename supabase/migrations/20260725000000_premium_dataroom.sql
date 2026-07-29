@@ -185,12 +185,12 @@ BEGIN
 END $$;
 
 -- -----------------------------------------------------------------------------
--- 7. FUNCIÓN DE VALIDACIÓN MULTI-TIER (REFACTORIZADA)
+-- 7. FUNCIÓN DE VALIDACIÓN MULTI-TIER (UNIFICADA)
 -- -----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION check_upload_limits(
+-- Firma única con 2 parámetros para evitar ambigüedad en PostgREST (PGRST203).
+CREATE OR REPLACE FUNCTION public.check_upload_limits(
   p_user_id UUID,
-  p_file_size INTEGER,
-  p_is_folder_upload BOOLEAN DEFAULT FALSE
+  p_file_size INTEGER
 )
 RETURNS TABLE (
   can_upload BOOLEAN,
@@ -205,8 +205,12 @@ DECLARE
   v_storage_used BIGINT;
   v_storage_max BIGINT;
 BEGIN
-  SELECT subscription_tier, monthly_links_generated, max_links_monthly,
-         max_file_size_bytes, total_storage_used_bytes, max_storage_bytes
+  SELECT subscription_tier,
+         COALESCE(monthly_links_generated, 0),
+         COALESCE(max_links_monthly, 20),
+         COALESCE(max_file_size_bytes, 10485760),
+         COALESCE(total_storage_used_bytes, 0),
+         COALESCE(max_storage_bytes, max_storage_premium_bytes, 2147483648)
     INTO v_tier, v_links_used, v_links_max, v_file_size_max,
          v_storage_used, v_storage_max
     FROM public.users
@@ -214,20 +218,15 @@ BEGIN
 
   -- Tiers Premium & Enterprise
   IF v_tier IN ('premium', 'enterprise') THEN
-    -- Límite individual por archivo (100 MB)
-    IF p_file_size > 104857600 THEN
+    IF p_file_size > v_file_size_max THEN
       RETURN QUERY SELECT FALSE,
-        'Premium: El archivo excede el límite de 100 MB por documento.'::TEXT;
+        ('Premium: El archivo excede el límite de ' || (v_file_size_max / 1048576) || ' MB por documento.')::TEXT;
       RETURN;
     END IF;
 
-    -- Capacidad global acumulada (1 GB base o más con Add-ons)
     IF (v_storage_used + p_file_size) > v_storage_max THEN
       RETURN QUERY SELECT FALSE,
-        ('Premium: Capacidad de Bóveda saturada (' ||
-         round((v_storage_used::numeric / 1073741824::numeric), 2) || ' GB / ' ||
-         round((v_storage_max::numeric / 1073741824::numeric), 2) ||
-         ' GB). Adquiere más espacio para continuar.')::TEXT;
+        ('Premium: Capacidad de almacenamiento saturada. Límite de ' || (v_storage_max / 1073741824) || ' GB alcanzado.')::TEXT;
       RETURN;
     END IF;
 
@@ -236,21 +235,15 @@ BEGIN
   END IF;
 
   -- Tier Freemium
-  IF p_is_folder_upload THEN
+  IF p_file_size > v_file_size_max THEN
     RETURN QUERY SELECT FALSE,
-      'Plan Gratis: La creación de Carpetas Virtuales (Data Rooms) es una función exclusiva Premium.'::TEXT;
+      ('Plan Gratis: El archivo excede el límite de ' || (v_file_size_max / 1048576) || ' MB.')::TEXT;
     RETURN;
   END IF;
 
-  IF p_file_size > 10485760 THEN -- 10 MB
+  IF v_links_used >= v_links_max THEN
     RETURN QUERY SELECT FALSE,
-      'Plan Gratis: El archivo excede el límite de 10 MB.'::TEXT;
-    RETURN;
-  END IF;
-
-  IF v_links_used >= 20 THEN
-    RETURN QUERY SELECT FALSE,
-      'Plan Gratis: Límite de 20 enlaces mensuales alcanzado.'::TEXT;
+      ('Plan Gratis: Límite de ' || v_links_max || ' enlaces mensuales alcanzado.')::TEXT;
     RETURN;
   END IF;
 

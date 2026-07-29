@@ -35,9 +35,12 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     monthly_links_generated INTEGER DEFAULT 0,
     monthly_links_reset_at TIMESTAMPTZ DEFAULT NOW(),
-    max_file_size_bytes BIGINT DEFAULT 10485760,  -- 10 MB free
-    max_links_monthly INTEGER DEFAULT 50,          -- 50 links/mes free
-    watermark_dynamic BOOLEAN DEFAULT FALSE
+    max_file_size_bytes BIGINT DEFAULT 10485760,        -- 10 MB free
+    max_links_monthly INTEGER DEFAULT 20,               -- 20 links/mes free
+    watermark_dynamic BOOLEAN DEFAULT FALSE,
+    total_storage_used_bytes BIGINT DEFAULT 0,          -- bóveda acumulada
+    max_storage_premium_bytes BIGINT DEFAULT 2147483648,-- 2 GB legacy Premium
+    max_storage_bytes BIGINT DEFAULT 1073741824         -- 1 GB base actual
 );
 
 -- Enable RLS
@@ -77,6 +80,11 @@ CREATE TABLE IF NOT EXISTS files (
     storage_provider TEXT NOT NULL DEFAULT 'r2',
     bucket_name TEXT NOT NULL DEFAULT 'kriptonshare-ephemeral',
     storage_object_key UUID NOT NULL UNIQUE,
+    viewer_object_key UUID,
+    viewer_file_size_bytes INTEGER
+        CHECK (viewer_file_size_bytes IS NULL OR viewer_file_size_bytes > 0),
+    conversion_status TEXT NOT NULL DEFAULT 'none'
+        CHECK (conversion_status IN ('none', 'pending', 'ready', 'failed')),
     aes_key_encrypted BYTEA NOT NULL,
     salt BYTEA NOT NULL,
     encryption_salt BYTEA NOT NULL,
@@ -112,6 +120,7 @@ CREATE POLICY file_recipient_access ON files
 -- Index for expiry cleanup
 CREATE INDEX idx_files_expiry ON files(expires_at, status);
 CREATE INDEX idx_files_owner ON files(owner_id, created_at DESC);
+CREATE UNIQUE INDEX idx_files_viewer_object_key ON files(viewer_object_key) WHERE viewer_object_key IS NOT NULL;
 
 -- ==========================================================
 -- TABLE: share_links
@@ -235,9 +244,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ==========================================================
--- FUNCTION: Check upload limits (10MB, 50 links/mes)
+-- FUNCTION: Check upload limits (Multi-tier, firma única)
 -- ==========================================================
-CREATE OR REPLACE FUNCTION check_upload_limits(
+CREATE OR REPLACE FUNCTION public.check_upload_limits(
     p_user_id UUID,
     p_file_size INTEGER
 )
@@ -246,43 +255,136 @@ RETURNS TABLE (
     message TEXT
 ) AS $$
 DECLARE
-    user_tier TEXT;
-    links_used INTEGER;
-    links_max INTEGER;
-    file_size_max INTEGER;
+    v_tier TEXT;
+    v_links_used INTEGER;
+    v_links_max INTEGER;
+    v_file_size_max BIGINT;
+    v_active_links_count INTEGER;
+    v_storage_used BIGINT;
+    v_storage_max BIGINT;
 BEGIN
-    SELECT subscription_tier, monthly_links_generated, max_links_monthly, max_file_size_bytes
-    INTO user_tier, links_used, links_max, file_size_max
-    FROM users
+    SELECT subscription_tier,
+           COALESCE(monthly_links_generated, 0),
+           COALESCE(max_links_monthly, 20),
+           COALESCE(max_file_size_bytes, 10485760),
+           COALESCE(total_storage_used_bytes, 0),
+           COALESCE(max_storage_bytes, max_storage_premium_bytes, 2147483648)
+    INTO v_tier, v_links_used, v_links_max, v_file_size_max, v_storage_used, v_storage_max
+    FROM public.users
     WHERE id = p_user_id;
 
-    -- Premium/Enterprise bypass
-    IF user_tier IN ('premium', 'enterprise') THEN
-        RETURN QUERY SELECT TRUE, 'Premium: sin límites'::TEXT;
+    -- Premium/Enterprise
+    IF v_tier IN ('premium', 'enterprise') THEN
+        IF p_file_size > v_file_size_max THEN
+            RETURN QUERY SELECT FALSE,
+                ('Premium: El archivo excede el límite de ' || (v_file_size_max / 1048576) || ' MB por documento.')::TEXT;
+            RETURN;
+        END IF;
+
+        IF (v_storage_used + p_file_size) > v_storage_max THEN
+            RETURN QUERY SELECT FALSE,
+                ('Premium: Capacidad de almacenamiento saturada. Límite de ' || (v_storage_max / 1073741824) || ' GB alcanzado.')::TEXT;
+            RETURN;
+        END IF;
+
+        RETURN QUERY SELECT TRUE, 'Validación Premium exitosa'::TEXT;
         RETURN;
     END IF;
 
-    -- Check file size (10MB for free)
-    IF p_file_size > file_size_max THEN
+    -- Free
+    IF p_file_size > v_file_size_max THEN
         RETURN QUERY SELECT FALSE,
-            ('Archivo excede ' || (file_size_max / 1024 / 1024) || 'MB límite del plan gratuito')::TEXT;
+            ('Plan Gratis: El archivo excede el límite de ' || (v_file_size_max / 1048576) || ' MB.')::TEXT;
         RETURN;
     END IF;
 
-    -- Check links limit (50/month for free)
-    IF links_used >= links_max THEN
+    IF v_links_used >= v_links_max THEN
         RETURN QUERY SELECT FALSE,
-            ('Límite de ' || links_max || ' enlaces/mes alcanzado')::TEXT;
+            ('Plan Gratis: Límite de ' || v_links_max || ' enlaces mensuales alcanzado.')::TEXT;
         RETURN;
     END IF;
 
-    RETURN QUERY SELECT TRUE, 'OK'::TEXT;
+    SELECT COUNT(*)::INTEGER INTO v_active_links_count
+    FROM public.share_links
+    WHERE created_by = p_user_id
+      AND is_active = TRUE
+      AND expires_at > NOW();
+
+    IF v_active_links_count >= 3 THEN
+        RETURN QUERY SELECT FALSE, 'Plan Gratis: Límite de 3 enlaces activos simultáneos alcanzado.'::TEXT;
+        RETURN;
+    END IF;
+
+    RETURN QUERY SELECT TRUE, 'Validación Freemium exitosa'::TEXT;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ==========================================================
+-- FUNCTION: Metadata of a shared file (including Office preview)
+-- ==========================================================
+DROP FUNCTION IF EXISTS get_shared_file_metadata(p_link_id UUID);
+CREATE OR REPLACE FUNCTION get_shared_file_metadata(p_link_id UUID)
+RETURNS TABLE (
+    id UUID, owner_id UUID, original_filename TEXT,
+    file_size_bytes INTEGER, mime_type TEXT,
+    storage_provider TEXT, bucket_name TEXT, storage_object_key UUID,
+    viewer_object_key UUID, viewer_file_size_bytes INTEGER,
+    conversion_status TEXT,
+    created_at TIMESTAMPTZ, expires_at TIMESTAMPTZ,
+    max_downloads INTEGER, downloads_count INTEGER, status TEXT,
+    link_id UUID, link_expires_at TIMESTAMPTZ,
+    recipient_email TEXT, is_active BOOLEAN
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT f.id, f.owner_id, f.original_filename, f.file_size_bytes, f.mime_type,
+           f.storage_provider, f.bucket_name, f.storage_object_key,
+           f.viewer_object_key, f.viewer_file_size_bytes, f.conversion_status,
+           f.created_at, f.expires_at, f.max_downloads, f.downloads_count, f.status,
+           sl.id, sl.expires_at, sl.recipient_email, sl.is_active
+    FROM share_links sl
+    JOIN files f ON f.id = sl.file_id
+    WHERE sl.id = p_link_id
+      AND sl.is_active = TRUE
+      AND sl.expires_at > NOW()
+      AND f.status = 'active'
+      AND f.expires_at > NOW()
+      AND f.downloads_count < f.max_downloads
+    LIMIT 1;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ==========================================================
+-- FUNCTION: Increment share_link access counter
+-- ==========================================================
+DROP FUNCTION IF EXISTS increment_link_access_count(p_link_id UUID);
+CREATE OR REPLACE FUNCTION increment_link_access_count(p_link_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE share_links
+    SET access_count = access_count + 1,
+        last_accessed_at = NOW()
+    WHERE id = p_link_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ==========================================================
+-- FUNCTION: Increment file download counter
+-- ==========================================================
+DROP FUNCTION IF EXISTS increment_file_download_count(p_file_id UUID);
+CREATE OR REPLACE FUNCTION increment_file_download_count(p_file_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE files
+    SET downloads_count = downloads_count + 1
+    WHERE id = p_file_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ==========================================================
 -- FUNCTION: List files received by the authenticated user
 -- ==========================================================
+DROP FUNCTION IF EXISTS get_received_files();
 CREATE OR REPLACE FUNCTION get_received_files()
 RETURNS TABLE (
     id UUID,
@@ -314,6 +416,9 @@ BEGIN
         f.storage_provider,
         f.bucket_name,
         f.storage_object_key,
+        f.viewer_object_key,
+        f.viewer_file_size_bytes,
+        f.conversion_status,
         f.created_at,
         f.expires_at,
         f.max_downloads,
@@ -381,3 +486,172 @@ SELECT cron.schedule('kriptonshare-partition-maintenance', '0 4 * * *', $$CALL p
 -- CREATE POLICY "Users can read their own files"
 -- ON storage.objects FOR SELECT
 -- USING (auth.uid() = owner);
+
+
+-- ==========================================================
+-- VIRTUAL DATA ROOM (VDR) UPDATE — 2026-07-29
+-- ==========================================================
+
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(5) DEFAULT 'en'
+    CHECK (preferred_language IN ('es', 'en', 'fr', 'de', 'pt')),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE public.folders
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE OR REPLACE FUNCTION touch_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_folders_touch ON public.folders;
+CREATE TRIGGER trg_folders_touch
+  BEFORE UPDATE ON public.folders
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+DROP TRIGGER IF EXISTS trg_users_touch ON public.users;
+CREATE TRIGGER trg_users_touch
+  BEFORE UPDATE ON public.users
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+ALTER TABLE public.share_links
+  ADD COLUMN IF NOT EXISTS link_type TEXT NOT NULL DEFAULT 'single_file'
+    CHECK (link_type IN ('single_file', 'full_folder')),
+  ADD COLUMN IF NOT EXISTS require_recipient_email BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS enable_watermark BOOLEAN DEFAULT TRUE;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_schema = 'public' AND table_name = 'share_links'
+      AND constraint_name = 'chk_share_link_type_coherence'
+  ) THEN
+    ALTER TABLE public.share_links
+      ADD CONSTRAINT chk_share_link_type_coherence CHECK (
+        (file_id IS NOT NULL AND link_type = 'single_file') OR
+        (folder_id IS NOT NULL AND link_type = 'full_folder')
+      );
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_share_links_folder
+  ON public.share_links(folder_id) WHERE is_active = TRUE;
+
+CREATE OR REPLACE FUNCTION validate_share_link_expiration(
+  p_user_id UUID,
+  p_expires_at TIMESTAMPTZ
+)
+RETURNS TABLE (is_valid BOOLEAN, message TEXT) AS $$
+DECLARE
+  v_tier TEXT;
+  v_max_freemium TIMESTAMPTZ := NOW() + INTERVAL '48 hours';
+  v_max_premium  TIMESTAMPTZ := NOW() + INTERVAL '30 days';
+BEGIN
+  SELECT subscription_tier INTO v_tier FROM public.users WHERE id = p_user_id;
+
+  IF p_expires_at <= NOW() THEN
+    RETURN QUERY SELECT FALSE, 'La fecha de expiración debe ser futura.'::TEXT;
+    RETURN;
+  END IF;
+
+  IF v_tier IN ('premium', 'enterprise') THEN
+    IF p_expires_at > v_max_premium THEN
+      RETURN QUERY SELECT FALSE,
+        'Premium: La expiración máxima de un enlace es de 30 días.'::TEXT;
+      RETURN;
+    END IF;
+    RETURN QUERY SELECT TRUE, 'Expiración Premium válida (<= 30 días).'::TEXT;
+    RETURN;
+  END IF;
+
+  IF p_expires_at > v_max_freemium THEN
+    RETURN QUERY SELECT FALSE,
+      'Plan Gratis: La expiración máxima de un enlace es de 48 horas.'::TEXT;
+    RETURN;
+  END IF;
+
+  RETURN QUERY SELECT TRUE, 'Expiración Freemium válida (<= 48 h).'::TEXT;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION recalc_user_storage()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_owner UUID;
+BEGIN
+  v_owner := COALESCE(NEW.owner_id, OLD.owner_id);
+  UPDATE public.users u
+     SET total_storage_used_bytes = COALESCE((
+       SELECT SUM(f.file_size_bytes)
+         FROM public.files f
+        WHERE f.owner_id = v_owner AND f.is_deleted = FALSE
+     ), 0)
+   WHERE u.id = v_owner;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_files_recalc_storage ON public.files;
+CREATE TRIGGER trg_files_recalc_storage
+  AFTER INSERT OR UPDATE OF file_size_bytes, is_deleted OR DELETE
+  ON public.files
+  FOR EACH ROW EXECUTE FUNCTION recalc_user_storage();
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'share_links'
+      AND policyname = 'share_links_public_read_active'
+  ) THEN
+    CREATE POLICY share_links_public_read_active ON public.share_links
+      FOR SELECT USING (is_active = TRUE AND expires_at > NOW());
+  END IF;
+END $$;
+
+
+-- ==========================================================
+-- VDR RLS: lectura pública de carpetas y archivos vía links activos
+-- ==========================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'folders'
+      AND policyname = 'folders_public_read_active_link'
+  ) THEN
+    CREATE POLICY folders_public_read_active_link ON public.folders
+      FOR SELECT USING (
+        EXISTS (
+          SELECT 1 FROM public.share_links sl
+          WHERE sl.folder_id = folders.id
+            AND sl.is_active = TRUE
+            AND sl.expires_at > NOW()
+        )
+      );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'files'
+      AND policyname = 'files_public_read_active_folder_link'
+  ) THEN
+    CREATE POLICY files_public_read_active_folder_link ON public.files
+      FOR SELECT USING (
+        EXISTS (
+          SELECT 1 FROM public.share_links sl
+          WHERE sl.folder_id = files.folder_id
+            AND sl.is_active = TRUE
+            AND sl.expires_at > NOW()
+        )
+      );
+  END IF;
+END $$;

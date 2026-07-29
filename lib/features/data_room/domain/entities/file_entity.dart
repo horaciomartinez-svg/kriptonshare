@@ -1,35 +1,37 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 
-class FileEntity extends Equatable {
+@immutable
+class FileEntity {
   final String id;
-  final String name;
-  final String mimeType;
-  final int sizeBytes;
-  final DateTime createdAt;
-  final DateTime expiresAt;
-  final String storagePath;
   final String ownerId;
-  final bool isEncrypted;
-  final String? encryptionKeyId;
-  final Map<String, dynamic> metadata;
+  final String? folderId; // null = archivo individual suelto
+  final String originalFilename;
+  final int fileSizeBytes;
+  final String mimeType;
+  final String storageObjectKey;
+  final Map<String, dynamic> salt;
+  final Map<String, dynamic> nonce;
+  final Map<String, dynamic> macTag;
+  final Map<String, dynamic> aesKeyEncrypted;
+  final DateTime createdAt;
 
   const FileEntity({
     required this.id,
-    required this.name,
-    required this.mimeType,
-    required this.sizeBytes,
-    required this.createdAt,
-    required this.expiresAt,
-    required this.storagePath,
     required this.ownerId,
-    required this.isEncrypted,
-    this.encryptionKeyId,
-    this.metadata = const {},
+    this.folderId,
+    required this.originalFilename,
+    required this.fileSizeBytes,
+    required this.mimeType,
+    required this.storageObjectKey,
+    required this.salt,
+    required this.nonce,
+    required this.macTag,
+    required this.aesKeyEncrypted,
+    required this.createdAt,
   });
 
-  @override
-  List<Object?> get props => [
-        id, name, mimeType, sizeBytes, createdAt, expiresAt,
-        storagePath, ownerId, isEncrypted, encryptionKeyId, metadata,
-      ];
+  /// Validación cliente del límite por archivo Premium (100 MB)
+  bool get isWithinPremiumLimit => fileSizeBytes <= (100 * 1024 * 1024);
+
+  double get sizeInMB => fileSizeBytes / (1024 * 1024);
 }

@@ -1,5 +1,100 @@
 # KRIPTONSHARE — Memoria de sesión
 
+## 2026-07-29
+
+### Tarea
+Aplicar la actualización de arquitectura del Virtual Data Room (VDR) para usuarios Premium de KRIPTONSHARE según `KRIPTONSHARE Actualización Arquitectura Virtual Data Room 29Jul26.md`, e integrar tests + guía E2E.
+
+### Fases implementadas
+1. **Migración SQL y Edge Function**
+   - `supabase/migrations/20260729000000_vdr_architecture_update.sql`: tablas `data_rooms`, `folders`, `files`, `share_links`, `journey_telemetry`, columnas Premium, políticas RLS, triggers y funciones RPC.
+   - `supabase/functions/billing-sync/index.ts`: Edge Function para sincronizar eventos de RevenueCat y actualizar `max_storage_bytes`/`is_premium`.
+2. **Core cliente**
+   - Constantes VDR, tema corporativo, utilidades crypto/network y datasource R2.
+3. **Dominio y datos**
+   - Entidades `DataRoomEntity`, `FolderEntity`, `FileEntity`, `ShareLinkEntity`, `JourneyTelemetryEntity`.
+   - Legacy aislado en `legacy_file_entity.dart`.
+   - Modelos, datasources, repositorios y use cases.
+4. **Notifiers**
+   - Lazy decryption, batch upload y explorer.
+5. **UI/UX**
+   - Pantallas explorer/lobby/storage, widgets Atomic Design, watermark dinámico, layout seguro.
+6. **Enrutamiento e integración**
+   - Rutas `/data-room`, `/f/:id` y `/d/:id`.
+7. **Tests y guía E2E**
+   - Tests unitarios VDR y actualización de `E2E_TEST_GUIDE.md`.
+
+### Decisiones clave
+- Entidades legacy aisladas para no romper el repositorio histórico; nuevas entidades usan nombres exactos del documento.
+- Políticas RLS públicas para lectura a través de enlaces activos.
+- Contraseña de compartir e IP del receptor son placeholders por ahora.
+
+### Verificación pendiente
+- `flutter analyze` y `flutter test` deben correrse en el entorno del usuario; no se ejecutaron desde este agente por limitaciones de Windows/PowerShell 5.1 con `&&`.
+
+### Acciones pendientes del usuario
+1. Aplicar migración SQL en Supabase.
+2. Desplegar Edge Function `billing-sync`.
+3. Configurar webhook de RevenueCat.
+4. Ejecutar `flutter pub get`, `flutter analyze`, `flutter test` y build de prueba.
+5. Seguir sección VDR de `E2E_TEST_GUIDE.md`.
+
+## 2026-07-26
+
+### Tarea
+Corregir el overload conflictivo de `check_upload_limits` en Supabase que causaba `PGRST203`.
+
+### Causa
+Existían dos funciones `public.check_upload_limits`:
+- `public.check_upload_limits(p_user_id => uuid, p_file_size => integer)` — usada por el cliente (`lib/providers/file_provider.dart:139`).
+- `public.check_upload_limits(p_user_id => uuid, p_file_size => integer, p_is_folder_upload => boolean)` — residual de migraciones anteriores.
+PostgREST no podía resolver la llamada con dos parámetros nombrados.
+
+### Cambios realizados
+- `supabase/migrations/20260726000000_unify_check_upload_limits.sql`:
+  - Asegura columnas `total_storage_used_bytes`, `max_storage_premium_bytes`, `max_storage_bytes` en `users`.
+  - Alinea `max_links_monthly` a `20`.
+  - Elimina el overload de 3 parámetros.
+  - Recrea `check_upload_limits(UUID, INTEGER)` con lógica multi-tier completa.
+- `supabase/schema.sql`, `supabase/schema_migration_fix.sql`: actualizados al estado final.
+- `supabase/migrations/20260725000000_premium_dataroom.sql`: reemplazada función de 3 parámetros por la de 2.
+- `supabase/migrations/20260712000000_must_have_and_premium.sql`: usa `COALESCE(max_storage_bytes, max_storage_premium_bytes, 2147483648)`.
+
+### Resultado
+- SQL ejecutado sin errores.
+- `flutter run` inició limpio.
+- No apareció `PGRST203` ni `[canUpload] RPC error...` en los logs.
+- Login como `receptor@kriptonshare.test` funciona; `getReceivedFiles` devolvió 5 archivos.
+- Falta confirmar `check_upload_limits` intentando una subida real.
+
+### Pendientes relacionados
+- Desplegar gateway `infra/conversion/` para que funcione la vista previa PDF de Office.
+- Corregir `RenderFlex overflowed by 7.8 pixels` en `lib/screens/viewer/viewer_screen.dart:311`.
+
+## 2026-07-25
+
+### Tarea
+Implementar Fase 1: Vista Previa Segura de Documentos Microsoft Office (`.docx`, `.xlsx`, `.pptx`, etc.) según `KRIPTONSHARE_Fase1_Vista_Previa_Office_Especificacion.md`.
+
+### Cambios realizados
+- Migración SQL `supabase/migrations/20260801000000_office_pdf_preview.sql` con columnas `viewer_*` y `conversion_status`, y RPCs actualizadas.
+- Infraestructura de conversión `infra/conversion/`: Docker Compose con Gotenberg + gateway Deno propio (JWT, límites por plan, rate-limit, sin logs de contenido).
+- Utilidades y servicios Flutter: `OfficeFormats`, `ConversionService`, constantes de conversión.
+- Modelo `KriptonFile` con campos de preview y `hasPdfPreview`.
+- `FileService`: conversión en upload, doble objeto R2, `useViewerObject`, borrado doble, limpieza best-effort.
+- `ViewerScreen`: rama de preview Office con `pdfrx`, watermark dinámico con email + fecha.
+- Paridad en capa Clean Architecture de upload: repositorio y notifier actualizados.
+- UI de upload: chip informativo, estado "Generando vista previa segura…", aviso de fallback.
+- Tests unitarios para `office_formats`, `conversion_service`, `kripton_file` y nuevo test crypto de payloads distintos con misma contraseña.
+- README y E2E_TEST_GUIDE actualizados.
+
+### Pendiente
+- ✅ Migración SQL aplicada con éxito en Supabase tras corregir error `42P13` con `DROP FUNCTION IF EXISTS`.
+- `flutter analyze` ejecutado; se corrigieron errores/warnings en `upload_repository_impl.dart`, `file_provider.dart` y `conversion_service_test.dart`.
+- Ejecutar `flutter analyze` y `flutter test` nuevamente para confirmar.
+- Desplegar gateway de conversión.
+- Validar E2E con documentos Office reales.
+
 ## 2026-07-24
 
 ### Tarea

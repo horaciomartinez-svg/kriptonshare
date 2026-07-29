@@ -192,6 +192,48 @@ void main() {
       );
     });
 
+    test('two encryptFileInIsolate with same password produce distinct payloads', () async {
+      // Arrange
+      final plaintext = utf8.encode('Contrato de confidencialidad NDA');
+      const password = 'shared-password';
+
+      // Act
+      final enc1 = await encryptFileInIsolate({
+        'fileBytes': Uint8List.fromList(plaintext),
+        'password': password,
+      });
+      final enc2 = await encryptFileInIsolate({
+        'fileBytes': Uint8List.fromList(plaintext),
+        'password': password,
+      });
+
+      // Assert: salts y nonces distintos
+      expect(enc1['salt'], isNot(equals(enc2['salt'])));
+      expect(enc1['nonce'], isNot(equals(enc2['nonce'])));
+
+      // Ambos descifrables con la misma contraseña
+      final decrypted1 = await cryptoService.decryptFileBytes(
+        encryptedBytes: Uint8List.fromList([
+          ...(enc1['salt'] as Uint8List),
+          ...(enc1['nonce'] as Uint8List),
+          ...(enc1['ciphertext'] as Uint8List),
+          ...(enc1['authTag'] as Uint8List),
+        ]),
+        password: password,
+      );
+      final decrypted2 = await cryptoService.decryptFileBytes(
+        encryptedBytes: Uint8List.fromList([
+          ...(enc2['salt'] as Uint8List),
+          ...(enc2['nonce'] as Uint8List),
+          ...(enc2['ciphertext'] as Uint8List),
+          ...(enc2['authTag'] as Uint8List),
+        ]),
+        password: password,
+      );
+      expect(decrypted1.toList(), plaintext);
+      expect(decrypted2.toList(), plaintext);
+    });
+
     test('should fail decryption with wrong key', () {
       // Arrange
       final plaintext = utf8.encode('Mensaje secreto');

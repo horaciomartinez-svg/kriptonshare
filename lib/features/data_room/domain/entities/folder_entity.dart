@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../../../../models/kripton_file.dart';
+import 'file_entity.dart';
 
 @immutable
 class FolderEntity {
@@ -7,10 +7,11 @@ class FolderEntity {
   final String ownerId;
   final String name;
   final String? description;
-  final List<KriptonFile> files;
+  final List<FileEntity> files;
   final int totalSizeBytes;
-  final DateTime createdAt;
   final bool isDeleted;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   const FolderEntity({
     required this.id,
@@ -18,20 +19,29 @@ class FolderEntity {
     required this.name,
     this.description,
     this.files = const [],
-    this.totalSizeBytes = 0,
-    required this.createdAt,
+    required this.totalSizeBytes,
     this.isDeleted = false,
+    required this.createdAt,
+    required this.updatedAt,
   });
+
+  /// Capacidad usada en megabytes
+  double get totalSizeInMB => totalSizeBytes / (1024 * 1024);
+
+  /// Porcentaje consumido respecto al límite base de 1 GB
+  double get storagePercentage =>
+      (totalSizeBytes / 1073741824).clamp(0.0, 1.0);
 
   FolderEntity copyWith({
     String? id,
     String? ownerId,
     String? name,
     String? description,
-    List<KriptonFile>? files,
+    List<FileEntity>? files,
     int? totalSizeBytes,
-    DateTime? createdAt,
     bool? isDeleted,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return FolderEntity(
       id: id ?? this.id,
@@ -40,11 +50,9 @@ class FolderEntity {
       description: description ?? this.description,
       files: files ?? this.files,
       totalSizeBytes: totalSizeBytes ?? this.totalSizeBytes,
-      createdAt: createdAt ?? this.createdAt,
       isDeleted: isDeleted ?? this.isDeleted,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
-
-  bool get isOverLimit => totalSizeBytes > (1024 * 1024 * 1024); // > 1 GB base
-  int get fileCount => files.length;
 }

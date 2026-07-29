@@ -11,7 +11,7 @@ import 'core/network/network_info.dart';
 import 'core/utils/theme.dart';
 import 'utils/constants.dart';
 import 'features/data_room/data/repositories/crypto_repository_impl.dart';
-import 'features/data_room/data/repositories/data_room_repository_impl.dart';
+import 'features/data_room/data_room_providers.dart';
 import 'features/data_room/domain/repositories/i_crypto_repository.dart';
 import 'features/data_room/domain/repositories/i_data_room_repository.dart';
 import 'features/data_room/presentation/notifiers/data_room_notifier.dart';
@@ -31,12 +31,7 @@ final cryptoRepositoryProvider = Provider<ICryptoRepository>((ref) {
   return CryptoRepositoryImpl(CryptoService());
 });
 
-final dataRoomRepositoryProvider = Provider<IDataRoomRepository>((ref) {
-  return DataRoomRepositoryImpl(
-    localDB: ref.watch(localDatabaseProvider),
-    supabase: Supabase.instance.client,
-  );
-});
+// dataRoomRepositoryProvider se define en features/data_room/data_room_providers.dart
 
 final dataRoomNotifierProvider = StateNotifierProvider<DataRoomNotifier, DataRoomState>((ref) {
   return DataRoomNotifier(
@@ -132,6 +127,8 @@ class _KriptonShareAppState extends ConsumerState<KriptonShareApp> {
     // Supported paths:
     //   https://kriptonshare.com/room/<id>
     //   https://kriptonshare.com/folder-room/<id>
+    //   https://kriptonshare.com/f/<id>
+    //   https://kriptonshare.com/d/<id>
     //   kriptonshare://room/<id>
     if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'room') {
       final linkId = uri.pathSegments[1];
@@ -140,6 +137,12 @@ class _KriptonShareAppState extends ConsumerState<KriptonShareApp> {
         uri.pathSegments[0] == 'folder-room') {
       final folderLinkId = uri.pathSegments[1];
       router.go('/folder-room/$folderLinkId');
+    } else if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'f') {
+      final folderLinkId = uri.pathSegments[1];
+      router.go('/f/$folderLinkId');
+    } else if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'd') {
+      final linkId = uri.pathSegments[1];
+      router.go('/d/$linkId');
     }
   }
 

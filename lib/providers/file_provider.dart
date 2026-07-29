@@ -7,9 +7,11 @@ import 'package:uuid/uuid.dart';
 import 'package:dio/dio.dart';
 import 'package:crypto/crypto.dart';
 import '../models/kripton_file.dart';
+import '../services/conversion_service.dart';
 import '../services/crypto_service.dart';
 import '../services/r2_signature_service.dart';
 import '../utils/constants.dart';
+import '../utils/office_formats.dart';
 import 'auth_provider.dart';
 
 final fileServiceProvider = Provider<FileService>((ref) => FileService(ref));
@@ -67,6 +69,40 @@ class FileService {
   SupabaseClient get _client => _ref.read(supabaseClientProvider);
 
   String _objectPath(String storageKey) => '/${AppConstants.bucketName}/$storageKey';
+
+  /// Sube un objeto cifrado a Cloudflare R2 con firma SigV4.
+  Future<void> _putEncryptedObject(String storageKey, Uint8List encryptedBytes) async {
+    final objectPath = _objectPath(storageKey);
+    final payloadHash = sha256.convert(encryptedBytes).toString();
+    final signedHeaders = _r2Signer.signRequest(
+      method: 'PUT',
+      path: objectPath,
+      payloadHash: payloadHash,
+      headers: {'Content-Type': 'application/octet-stream'},
+    );
+    await _dio.put(
+      '${AppConstants.r2Endpoint}$objectPath',
+      data: encryptedBytes,
+      options: Options(headers: signedHeaders),
+    );
+  }
+
+  /// Elimina un objeto de Cloudflare R2 (best-effort, no falla).
+  Future<void> _deleteR2Object(String storageKey) async {
+    try {
+      final objectPath = _objectPath(storageKey);
+      final signedHeaders = _r2Signer.signRequest(
+        method: 'DELETE',
+        path: objectPath,
+      );
+      await _dio.delete(
+        '${AppConstants.r2Endpoint}$objectPath',
+        options: Options(headers: signedHeaders),
+      );
+    } catch (e) {
+      debugPrint('[R2 DELETE] Error eliminando $storageKey: $e');
+    }
+  }
 
   /// Prueba temporal de conectividad contra R2. Devuelve el status code o relanza el error.
   Future<int> testR2Connection() async {
@@ -144,6 +180,7 @@ class FileService {
     required int selectedDurationHours,
     int? maxDownloads,
     String? recipientEmail,
+    void Function(String status)? onConversionStatus,
   }) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) throw Exception('Usuario no autenticado');
@@ -181,51 +218,87 @@ class FileService {
     ]);
 
     // 2. SUBIDA DIRECTA A CLOUDFLARE R2 REST ENDPOINT (S3-compatible, firmada SigV4)
-    final objectPath = _objectPath(storageKey);
-    final uploadUrl = '${AppConstants.r2Endpoint}$objectPath';
-    final payloadHash = sha256.convert(encryptedBytes).toString();
-    debugPrint('[R2 UPLOAD] URL: $uploadUrl');
-    debugPrint('[R2 UPLOAD] Payload size: ${encryptedBytes.length} bytes');
-    debugPrint('[R2 UPLOAD] Payload hash: $payloadHash');
+    await _putEncryptedObject(storageKey, encryptedBytes);
 
-    final signedHeaders = _r2Signer.signRequest(
-      method: 'PUT',
-      path: objectPath,
-      payloadHash: payloadHash,
-      headers: {'Content-Type': 'application/octet-stream'},
-    );
-    debugPrint('[R2 UPLOAD] Authorization header: ${signedHeaders['Authorization']?.substring(0, signedHeaders['Authorization']!.length > 80 ? 80 : signedHeaders['Authorization']!.length)}...');
+    // 3. Conversión Office → PDF (Fase 1). Se ejecuta en el emisor antes de
+    //    subir el preview cifrado como segundo objeto en R2.
+    String? viewerStorageKey;
+    int? viewerSizeBytes;
+    String conversionStatus = 'none';
 
-    await _dio.put(
-      uploadUrl,
-      data: encryptedBytes,
-      options: Options(headers: signedHeaders),
-    );
+    if (OfficeFormats.isConvertible(mimeType: mimeType, fileName: fileName)) {
+      conversionStatus = 'pending';
+      onConversionStatus?.call(conversionStatus);
+      try {
+        final accessToken = _client.auth.currentSession?.accessToken;
+        if (accessToken == null) {
+          throw const ConversionException('unauthorized', 'Sin sesión');
+        }
+        final result = await ConversionService().convertOfficeToPdf(
+          fileBytes: fileBytes,
+          fileName: fileName,
+          accessToken: accessToken,
+          maxBytes: AppConstants.conversionMaxBytesFor(isPremium: user.isPremium),
+        );
+        // Misma contraseña del usuario → el receptor solo necesita una.
+        final encPreview = await Isolate.run(() => encryptFileInIsolate({
+          'fileBytes': result.pdfBytes,
+          'password': userPassword,
+        }));
+        viewerStorageKey = _uuid.v4();
+        final previewPayload = Uint8List.fromList([
+          ...(encPreview['salt'] as Uint8List),
+          ...(encPreview['nonce'] as Uint8List),
+          ...(encPreview['ciphertext'] as Uint8List),
+          ...(encPreview['authTag'] as Uint8List),
+        ]);
+        await _putEncryptedObject(viewerStorageKey, previewPayload);
+        viewerSizeBytes = result.pdfBytes.length;
+        conversionStatus = 'ready';
+        onConversionStatus?.call(conversionStatus);
+      } on ConversionException catch (e) {
+        debugPrint('[CONVERSION] Falló (${e.code}): ${e.message}. Continúa sin preview.');
+        conversionStatus = 'failed';   // fallback: comportamiento actual
+        viewerStorageKey = null;
+        onConversionStatus?.call(conversionStatus);
+      }
+    }
 
-    // 3. Temporalidad dinámica inyectada desde el Slider
+    // 4. Temporalidad dinámica inyectada desde el Slider
     final expiresAt = DateTime.now().add(Duration(hours: selectedDurationHours));
 
-    // 4. Inserción de metadatos estructurales (Almacenamiento liviano en Supabase)
-    await _client.from('files').insert({
-      'id': fileId,
-      'owner_id': user.id,
-      'original_filename': fileName,
-      'file_size_bytes': fileBytes.length,
-      'mime_type': mimeType,
-      'storage_provider': 'r2',
-      'bucket_name': AppConstants.bucketName,
-      'storage_object_key': storageKey,
-      'object_path': storageKey,
-      'aes_key_encrypted': key,
-      'salt': salt,
-      'encryption_salt': salt,
-      'nonce': nonce,
-      'mac_tag': authTag,
-      'is_deleted': false,
-      'expires_at': expiresAt.toIso8601String(),
-      'max_downloads': maxDownloads ?? AppConstants.maxDownloadsDefault,
-      'status': 'active',
-    });
+    // 5. Inserción de metadatos estructurales (Almacenamiento liviano en Supabase)
+    try {
+      await _client.from('files').insert({
+        'id': fileId,
+        'owner_id': user.id,
+        'original_filename': fileName,
+        'file_size_bytes': fileBytes.length,
+        'mime_type': mimeType,
+        'storage_provider': 'r2',
+        'bucket_name': AppConstants.bucketName,
+        'storage_object_key': storageKey,
+        'object_path': storageKey,
+        'viewer_object_key': viewerStorageKey,
+        'viewer_file_size_bytes': viewerSizeBytes,
+        'conversion_status': conversionStatus,
+        'aes_key_encrypted': key,
+        'salt': salt,
+        'encryption_salt': salt,
+        'nonce': nonce,
+        'mac_tag': authTag,
+        'is_deleted': false,
+        'expires_at': expiresAt.toIso8601String(),
+        'max_downloads': maxDownloads ?? AppConstants.maxDownloadsDefault,
+        'status': 'active',
+      });
+    } catch (e) {
+      // Best-effort: si falla el insert, intentar limpiar ambos objetos R2.
+      debugPrint('[UPLOAD] Falló insert de metadatos, limpiando objetos R2: $e');
+      await _deleteR2Object(storageKey);
+      if (viewerStorageKey != null) await _deleteR2Object(viewerStorageKey);
+      rethrow;
+    }
 
     await _client.from('share_links').insert({
       'id': linkId,
@@ -290,7 +363,8 @@ class FileService {
 
   Future<List<KriptonFile>> getReceivedFiles() async {
     final user = _ref.read(authStateProvider).valueOrNull;
-    debugPrint('[getReceivedFiles] Current user email: ${user?.email}');
+    if (user == null) throw Exception('Usuario no autenticado');
+    debugPrint('[getReceivedFiles] Current user email: ${user.email}');
 
     // 1. Intentar la RPC preferida (SECURITY DEFINER, case-insensitive)
     try {
@@ -318,7 +392,7 @@ class FileService {
             'expires_at, '
             'recipient_email, '
             'is_active, '
-            'files!inner(id, owner_id, original_filename, file_size_bytes, mime_type, storage_provider, bucket_name, storage_object_key, created_at, expires_at, max_downloads, downloads_count, status)',
+            'files!inner(id, owner_id, original_filename, file_size_bytes, mime_type, storage_provider, bucket_name, storage_object_key, viewer_object_key, viewer_file_size_bytes, conversion_status, created_at, expires_at, max_downloads, downloads_count, status)',
           )
           .filter('recipient_email', 'ilike', user.email)
           .eq('is_active', true)
@@ -359,9 +433,17 @@ class FileService {
     return KriptonFile.fromJson(response.first as Map<String, dynamic>);
   }
 
-  Future<Uint8List> downloadAndDecryptFile(KriptonFile file, String password, {String? linkId}) async {
+  Future<Uint8List> downloadAndDecryptFile(
+    KriptonFile file,
+    String password, {
+    String? linkId,
+    bool useViewerObject = false,
+  }) async {
     // DESCARGA FLUIDA DESDE CLOUDFLARE R2 (S3-compatible, firmada SigV4)
-    final objectPath = '/${file.bucketName}/${file.storageObjectKey}';
+    final objectKey = useViewerObject && file.viewerObjectKey != null
+        ? file.viewerObjectKey!
+        : file.storageObjectKey;
+    final objectPath = '/${file.bucketName}/$objectKey';
     final downloadUrl = '${AppConstants.r2Endpoint}$objectPath';
     debugPrint('[R2 DOWNLOAD] URL: $downloadUrl');
 
@@ -412,17 +494,13 @@ class FileService {
     final file = await _client.from('files').select().eq('id', fileId).eq('owner_id', user.id).maybeSingle();
     if (file == null) return;
 
-    try {
-      final objectPath = _objectPath(file['storage_object_key'] as String);
-      final deleteUrl = '${AppConstants.r2Endpoint}$objectPath';
-      debugPrint('[R2 DELETE] URL: $deleteUrl');
-      final signedHeaders = _r2Signer.signRequest(
-        method: 'DELETE',
-        path: objectPath,
-      );
-      await _dio.delete(deleteUrl, options: Options(headers: signedHeaders));
-    } catch (e) {
-      debugPrint('[R2 DELETE] Error: $e');
+    // Borrar objeto principal (original cifrado)
+    await _deleteR2Object(file['storage_object_key'] as String);
+
+    // Borrar preview PDF cifrado si existe
+    final viewerKey = file['viewer_object_key'] as String?;
+    if (viewerKey != null && viewerKey.isNotEmpty) {
+      await _deleteR2Object(viewerKey);
     }
 
     await _client.from('share_links').delete().eq('file_id', fileId);

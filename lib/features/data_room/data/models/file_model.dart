@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/file_entity.dart';
+import '../../domain/entities/legacy_file_entity.dart';
 
 class FileModel extends Equatable {
   final String id;
@@ -70,8 +70,8 @@ class FileModel extends Equatable {
         storagePath, ownerId, isEncrypted, encryptionKeyId, metadata,
       ];
 
-  FileEntity toEntity() {
-    return FileEntity(
+  LegacyFileEntity toEntity() {
+    return LegacyFileEntity(
       id: id,
       name: name,
       mimeType: mimeType,

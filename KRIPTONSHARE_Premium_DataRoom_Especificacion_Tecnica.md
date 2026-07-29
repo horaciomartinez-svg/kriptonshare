@@ -1008,4 +1008,30 @@ El plano técnico satisface integralmente los requerimientos comerciales y de se
 
 ---
 
+## Anexo A — Fase 1: Vista previa segura de documentos Microsoft Office
+
+Aprobada para implementación el 27 de julio de 2026. Permite que los usuarios suban documentos Office (`.docx`, `.xlsx`, `.pptx`, `.odt`, `.rtf`, etc.) y que los receptores los visualicen como PDF dentro de la app, sin salir de KRIPTONSHARE.
+
+### Cambios de modelo
+- Tabla `files` recibe `viewer_object_key UUID`, `viewer_file_size_bytes INTEGER` y `conversion_status TEXT` (`none` | `pending` | `ready` | `failed`).
+- Funciones RPC `get_shared_file_metadata`, `get_received_files`, `increment_link_access_count` e `increment_file_download_count` se recrean exponiendo las nuevas columnas.
+
+### Infraestructura de conversión
+- Nuevo directorio `infra/conversion/`: Docker Compose con Gotenberg (LibreOffice headless) y un gateway Deno propio.
+- El gateway valida JWT de Supabase, resuelve el límite del plan desde `users.max_file_size_bytes`, aplica rate-limit 10/min y 100/día, filtra extensiones y reenvía a Gotenberg con `pdfa=PDF/A-2b`.
+- Sin persistencia de contenido: tmpfs, logs solo métricas agregadas.
+
+### App Flutter
+- `OfficeFormats.isConvertible(...)` detecta documentos convertibles por MIME/extensión.
+- `ConversionService` llama al gateway durante el upload; el PDF devuelto se cifra con la **misma contraseña** que el archivo original.
+- `FileService.uploadAndCreateLink` sube dos objetos a Cloudflare R2: original cifrado y preview cifrado.
+- `ViewerScreen` descarga el preview para Office con `conversion_status='ready'` y lo renderiza con `pdfrx`; el watermark ahora muestra el email del receptor y la fecha.
+- Si la conversión falla, el upload continúa y el receptor ve el mensaje de formato protegido actualizado.
+
+### Tests y documentación
+- Tests unitarios en `test/utils/office_formats_test.dart`, `test/services/conversion_service_test.dart` y `test/models/kripton_file_test.dart`.
+- README y `E2E_TEST_GUIDE.md` actualizados con la nueva funcionalidad y el matiz zero-knowledge para Office.
+
+---
+
 *Documento generado a partir de "Modificacion Arquitectura KRIPTONSHARE usuario premium 23Jul26.pdf" y del análisis del repositorio github.com/horaciomartinez-svg/kriptonshare (commit 06e8f28).*

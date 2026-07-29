@@ -13,6 +13,7 @@ import '../../models/kripton_file.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/file_provider.dart';
 import '../../services/screenshot_service.dart';
+import '../../utils/office_formats.dart';
 import '../../utils/theme.dart';
 import '../../widgets/video_player_screen.dart';
 
@@ -132,10 +133,15 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       debugPrint('[VIEWER] Iniciando descarga y descifrado para linkId=$linkId');
       debugPrint('[VIEWER] Archivo: ${_file!.originalFilename} (${_file!.mimeType})');
 
+      final usePreview = OfficeFormats.isConvertible(
+              mimeType: _file!.mimeType, fileName: _file!.originalFilename) &&
+          _file!.hasPdfPreview;
+
       final decrypted = await fileService.downloadAndDecryptFile(
         _file!,
         _passwordController.text,
         linkId: linkId,
+        useViewerObject: usePreview,
       );
 
       debugPrint('[VIEWER] Descifrado exitoso: ${decrypted.length} bytes');
@@ -148,8 +154,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         _status = _ViewerStatus.viewing;
       });
 
-      // Si el PDF no se renderiza en 3 segundos, ofrecer fallback externo.
-      if (_file!.mimeType == 'application/pdf') {
+      // Si el PDF no se renderiza en 3 segundos, ofrecer fallback.
+      if (_file!.mimeType == 'application/pdf' || usePreview) {
         _pdfLoadTimer?.cancel();
         _pdfLoadTimer = Timer(const Duration(seconds: 3), () {
           if (mounted && !_pdfController.isReady) {
@@ -454,9 +460,14 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           ),
         ),
       );
-    } else if (mimeType == 'application/pdf') {
-      // PDF: visor nativo dentro de la app; no se permite compartir, descargar
-      // ni abrir con aplicaciones externas.
+    } else if (mimeType == 'application/pdf' ||
+        (OfficeFormats.isConvertible(
+                mimeType: mimeType, fileName: _file!.originalFilename) &&
+            _file!.hasPdfPreview)) {
+      // PDF original o vista previa PDF de un Office (Fase 1).
+      final isOfficePreview = OfficeFormats.isConvertible(
+              mimeType: mimeType, fileName: _file!.originalFilename) &&
+          _file!.hasPdfPreview;
       final pdfParams = PdfViewerParams(
         backgroundColor: KriptonTheme.charcoalBlack,
         errorBannerBuilder: (context, error, stackTrace, documentRef) {
@@ -481,9 +492,11 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         // Usamos PdfViewer.data para evitar problemas de URI de archivo
         // en algunos dispositivos Android.
         content = PdfViewer.data(
-          key: ValueKey(_file!.id),
+          key: ValueKey('${_file!.id}-preview'),
           _decryptedBytes!,
-          sourceName: _file!.originalFilename,
+          sourceName: isOfficePreview
+              ? '${_file!.originalFilename} (vista previa)'
+              : _file!.originalFilename,
           controller: _pdfController,
           useProgressiveLoading: false,
           params: pdfParams,
@@ -566,7 +579,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             ),
             const SizedBox(height: 32),
             Text(
-              'Los documentos de Microsoft Office y otros formatos no se visualizan directamente dentro de la app por seguridad.',
+              _file!.conversionStatus == 'failed'
+                  ? 'No se pudo generar la vista previa segura de este documento. Puedes pedir al emisor que lo vuelva a subir o que lo convierta a PDF.'
+                  : 'Los documentos de Microsoft Office y otros formatos no se visualizan directamente dentro de la app por seguridad.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: KriptonTheme.silver,
                   ),
@@ -599,8 +614,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               ),
               child: CustomPaint(
                 painter: WatermarkPainter(
-                  text: 'KRIPTONSHARE | CONFIDENCIAL',
-                  opacity: 0.18,
+                  text: _file!.recipientEmail ?? 'KRIPTONSHARE | CONFIDENCIAL',
+                  secondaryText: DateTime.now().toIso8601String().substring(0, 16),
+                  opacity: 0.15,
                 ),
               ),
             ),
@@ -708,23 +724,40 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
 class WatermarkPainter extends CustomPainter {
   final String text;
+  final String? secondaryText;
   final double opacity;
 
-  WatermarkPainter({required this.text, this.opacity = 0.15});
+  WatermarkPainter({
+    required this.text,
+    this.secondaryText,
+    this.opacity = 0.15,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final textStyle = TextStyle(
+    final primaryStyle = TextStyle(
       color: Colors.white.withOpacity(opacity),
       fontSize: 24,
       fontWeight: FontWeight.w500,
     );
 
-    final textSpan = TextSpan(text: text, style: textStyle);
-    final textPainter = TextPainter(
-      text: textSpan,
+    final secondaryStyle = TextStyle(
+      color: Colors.white.withOpacity(opacity * 0.8),
+      fontSize: 14,
+      fontWeight: FontWeight.w400,
+    );
+
+    final primaryPainter = TextPainter(
+      text: TextSpan(text: text, style: primaryStyle),
       textDirection: TextDirection.ltr,
     );
+
+    final secondaryPainter = secondaryText != null
+        ? TextPainter(
+            text: TextSpan(text: secondaryText, style: secondaryStyle),
+            textDirection: TextDirection.ltr,
+          )
+        : null;
 
     // Draw diagonal watermarks
     for (int i = 0; i < 5; i++) {
@@ -735,13 +768,20 @@ class WatermarkPainter extends CustomPainter {
           j * size.height / 3 + 50,
         );
         canvas.rotate(-45 * 3.14159265359 / 180);
-        textPainter.layout(maxWidth: 200);
-        textPainter.paint(canvas, Offset.zero);
+
+        primaryPainter.layout(maxWidth: 300);
+        primaryPainter.paint(canvas, Offset.zero);
+
+        if (secondaryPainter != null) {
+          secondaryPainter.layout(maxWidth: 300);
+          secondaryPainter.paint(canvas, Offset(0, primaryPainter.height + 4));
+        }
+
         canvas.restore();
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

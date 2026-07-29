@@ -5,19 +5,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pdfrx/pdfrx.dart';
-import '../../../../models/kripton_file.dart';
-import '../../../../models/user_model.dart';
-import '../../../../providers/auth_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../app/config/theme/app_theme.dart';
 import '../../../../services/screenshot_service.dart';
-import '../../../../utils/theme.dart';
+import '../../../../utils/constants.dart';
 import '../../../../widgets/video_player_screen.dart';
-import '../../domain/repositories/i_folder_repository.dart';
-import '../../folder_providers.dart';
+import '../../data_room_providers.dart';
+import '../../domain/entities/file_entity.dart';
+import '../../domain/entities/folder_entity.dart';
 import '../notifiers/folder_notifier.dart';
+import '../notifiers/lazy_decryption_notifier.dart';
+import '../widgets/atoms/dynamic_watermark_text.dart';
+import '../widgets/organisms/recipient_email_modal.dart';
+import '../widgets/templates/viewer_secure_layout.dart';
 
-final folderNotifierProvider = StateNotifierProvider.family<FolderNotifier,
-    FolderScreenState, IFolderRepository>((ref, repository) {
-  return FolderNotifier(folderRepository: repository);
+final folderNotifierProvider = StateNotifierProvider<FolderNotifier, FolderScreenState>((ref) {
+  return FolderNotifier(folderRepository: ref.watch(folderRepositoryProvider));
 });
 
 class DataRoomLobbyScreen extends ConsumerStatefulWidget {
@@ -26,28 +29,24 @@ class DataRoomLobbyScreen extends ConsumerStatefulWidget {
   const DataRoomLobbyScreen({super.key, required this.folderLinkId});
 
   @override
-  ConsumerState<DataRoomLobbyScreen> createState() =>
-      _DataRoomLobbyScreenState();
+  ConsumerState<DataRoomLobbyScreen> createState() => _DataRoomLobbyScreenState();
 }
 
 class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
   final _passwordController = TextEditingController();
   final _pdfController = PdfViewerController();
-  Uint8List? _decryptedBytes;
-  KriptonFile? _openFile;
+  final _pageStopwatch = Stopwatch();
+  String? _recipientEmail;
+  bool _emailRequired = true;
+  bool _watermarkEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _initializeSecureView();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final repo = ref.read(folderRepositoryProvider);
-      ref.read(folderNotifierProvider(repo).notifier)
-        ..loadFolderByShareLink(widget.folderLinkId)
-        ..logJourneyEvent(
-          shareLinkId: widget.folderLinkId,
-          eventType: 'lobby_enter',
-        );
+      ref.read(folderNotifierProvider.notifier).loadFolderByShareLink(widget.folderLinkId);
+      _maybeLogLobbyEnter();
     });
   }
 
@@ -55,11 +54,58 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
     await ScreenshotService.enableSecureView();
   }
 
+  Future<void> _maybeLogLobbyEnter() async {
+    final link = await _getShareLinkMeta();
+    if (link == null) return;
+    _emailRequired = link['require_recipient_email'] as bool? ?? true;
+    _watermarkEnabled = link['enable_watermark'] as bool? ?? true;
+    setState(() {});
+
+    if (_recipientEmail != null || !_emailRequired) {
+      _logJourneyEvent('lobby_enter');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _getShareLinkMeta() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('share_links')
+          .select('require_recipient_email, enable_watermark')
+          .eq('id', widget.folderLinkId)
+          .eq('is_active', true)
+          .maybeSingle();
+      return response;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _logJourneyEvent(String eventType, {String? fileId, int? pageNumber, int durationMs = 0}) async {
+    final email = _recipientEmail ?? 'anon@kriptonshare.com';
+    await ref.read(folderNotifierProvider.notifier).logJourneyEvent(
+          shareLinkId: widget.folderLinkId,
+          eventType: eventType,
+          fileId: fileId,
+          pageNumber: pageNumber,
+          durationMs: durationMs,
+        );
+    // También al repositorio VDR para redundancia
+    try {
+      await ref.read(dataRoomRepositoryProvider).recordJourneyEvent(
+            shareLinkId: widget.folderLinkId,
+            fileId: fileId,
+            recipientEmail: email,
+            eventType: eventType,
+            pageNumber: pageNumber,
+            durationMs: durationMs,
+          );
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _passwordController.dispose();
-    // No deshabilitamos FLAG_SECURE: ahora es global para toda la app.
-    // PdfViewerController no requiere dispose() en esta versión de pdfrx.
+    _pageStopwatch.stop();
     super.dispose();
   }
 
@@ -72,202 +118,228 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
     if (mime.startsWith('image/')) return Icons.image;
     if (mime.startsWith('video/')) return Icons.videocam;
     if (mime == 'application/pdf') return Icons.picture_as_pdf;
-    if (mime.contains('spreadsheet') || mime.contains('excel')) {
-      return Icons.table_chart;
-    }
-    if (mime.contains('presentation') || mime.contains('powerpoint')) {
-      return Icons.slideshow;
-    }
-    if (mime.contains('word') || mime.contains('document')) {
-      return Icons.description;
-    }
+    if (mime.contains('spreadsheet') || mime.contains('excel')) return Icons.table_chart;
+    if (mime.contains('presentation') || mime.contains('powerpoint')) return Icons.slideshow;
+    if (mime.contains('word') || mime.contains('document')) return Icons.description;
     return Icons.insert_drive_file;
   }
 
-  Future<void> _openFileInLobby(KriptonFile file) async {
+  Future<void> _openFileInLobby(FileEntity file) async {
     if (_passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa la contraseña del Data Room')),
-      );
+      _showError('Ingresa la contraseña del Data Room');
       return;
     }
 
-    final repo = ref.read(folderRepositoryProvider);
-    final notifier = ref.read(folderNotifierProvider(repo).notifier);
+    _pageStopwatch.reset();
+    _pageStopwatch.start();
 
-    final decrypted = await notifier.decryptSingleFile(
-      file,
-      _passwordController.text,
-    );
+    await ref.read(lazyDecryptionProvider.notifier).decryptSingleFile(
+          file: file,
+          password: _passwordController.text,
+        );
 
-    if (decrypted == null) return;
-
-    await notifier.logJourneyEvent(
-      shareLinkId: widget.folderLinkId,
-      eventType: 'file_open',
-      fileId: file.id,
-    );
-
-    setState(() {
-      _decryptedBytes = decrypted;
-      _openFile = file;
-    });
+    ref.read(folderNotifierProvider.notifier).selectFile(file);
+    await _logJourneyEvent('file_open', fileId: file.id);
   }
 
   void _closeFile() {
-    final repo = ref.read(folderRepositoryProvider);
-    ref.read(folderNotifierProvider(repo).notifier)
-      ..purgeRAM()
-      ..logJourneyEvent(
-        shareLinkId: widget.folderLinkId,
-        eventType: 'lobby_exit',
+    final selectedFile = ref.read(folderNotifierProvider).selectedFile;
+    if (selectedFile != null) {
+      _logJourneyEvent('lobby_exit', fileId: selectedFile.id, durationMs: _pageStopwatch.elapsedMilliseconds);
+    }
+    _pageStopwatch.stop();
+    ref.read(lazyDecryptionProvider.notifier).purgeRAM();
+    ref.read(folderNotifierProvider.notifier).clearSelectedFile();
+  }
+
+  void _onPdfPageChanged(int page) {
+    final selectedFile = ref.read(folderNotifierProvider).selectedFile;
+    if (selectedFile != null) {
+      _logJourneyEvent(
+        'page_view',
+        fileId: selectedFile.id,
+        pageNumber: page,
+        durationMs: _pageStopwatch.elapsedMilliseconds,
       );
-    setState(() {
-      _decryptedBytes = null;
-      _openFile = null;
-    });
+      _pageStopwatch.reset();
+      _pageStopwatch.start();
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppTheme.crimsonRed),
+    );
+  }
+
+  void _onEmailSubmitted(String email) {
+    setState(() => _recipientEmail = email);
+    _logJourneyEvent('lobby_enter');
   }
 
   @override
   Widget build(BuildContext context) {
-    final repo = ref.watch(folderRepositoryProvider);
-    final state = ref.watch(folderNotifierProvider(repo));
-    final user = ref.watch(authStateProvider).valueOrNull;
+    final folderState = ref.watch(folderNotifierProvider);
+    final decryptedState = ref.watch(lazyDecryptionProvider);
+    final folder = folderState.folder;
+    final selectedFile = folderState.selectedFile;
 
-    return Scaffold(
-      backgroundColor: KriptonTheme.charcoalBlack,
-      appBar: AppBar(
-        title: Text(_openFile == null ? 'Data Room' : _openFile!.originalFilename),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () {
-            if (_openFile != null) {
-              _closeFile();
-            } else {
-              context.go('/dashboard');
-            }
-          },
+    if (folder == null && folderState.isLoading) {
+      return const Scaffold(
+        backgroundColor: AppTheme.charcoalDeep,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (folder == null) {
+      return Scaffold(
+        backgroundColor: AppTheme.charcoalDeep,
+        appBar: AppBar(title: const Text('Data Room')),
+        body: Center(
+          child: Text(
+            folderState.error ?? 'No se encontró el Data Room',
+            style: const TextStyle(color: AppTheme.silver),
+          ),
         ),
-      ),
-      body: SafeArea(
-        child: Stack(
+      );
+    }
+
+    if (_emailRequired && _recipientEmail == null) {
+      return Scaffold(
+        backgroundColor: AppTheme.charcoalDeep,
+        appBar: AppBar(title: Text(folder.name)),
+        body: SafeArea(
+          child: RecipientEmailModal(onSubmit: _onEmailSubmitted),
+        ),
+      );
+    }
+
+    if (selectedFile != null) {
+      return decryptedState.when(
+        data: (bytes) {
+          if (bytes == null) {
+            return _buildLobby(folder);
+          }
+          return ViewerSecureLayout(
+            title: selectedFile.originalFilename,
+            onClose: _closeFile,
+            content: _buildFileViewer(selectedFile, bytes),
+            overlays: _watermarkEnabled
+                ? [
+                    Positioned.fill(
+                      child: DynamicWatermarkText(
+                        recipientEmail: _recipientEmail ?? 'anon@kriptonshare.com',
+                        recipientIp: '0.0.0.0',
+                      ),
+                    ),
+                  ]
+                : null,
+          );
+        },
+        loading: () => Scaffold(
+          backgroundColor: AppTheme.charcoalDeep,
+          appBar: AppBar(title: Text(selectedFile.originalFilename)),
+          body: const Center(child: CircularProgressIndicator()),
+        ),
+        error: (err, _) => Scaffold(
+          backgroundColor: AppTheme.charcoalDeep,
+          appBar: AppBar(title: Text(selectedFile.originalFilename)),
+          body: Center(
+            child: Text('Error: $err', style: const TextStyle(color: AppTheme.silver)),
+          ),
+        ),
+      );
+    }
+
+    return _buildLobby(folder);
+  }
+
+  Widget _buildLobby(FolderEntity folder) {
+    return ViewerSecureLayout(
+      title: folder.name,
+      onClose: () => context.go('/dashboard'),
+      content: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildBody(state, user),
-            // Watermark global diagonal
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _LobbyWatermarkPainter(
-                    text: '${user?.email ?? "KRIPTONSHARE"} • CONFIDENCIAL',
-                  ),
-                ),
+            Text(
+              folder.name,
+              style: Theme.of(context).textTheme.displayMedium?.copyWith(color: AppTheme.platinum),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${folder.files.length} Archivos Cifrados · ${_formatBytes(folder.totalSizeBytes)}',
+              style: const TextStyle(color: AppTheme.silver),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              style: const TextStyle(color: AppTheme.platinum),
+              decoration: const InputDecoration(
+                labelText: 'Contraseña del Data Room',
+                prefixIcon: Icon(Icons.vpn_key, color: AppTheme.silver),
               ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Selecciona un archivo para descifrarlo en memoria RAM',
+              style: TextStyle(color: AppTheme.silver),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                itemCount: folder.files.length,
+                itemBuilder: (context, index) {
+                  final file = folder.files[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      leading: Icon(
+                        _iconForMime(file.mimeType),
+                        color: AppTheme.electricLime,
+                      ),
+                      title: Text(
+                        file.originalFilename,
+                        style: const TextStyle(color: AppTheme.platinum),
+                      ),
+                      subtitle: Text(
+                        '${_formatBytes(file.fileSizeBytes)} · Cifrado AES-256',
+                        style: const TextStyle(color: AppTheme.silver),
+                      ),
+                      trailing: const Icon(
+                        Icons.lock_open,
+                        color: AppTheme.mutedGreen,
+                      ),
+                      onTap: () => _openFileInLobby(file),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const Text(
+              'Los documentos se descifran exclusivamente en RAM volátil y cuentan con auditoría de lectura activa.',
+              style: TextStyle(color: AppTheme.silver, fontSize: 12),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
       ),
+      overlays: _watermarkEnabled && _recipientEmail != null
+          ? [
+              Positioned.fill(
+                child: DynamicWatermarkText(
+                  recipientEmail: _recipientEmail!,
+                  recipientIp: '0.0.0.0',
+                ),
+              ),
+            ]
+          : null,
     );
   }
 
-  Widget _buildBody(FolderScreenState state, KriptonUser? user) {
-    if (state.isLoading && state.folder == null) {
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation(KriptonTheme.electricLime),
-        ),
-      );
-    }
-
-    if (state.error != null && state.folder == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            state.error!,
-            style: const TextStyle(color: KriptonTheme.alertRed),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    final folder = state.folder;
-    if (folder == null) {
-      return const Center(
-        child: Text('No se encontró el Data Room'),
-      );
-    }
-
-    if (_openFile != null && _decryptedBytes != null) {
-      return _buildFileViewer(_openFile!, _decryptedBytes!);
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            folder.name,
-            style: Theme.of(context).textTheme.displayMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${folder.fileCount} Archivos Cifrados · ${_formatBytes(folder.totalSizeBytes)}',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _passwordController,
-            obscureText: true,
-            style: const TextStyle(color: KriptonTheme.platinum),
-            decoration: const InputDecoration(
-              labelText: 'Contraseña del Data Room',
-              prefixIcon: Icon(Icons.vpn_key, color: KriptonTheme.silver),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Selecciona un archivo para descifrarlo en memoria RAM',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView.builder(
-              itemCount: folder.files.length,
-              itemBuilder: (context, index) {
-                final file = folder.files[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: Icon(
-                      _iconForMime(file.mimeType),
-                      color: KriptonTheme.electricLime,
-                    ),
-                    title: Text(
-                      file.originalFilename,
-                      style: const TextStyle(color: KriptonTheme.platinum),
-                    ),
-                    subtitle: Text(
-                      '${_formatBytes(file.fileSizeBytes)} · Cifrado AES-256',
-                      style: const TextStyle(color: KriptonTheme.silver),
-                    ),
-                    trailing: const Icon(
-                      Icons.lock_open,
-                      color: KriptonTheme.kryptonGreen,
-                    ),
-                    onTap: () => _openFileInLobby(file),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFileViewer(KriptonFile file, Uint8List bytes) {
+  Widget _buildFileViewer(FileEntity file, Uint8List bytes) {
     final mime = file.mimeType;
 
     if (mime.startsWith('image/')) {
@@ -287,7 +359,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
         child: Text(
           text,
           style: const TextStyle(
-            color: KriptonTheme.platinum,
+            color: AppTheme.platinum,
             fontSize: 14,
             height: 1.5,
           ),
@@ -302,11 +374,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.videocam,
-                size: 64,
-                color: KriptonTheme.electricLime,
-              ),
+              const Icon(Icons.videocam, size: 64, color: AppTheme.electricLime),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: () {
@@ -334,11 +402,12 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
         sourceName: file.originalFilename,
         controller: _pdfController,
         params: PdfViewerParams(
-          backgroundColor: KriptonTheme.charcoalBlack,
+          backgroundColor: AppTheme.charcoalDeep,
+          onPageChanged: _onPdfPageChanged,
           errorBannerBuilder: (context, error, stackTrace, documentRef) => Center(
             child: Text(
               'Error al abrir PDF:\n$error',
-              style: const TextStyle(color: KriptonTheme.silver),
+              style: const TextStyle(color: AppTheme.silver),
               textAlign: TextAlign.center,
             ),
           ),
@@ -351,59 +420,15 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.lock_outline,
-              size: 64, color: KriptonTheme.electricLime),
+          const Icon(Icons.lock_outline, size: 64, color: AppTheme.electricLime),
           const SizedBox(height: 16),
           Text(
             'Formato protegido',
             style: Theme.of(context).textTheme.displayLarge,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Los documentos Office no se visualizan directamente por seguridad.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
         ],
       ),
     );
   }
-}
-
-class _LobbyWatermarkPainter extends CustomPainter {
-  final String text;
-
-  _LobbyWatermarkPainter({required this.text});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final textStyle = TextStyle(
-      color: Colors.white.withOpacity(0.08),
-      fontSize: 18,
-      fontWeight: FontWeight.w500,
-    );
-    final textSpan = TextSpan(text: text, style: textStyle);
-    final textPainter = TextPainter(
-      text: textSpan,
-      textDirection: TextDirection.ltr,
-    );
-
-    for (int i = 0; i < 6; i++) {
-      for (int j = 0; j < 4; j++) {
-        canvas.save();
-        canvas.translate(
-          i * size.width / 6 + 30,
-          j * size.height / 4 + 40,
-        );
-        canvas.rotate(-45 * 3.14159265359 / 180);
-        textPainter.layout(maxWidth: 300);
-        textPainter.paint(canvas, Offset.zero);
-        canvas.restore();
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

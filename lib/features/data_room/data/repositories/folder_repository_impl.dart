@@ -2,17 +2,20 @@ import 'package:dartz/dartz.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/error/failures.dart';
-import '../../../../models/kripton_file.dart';
+import '../../domain/entities/file_entity.dart';
 import '../../domain/entities/folder_entity.dart';
 import '../../domain/entities/journey_telemetry_entity.dart';
+import '../../domain/entities/share_link_entity.dart';
 import '../../domain/repositories/i_folder_repository.dart';
 import '../datasources/folder_remote_datasource.dart';
 
 class FolderRepositoryImpl implements IFolderRepository {
   final FolderRemoteDataSource _remote;
-  final Uuid _uuid = const Uuid();
+  final Uuid _uuid;
 
-  FolderRepositoryImpl(SupabaseClient supabase) : _remote = FolderRemoteDataSource(supabase);
+  FolderRepositoryImpl(SupabaseClient supabase, {Uuid? uuid})
+      : _remote = FolderRemoteDataSource(supabase),
+        _uuid = uuid ?? const Uuid();
 
   @override
   Future<Either<Failure, FolderEntity>> createFolder({
@@ -27,7 +30,7 @@ class FolderRepositoryImpl implements IFolderRepository {
         'description': description,
         'is_deleted': false,
       });
-      return Right(_mapFolder(data, []));
+      return Right(_mapFolder(data, const []));
     } catch (e) {
       return Left(ServerFailure('Error creando carpeta: $e'));
     }
@@ -63,41 +66,6 @@ class FolderRepositoryImpl implements IFolderRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addFileToFolder({
-    required String folderId,
-    required String fileId,
-  }) async {
-    try {
-      await _remote.addFileToFolder(folderId, fileId);
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure('Error agregando archivo a carpeta: $e'));
-    }
-  }
-
-  @override
-  Future<Either<Failure, String>> createFolderShareLink({
-    required String folderId,
-    required DateTime expiresAt,
-    String? recipientEmail,
-  }) async {
-    try {
-      final linkId = _uuid.v4();
-      await _remote.createShareLink({
-        'id': linkId,
-        'folder_id': folderId,
-        'created_by': Supabase.instance.client.auth.currentUser!.id,
-        'expires_at': expiresAt.toIso8601String(),
-        'recipient_email': recipientEmail,
-        'is_active': true,
-      });
-      return Right(linkId);
-    } catch (e) {
-      return Left(ServerFailure('Error creando enlace de carpeta: $e'));
-    }
-  }
-
-  @override
   Future<Either<Failure, FolderEntity>> getFolderByShareLinkId(String shareLinkId) async {
     try {
       final link = await _remote.getShareLinkById(shareLinkId);
@@ -117,6 +85,44 @@ class FolderRepositoryImpl implements IFolderRepository {
   }
 
   @override
+  Future<Either<Failure, ShareLinkEntity>> createFolderShareLink({
+    required String folderId,
+    required DateTime expiresAt,
+    String? recipientEmail,
+    bool requireRecipientEmail = true,
+    bool enableWatermark = true,
+  }) async {
+    try {
+      final validation = await _remote.validateShareLinkExpiration(
+        userId: Supabase.instance.client.auth.currentUser!.id,
+        expiresAt: expiresAt.toIso8601String(),
+      );
+      final isValid = validation['is_valid'] as bool? ?? false;
+      if (!isValid) {
+        return Left(ValidationFailure(validation['message'] as String? ?? 'Expiración inválida'));
+      }
+
+      final linkId = _uuid.v4();
+      final data = await _remote.createShareLink({
+        'id': linkId,
+        'folder_id': folderId,
+        'created_by': Supabase.instance.client.auth.currentUser!.id,
+        'link_type': 'full_folder',
+        'recipient_email': recipientEmail,
+        'require_recipient_email': requireRecipientEmail,
+        'enable_watermark': enableWatermark,
+        'expires_at': expiresAt.toIso8601String(),
+        'is_active': true,
+      });
+      return Right(_mapShareLink(data));
+    } on ValidationFailure catch (e) {
+      return Left(e);
+    } catch (e) {
+      return Left(ServerFailure('Error creando enlace de carpeta: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> logJourneyEvent(JourneyTelemetryEntity event) async {
     try {
       await _remote.logJourneyEvent(event.toJson());
@@ -127,7 +133,7 @@ class FolderRepositoryImpl implements IFolderRepository {
   }
 
   FolderEntity _mapFolder(Map<String, dynamic> folder, List<Map<String, dynamic>> files) {
-    final fileList = files.map((f) => KriptonFile.fromJson(f)).toList();
+    final fileList = files.map((f) => _mapFile(f)).toList();
     final totalSize = fileList.fold<int>(0, (sum, f) => sum + f.fileSizeBytes);
     return FolderEntity(
       id: folder['id'] as String,
@@ -136,8 +142,54 @@ class FolderRepositoryImpl implements IFolderRepository {
       description: folder['description'] as String?,
       files: fileList,
       totalSizeBytes: totalSize,
-      createdAt: DateTime.parse(folder['created_at'] as String),
       isDeleted: folder['is_deleted'] as bool? ?? false,
+      createdAt: DateTime.parse(folder['created_at'] as String),
+      updatedAt: folder['updated_at'] != null
+          ? DateTime.parse(folder['updated_at'] as String)
+          : DateTime.parse(folder['created_at'] as String),
+    );
+  }
+
+  FileEntity _mapFile(Map<String, dynamic> json) {
+    return FileEntity(
+      id: json['id'] as String,
+      ownerId: json['owner_id'] as String,
+      folderId: json['folder_id'] as String?,
+      originalFilename: json['original_filename'] as String,
+      fileSizeBytes: json['file_size_bytes'] as int,
+      mimeType: json['mime_type'] as String,
+      storageObjectKey: json['storage_object_key'] as String,
+      salt: _cryptoField(json['salt']),
+      nonce: _cryptoField(json['nonce']),
+      macTag: _cryptoField(json['mac_tag']),
+      aesKeyEncrypted: _cryptoField(json['aes_key_encrypted']),
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> _cryptoField(dynamic value) {
+    if (value == null) return {'bytes': <int>[]};
+    if (value is Map<String, dynamic>) return value;
+    if (value is List<dynamic>) return {'bytes': value.cast<int>()};
+    if (value is List<int>) return {'bytes': value};
+    return {'bytes': <int>[]};
+  }
+
+  ShareLinkEntity _mapShareLink(Map<String, dynamic> json) {
+    return ShareLinkEntity(
+      id: json['id'] as String,
+      createdBy: json['created_by'] as String,
+      fileId: json['file_id'] as String?,
+      folderId: json['folder_id'] as String?,
+      linkType: json['link_type'] == 'full_folder'
+          ? ShareLinkType.fullFolder
+          : ShareLinkType.singleFile,
+      isActive: json['is_active'] as bool? ?? true,
+      requireRecipientEmail: json['require_recipient_email'] as bool? ?? true,
+      enableWatermark: json['enable_watermark'] as bool? ?? true,
+      expiresAt: DateTime.parse(json['expires_at'] as String),
+      accessCount: json['access_count'] as int? ?? 0,
+      createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
 }

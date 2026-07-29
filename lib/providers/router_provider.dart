@@ -14,6 +14,7 @@ import '../features/analytics/presentation/screens/analytics_dashboard_screen.da
 import '../features/data_room/presentation/screens/storage_management_screen.dart';
 import '../features/links/presentation/screens/expired_links_screen.dart';
 import '../features/data_room/presentation/screens/data_room_lobby_screen.dart';
+import '../features/data_room/presentation/screens/data_room_explorer_screen.dart';
 import '../providers/auth_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -114,10 +115,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const StorageManagementScreen(),
       ),
       GoRoute(
+        path: '/data-room',
+        builder: (context, state) => const DataRoomExplorerScreen(),
+      ),
+      GoRoute(
         path: '/folder-room/:folderLinkId',
         builder: (context, state) {
           final folderLinkId = state.pathParameters['folderLinkId']!;
           return DataRoomLobbyScreen(folderLinkId: folderLinkId);
+        },
+      ),
+      GoRoute(
+        path: '/f/:folderLinkId',
+        builder: (context, state) {
+          final folderLinkId = state.pathParameters['folderLinkId']!;
+          return DataRoomLobbyScreen(folderLinkId: folderLinkId);
+        },
+      ),
+      GoRoute(
+        path: '/d/:linkId',
+        builder: (context, state) {
+          final linkId = state.pathParameters['linkId'];
+          return ViewerScreen(linkId: linkId);
         },
       ),
     ],

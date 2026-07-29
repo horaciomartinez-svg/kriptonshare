@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/file_provider.dart';
+import '../../../../utils/office_formats.dart';
 import '../../../../utils/theme.dart';
 import '../../../../utils/constants.dart';
 
@@ -24,7 +25,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   XFile? _selectedFile;
   int? _selectedFileSize;
   bool _isEncrypting = false;
+  bool _isConverting = false;
   bool _isUploading = false;
+  bool _conversionFailed = false;
   String? _shareLink;
   String? _errorMessage;
   double _progress = 0;
@@ -112,8 +115,18 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       return;
     }
 
+    final isConvertible = OfficeFormats.isConvertible(
+      mimeType: _selectedFile!.mimeType ??
+          lookupMimeType(_selectedFile!.name) ??
+          'application/octet-stream',
+      fileName: _selectedFile!.name,
+    );
+
     setState(() {
       _isEncrypting = true;
+      _isConverting = false;
+      _isUploading = false;
+      _conversionFailed = false;
       _errorMessage = null;
       _progress = 0.2;
     });
@@ -122,8 +135,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
     setState(() {
       _isEncrypting = false;
-      _isUploading = true;
-      _progress = 0.7;
+      _isConverting = isConvertible;
+      _progress = 0.45;
     });
 
     try {
@@ -136,8 +149,24 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         fileName: _selectedFile!.name,
         mimeType: mimeType,
         userPassword: _passwordController.text,
-        selectedDurationHours: _selectedDurationHours.toInt(), // Inyección del slider
+        selectedDurationHours: _selectedDurationHours.toInt(),
         recipientEmail: _recipientController.text.isEmpty ? null : _recipientController.text,
+        onConversionStatus: (status) {
+          if (status == 'ready') {
+            setState(() {
+              _isConverting = false;
+              _isUploading = true;
+              _progress = 0.75;
+            });
+          } else if (status == 'failed') {
+            setState(() {
+              _isConverting = false;
+              _isUploading = true;
+              _conversionFailed = true;
+              _progress = 0.75;
+            });
+          }
+        },
       );
 
       setState(() {
@@ -149,6 +178,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       setState(() {
         _isUploading = false;
         _isEncrypting = false;
+        _isConverting = false;
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
     }
@@ -231,7 +261,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               max: maxRange,
               divisions: isPremium ? 29 : 47, // Días (30) o horas exactas (48)
               label: _selectedDurationHours >= 24 ? '${(_selectedDurationHours / 24).toInt()}d' : '${_selectedDurationHours.toInt()}h',
-              onChanged: (_isEncrypting || _isUploading) ? null : (value) {
+              onChanged: (_isEncrypting || _isConverting || _isUploading) ? null : (value) {
                 setState(() => _selectedDurationHours = value);
               },
             ),
@@ -285,7 +315,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                         valueColor: const AlwaysStoppedAnimation(KriptonTheme.electricLime),
                       ),
                       const SizedBox(height: 10),
-                      Text(_isEncrypting ? '> Cifrando con AES-256...' : '> Sincronizando en R2...',
+                      Text(
+                        _isEncrypting
+                            ? '> Cifrando con AES-256...'
+                            : _isConverting
+                                ? '> Generando vista previa segura...'
+                                : '> Sincronizando en R2...',
                         style: const TextStyle(color: KriptonTheme.cyanTelemetry, fontFamily: 'SFMono', fontSize: 11),
                       ),
                     ],
@@ -368,7 +403,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     final user = ref.watch(authStateProvider).valueOrNull;
     final isPremium = user?.isPremium ?? false;
 
-    if (_isEncrypting || _isUploading) {
+    if (_isEncrypting || _isConverting || _isUploading) {
       return Scaffold(body: _buildProcessingAdOverlay());
     }
 
@@ -462,7 +497,36 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                   ),
                 ],
               ).animate().fade(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              if (_selectedFile != null &&
+                  OfficeFormats.isConvertible(
+                    mimeType: _selectedFile!.mimeType ??
+                        lookupMimeType(_selectedFile!.name) ??
+                        'application/octet-stream',
+                    fileName: _selectedFile!.name,
+                  )) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: KriptonTheme.electricLime.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: KriptonTheme.electricLime.withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.picture_as_pdf, color: KriptonTheme.electricLime, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Se generará una vista previa PDF segura para el receptor',
+                          style: TextStyle(color: KriptonTheme.electricLime, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               TextFormField(
                 controller: _passwordController,
                 obscureText: true,
@@ -494,6 +558,29 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                     const Icon(Icons.check_circle, size: 64, color: KriptonTheme.cryptoGreen),
                     const SizedBox(height: 16),
                     Text('Data Room listo en Cloudflare', style: Theme.of(context).textTheme.displayMedium),
+                    if (_conversionFailed) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: KriptonTheme.amber.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: KriptonTheme.amber.withOpacity(0.3)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, color: KriptonTheme.amber, size: 18),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'El archivo se compartió, pero no se pudo generar la vista previa. El receptor podrá descargarlo si tú lo permites.',
+                                style: TextStyle(color: KriptonTheme.amber, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     QrImageView(data: _shareLink!, version: QrVersions.auto, size: 140, backgroundColor: KriptonTheme.platinum),
                     const SizedBox(height: 20),

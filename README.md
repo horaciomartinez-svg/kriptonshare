@@ -68,8 +68,9 @@ Ideal para:
 | **Lenguaje** | Dart |
 | **Backend** | Supabase (PostgreSQL + Edge Functions) |
 | **Autenticación** | Supabase Auth (JWT) |
-| **Almacenamiento** | Supabase Storage |
-| **Cifrado** | AES-256 + RSA-4096 |
+| **Almacenamiento** | Cloudflare R2 (S3-compatible) |
+| **Cifrado** | AES-256-GCM + PBKDF2 |
+| **Conversión Office** | Gotenberg + gateway Deno propio |
 | **Estado** | Provider (Riverpod en roadmap) |
 | **Routing** | GoRouter |
 | **UI** | Material Design 3 + Custom Theme |
@@ -108,10 +109,10 @@ Ideal para:
 
 ### Flujo de Seguridad
 
-1. **Upload**: Archivo cifrado con AES-256 antes de subir
-2. **Storage**: Almacenamiento cifrado en Supabase Storage
+1. **Upload**: Archivo cifrado con AES-256-GCM antes de subir. Los documentos Office se convierten a PDF en un servicio efímero propio durante la subida.
+2. **Storage**: Almacenamiento cifrado en Cloudflare R2 (dos objetos para Office: original cifrado + PDF de vista previa cifrado)
 3. **Link**: Generación de URL temporal con token JWT
-4. **View**: Descifrado en memoria, streaming directo al visor
+4. **View**: Descifrado en memoria, streaming directo al visor seguro con watermark dinámico
 5. **Destroy**: Eliminación automática post-expiración
 
 ---
@@ -189,8 +190,9 @@ flutter build ios --release    # iOS
 ### Compromisos de Seguridad
 
 - ✅ **Cifrado en tránsito**: TLS 1.3 para todas las comunicaciones
-- ✅ **Cifrado en reposo**: AES-256 para archivos almacenados
-- ✅ **Zero-knowledge**: Nosotros no podemos ver tu contenido
+- ✅ **Cifrado en reposo**: AES-256-GCM para archivos almacenados
+- ✅ **Zero-knowledge**: Nosotros no podemos ver tu contenido (PDF, imágenes, texto, video)
+- ✅ **Vista previa Office segura**: Los documentos Office se convierten a PDF en un servicio efímero propio durante la subida; el contenido nunca se almacena sin cifrar ni sale de nuestra infraestructura.
 - ✅ **Auditoría completa**: Registro de todas las acciones
 - ✅ **Cumplimiento**: Diseñado para cumplir GDPR, CCPA, SOC2
 
@@ -211,9 +213,10 @@ Si descubres una vulnerabilidad de seguridad, por favor envía un email a [secur
 - [x] Autenticación y autorización
 
 ### Q3 2026
-- [ ] Sistema de watermark dinámico
+- [x] Sistema de watermark dinámico
+- [x] Soporte para documentos Office (Word, Excel, PowerPoint) con vista previa PDF segura
 - [ ] Integración con firmas digitales (DocuSign, Adobe Sign)
-- [ ] Soporte para documentos Office y PDF con anotaciones
+- [ ] Soporte para PDF con anotaciones
 - [ ] Notificaciones push avanzadas
 - [ ] Modo offline para documentos pre-autorizados
 

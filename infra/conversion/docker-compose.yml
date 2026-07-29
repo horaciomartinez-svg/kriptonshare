@@ -1,0 +1,32 @@
+services:
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--api-port=3000"
+      - "--api-timeout=120s"
+      - "--libreoffice-restart-after=200"
+      - "--log-level=warn"
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    networks: [conversion]
+
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    environment:
+      GOTENBERG_URL: http://gotenberg:3000
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      FREE_MAX_BYTES: "10485760"
+      PREMIUM_MAX_BYTES: "104857600"
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on: [gotenberg]
+    networks: [conversion]
+
+networks:
+  conversion:

@@ -17,7 +17,7 @@ class FolderRemoteDataSource {
         .select()
         .eq('owner_id', ownerId)
         .eq('is_deleted', false)
-        .order('created_at', ascending: false);
+        .order('updated_at', ascending: false);
     return (response as List).cast<Map<String, dynamic>>();
   }
 
@@ -41,6 +41,18 @@ class FolderRemoteDataSource {
     return (response as List).cast<Map<String, dynamic>>();
   }
 
+  Future<List<Map<String, dynamic>>> getUnfiledDocuments(String ownerId) async {
+    final response = await _supabase
+        .from('files')
+        .select()
+        .eq('owner_id', ownerId)
+        .is_('folder_id', null)
+        .eq('is_deleted', false)
+        .eq('status', 'active')
+        .order('created_at', ascending: false);
+    return (response as List).cast<Map<String, dynamic>>();
+  }
+
   Future<void> addFileToFolder(String folderId, String fileId) async {
     await _supabase
         .from('files')
@@ -60,10 +72,36 @@ class FolderRemoteDataSource {
   Future<Map<String, dynamic>?> getShareLinkById(String shareLinkId) async {
     return await _supabase
         .from('share_links')
-        .select('*, folders!inner(*)')
+        .select()
         .eq('id', shareLinkId)
         .eq('is_active', true)
         .maybeSingle();
+  }
+
+  Future<Map<String, dynamic>> validateShareLinkExpiration({
+    required String userId,
+    required String expiresAt,
+  }) async {
+    final result = await _supabase.rpc('validate_share_link_expiration', params: {
+      'p_user_id': userId,
+      'p_expires_at': expiresAt,
+    });
+    return (result as List).cast<Map<String, dynamic>>().first;
+  }
+
+  Future<Map<String, dynamic>> checkUploadLimits({
+    required String userId,
+    required int fileSize,
+  }) async {
+    final result = await _supabase.rpc('check_upload_limits', params: {
+      'p_user_id': userId,
+      'p_file_size': fileSize,
+    });
+    return (result as List).cast<Map<String, dynamic>>().first;
+  }
+
+  Future<void> insertFile(Map<String, dynamic> data) async {
+    await _supabase.from('files').insert(data);
   }
 
   Future<void> logJourneyEvent(Map<String, dynamic> data) async {

@@ -17,6 +17,7 @@ final uploadRepositoryProvider = Provider<IUploadRepository>((ref) {
   return UploadRepositoryImpl(
     dataSource: ref.watch(uploadDataSourceProvider),
     networkInfo: NetworkInfoImpl(),
+    supabase: Supabase.instance.client,
   );
 });
 

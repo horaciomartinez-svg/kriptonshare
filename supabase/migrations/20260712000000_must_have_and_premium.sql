@@ -79,7 +79,7 @@ BEGIN
            COALESCE(max_links_monthly, 20),
            COALESCE(max_file_size_bytes, 10485760),
            COALESCE(total_storage_used_bytes, 0),
-           COALESCE(max_storage_premium_bytes, 2147483648)
+           COALESCE(max_storage_bytes, max_storage_premium_bytes, 2147483648)
     INTO v_tier, v_links_used, v_links_max, v_file_size_max, v_storage_used, v_storage_max
     FROM public.users
     WHERE id = p_user_id;

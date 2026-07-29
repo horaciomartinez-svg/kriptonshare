@@ -19,6 +19,11 @@ class KriptonFile {
   final int downloadsCount;
   final String status;
 
+  // Campos de vista previa Office → PDF (Fase 1)
+  final String? viewerObjectKey;
+  final int? viewerFileSizeBytes;
+  final String conversionStatus; // 'none' | 'pending' | 'ready' | 'failed'
+
   // Campos opcionales del share_link (contexto de recepción)
   final String? linkId;
   final DateTime? linkExpiresAt;
@@ -43,6 +48,9 @@ class KriptonFile {
     this.maxDownloads,
     this.downloadsCount = 0,
     this.status = 'active',
+    this.viewerObjectKey,
+    this.viewerFileSizeBytes,
+    this.conversionStatus = 'none',
     this.linkId,
     this.linkExpiresAt,
     this.recipientEmail,
@@ -68,6 +76,9 @@ class KriptonFile {
       maxDownloads: json['max_downloads'] as int?,
       downloadsCount: json['downloads_count'] as int? ?? 0,
       status: json['status'] as String? ?? 'active',
+      viewerObjectKey: json['viewer_object_key'] as String?,
+      viewerFileSizeBytes: json['viewer_file_size_bytes'] as int?,
+      conversionStatus: json['conversion_status'] as String? ?? 'none',
       linkId: json['link_id'] as String?,
       linkExpiresAt: json['link_expires_at'] != null
           ? DateTime.parse(json['link_expires_at'] as String)
@@ -96,12 +107,18 @@ class KriptonFile {
       'max_downloads': maxDownloads,
       'downloads_count': downloadsCount,
       'status': status,
+      'viewer_object_key': viewerObjectKey,
+      'viewer_file_size_bytes': viewerFileSizeBytes,
+      'conversion_status': conversionStatus,
       'link_id': linkId,
       'link_expires_at': linkExpiresAt?.toIso8601String(),
       'recipient_email': recipientEmail,
       'is_active': linkIsActive,
     };
   }
+
+  /// Verdadero si existe un PDF de vista previa cifrado listo para renderizar.
+  bool get hasPdfPreview => conversionStatus == 'ready' && viewerObjectKey != null;
 
   /// Interpreta un campo BYTEA de Supabase que puede llegar en varios formatos:
   /// - `List<dynamic>` de enteros (JSON nativo)
