@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -58,7 +59,7 @@ class _BiometricSettingsScreenState
         _canCheckBiometrics = false;
         _availableBiometrics = [];
         _isLoading = false;
-        _statusMessage = 'Error al consultar biometría: ${e.message}';
+        _statusMessage = AppLocalizations.of(context).biometricQueryError(e.message ?? '');
         _statusIsError = true;
       });
     }
@@ -66,9 +67,9 @@ class _BiometricSettingsScreenState
 
   Future<void> _authenticate() async {
     if (_biometricService == null) return;
+    final l10n = AppLocalizations.of(context);
     if (!_canCheckBiometrics || _availableBiometrics.isEmpty) {
-      _showStatus('No hay biometría disponible en este dispositivo.',
-          isError: true);
+      _showStatus(l10n.biometricNotAvailableTitle, isError: true);
       return;
     }
 
@@ -76,9 +77,9 @@ class _BiometricSettingsScreenState
       final didAuthenticate = await _biometricService!.authenticate();
 
       if (didAuthenticate) {
-        _showStatus('Autenticación biométrica exitosa.', isError: false);
+        _showStatus(l10n.biometricAuthSuccess, isError: false);
       } else {
-        _showStatus('Autenticación cancelada.', isError: true);
+        _showStatus(l10n.authCancelled, isError: true);
       }
     } catch (e) {
       _showStatus(
@@ -106,34 +107,29 @@ class _BiometricSettingsScreenState
 
   Future<void> _toggleBiometric(bool value) async {
     if (_biometricService == null) return;
+    final l10n = AppLocalizations.of(context);
 
     if (value) {
       // Antes de activar el desbloqueo biométrico, exige una autenticación
       // exitosa para confirmar que el usuario controla el dispositivo.
       if (!_canCheckBiometrics || _availableBiometrics.isEmpty) {
-        _showStatus('No hay biometría disponible en este dispositivo.',
-            isError: true);
+        _showStatus(l10n.biometricNotAvailableTitle, isError: true);
         return;
       }
 
       try {
         final didAuthenticate = await _biometricService!.authenticate(
-          localizedReason:
-              'Confirma tu huella o rostro para activar el desbloqueo biométrico',
+          localizedReason: l10n.biometricEnableReason,
         );
 
         if (!didAuthenticate) {
-          _showStatus('No se pudo activar: autenticación cancelada.',
-              isError: true);
+          _showStatus(l10n.biometricEnableCancelled, isError: true);
           return;
         }
 
         await _biometricService!.setBiometricEnabled(true);
         setState(() => _isBiometricEnabled = true);
-        _showStatus(
-          'Desbloqueo biométrico activado. Se pedirá después de iniciar sesión.',
-          isError: false,
-        );
+        _showStatus(l10n.biometricUnlockEnabledMsg, isError: false);
       } catch (e) {
         _showStatus(
           e.toString().replaceFirst('Exception: ', ''),
@@ -143,7 +139,7 @@ class _BiometricSettingsScreenState
     } else {
       await _biometricService!.setBiometricEnabled(false);
       setState(() => _isBiometricEnabled = false);
-      _showStatus('Desbloqueo biométrico desactivado.', isError: false);
+      _showStatus(l10n.biometricUnlockDisabledMsg, isError: false);
     }
   }
 
@@ -157,34 +153,35 @@ class _BiometricSettingsScreenState
     return Icons.fingerprint;
   }
 
-  String _biometricLabel() {
+  String _biometricLabel(AppLocalizations l10n) {
     if (_availableBiometrics.contains(BiometricType.face)) {
-      return 'Face ID';
+      return l10n.faceId;
     }
     if (_availableBiometrics.contains(BiometricType.iris)) {
-      return 'Iris';
+      return l10n.iris;
     }
-    return 'Huella digital';
+    return l10n.fingerprint;
   }
 
-  String _biometricDescription() {
+  String _biometricDescription(AppLocalizations l10n) {
     if (_availableBiometrics.contains(BiometricType.face)) {
-      return 'Usa Face ID para desbloquear KRIPTONSHARE de forma segura.';
+      return l10n.faceIdDescription;
     }
     if (_availableBiometrics.contains(BiometricType.iris)) {
-      return 'Usa el reconocimiento de iris para acceder.';
+      return l10n.irisDescription;
     }
-    return 'Usa tu huella digital para desbloquear la app rápidamente.';
+    return l10n.fingerprintDescription;
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       appBar: AppBar(
-        title: const Text('Biometría'),
+        title: Text(l10n.biometricSettingsTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -214,15 +211,15 @@ class _BiometricSettingsScreenState
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildHeader(theme)
+                          _buildHeader(theme, l10n)
                               .animate()
                               .fade(duration: 300.ms)
                               .slideY(begin: 0.1, end: 0),
                           const SizedBox(height: 24),
                           if (isTablet)
-                            _buildTabletLayout(theme)
+                            _buildTabletLayout(theme, l10n)
                           else
-                            _buildMobileLayout(theme),
+                            _buildMobileLayout(theme, l10n),
                           const SizedBox(height: 24),
                           _buildStatusBanner(theme)
                               .animate()
@@ -237,17 +234,17 @@ class _BiometricSettingsScreenState
     );
   }
 
-  Widget _buildHeader(ThemeData theme) {
+  Widget _buildHeader(ThemeData theme, AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Configuración de Biometría',
+          l10n.biometricSettingsTitle,
           style: theme.textTheme.displayLarge?.copyWith(fontSize: 24),
         ),
         const SizedBox(height: 4),
         Text(
-          'Protege el acceso a tus Data Rooms con tu identidad biométrica.',
+          l10n.biometricIntro,
           style: theme.textTheme.bodyMedium?.copyWith(
                 color: KriptonTheme.silver,
               ),
@@ -256,16 +253,16 @@ class _BiometricSettingsScreenState
     );
   }
 
-  Widget _buildMobileLayout(ThemeData theme) {
+  Widget _buildMobileLayout(ThemeData theme, AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildMainCard(theme)
+        _buildMainCard(theme, l10n)
             .animate()
             .fade(delay: 100.ms, duration: 300.ms)
             .slideY(begin: 0.1, end: 0),
         const SizedBox(height: 16),
-        _buildSecurityInfoCard(theme)
+        _buildSecurityInfoCard(theme, l10n)
             .animate()
             .fade(delay: 200.ms, duration: 300.ms)
             .slideY(begin: 0.1, end: 0),
@@ -273,19 +270,19 @@ class _BiometricSettingsScreenState
     );
   }
 
-  Widget _buildTabletLayout(ThemeData theme) {
+  Widget _buildTabletLayout(ThemeData theme, AppLocalizations l10n) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: _buildMainCard(theme)
+          child: _buildMainCard(theme, l10n)
               .animate()
               .fade(delay: 100.ms, duration: 300.ms)
               .slideY(begin: 0.1, end: 0),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _buildSecurityInfoCard(theme)
+          child: _buildSecurityInfoCard(theme, l10n)
               .animate()
               .fade(delay: 200.ms, duration: 300.ms)
               .slideY(begin: 0.1, end: 0),
@@ -294,10 +291,10 @@ class _BiometricSettingsScreenState
     );
   }
 
-  Widget _buildMainCard(ThemeData theme) {
+  Widget _buildMainCard(ThemeData theme, AppLocalizations l10n) {
     final biometricIcon = _biometricIcon();
-    final biometricLabel = _biometricLabel();
-    final biometricDescription = _biometricDescription();
+    final biometricLabel = _biometricLabel(l10n);
+    final biometricDescription = _biometricDescription(l10n);
     final hasBiometrics =
         _canCheckBiometrics && _availableBiometrics.isNotEmpty;
 
@@ -330,7 +327,7 @@ class _BiometricSettingsScreenState
           ),
           const SizedBox(height: 20),
           Text(
-            hasBiometrics ? biometricLabel : 'Biometría no disponible',
+            hasBiometrics ? biometricLabel : l10n.biometricNotAvailableTitle,
             style: theme.textTheme.displayMedium?.copyWith(fontSize: 20),
             textAlign: TextAlign.center,
           ),
@@ -338,7 +335,7 @@ class _BiometricSettingsScreenState
           Text(
             hasBiometrics
                 ? biometricDescription
-                : 'Este dispositivo no tiene sensores biométricos configurados.',
+                : l10n.biometricNoSensorsBody,
             style: theme.textTheme.bodyMedium?.copyWith(
                   color: KriptonTheme.silver,
                 ),
@@ -346,18 +343,18 @@ class _BiometricSettingsScreenState
           ),
           const SizedBox(height: 24),
           if (hasBiometrics) ...[
-            _buildToggleRow(theme),
+            _buildToggleRow(theme, l10n),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _authenticate,
               icon: const Icon(Icons.security),
-              label: const Text('Probar ahora'),
+              label: Text(l10n.testNow),
             ),
           ] else ...[
             OutlinedButton.icon(
               onPressed: _checkBiometrics,
               icon: const Icon(Icons.refresh),
-              label: const Text('Verificar de nuevo'),
+              label: Text(l10n.verifyAgain),
             ),
           ],
         ],
@@ -365,7 +362,7 @@ class _BiometricSettingsScreenState
     );
   }
 
-  Widget _buildToggleRow(ThemeData theme) {
+  Widget _buildToggleRow(ThemeData theme, AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -397,14 +394,14 @@ class _BiometricSettingsScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Desbloqueo biométrico',
+                  l10n.biometricUnlock,
                   style: theme.textTheme.bodyMedium?.copyWith(
                         color: KriptonTheme.platinum,
                         fontWeight: FontWeight.w500,
                       ),
                 ),
                 Text(
-                  _isBiometricEnabled ? 'Activado' : 'Desactivado',
+                  _isBiometricEnabled ? l10n.enabled : l10n.disabled,
                   style: theme.textTheme.bodySmall?.copyWith(
                         color: KriptonTheme.silver,
                       ),
@@ -425,25 +422,22 @@ class _BiometricSettingsScreenState
     );
   }
 
-  Widget _buildSecurityInfoCard(ThemeData theme) {
+  Widget _buildSecurityInfoCard(ThemeData theme, AppLocalizations l10n) {
     final items = [
       _SecurityInfoItem(
         icon: Icons.verified_user,
-        title: 'Soberanía de datos',
-        description:
-            'Tu huella o rostro nunca salen del dispositivo. No almacenamos datos biométricos.',
+        title: l10n.dataSovereigntyTitle,
+        description: l10n.dataSovereigntyBody,
       ),
       _SecurityInfoItem(
         icon: Icons.speed,
-        title: 'Acceso rápido',
-        description:
-            'Desbloquea KRIPTONSHARE sin escribir tu contraseña cada vez.',
+        title: l10n.quickAccessTitle,
+        description: l10n.quickAccessBody,
       ),
       _SecurityInfoItem(
         icon: Icons.shield_outlined,
-        title: 'Protección adicional',
-        description:
-            'La biometría complementa tu contraseña; no la reemplaza.',
+        title: l10n.extraProtectionTitle,
+        description: l10n.extraProtectionBody,
       ),
     ];
 
@@ -461,7 +455,7 @@ class _BiometricSettingsScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Seguridad',
+            l10n.securityTitle,
             style: theme.textTheme.displayMedium?.copyWith(fontSize: 18),
           ),
           const SizedBox(height: 16),

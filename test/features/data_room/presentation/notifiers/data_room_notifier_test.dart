@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kriptonshare/core/error/failures.dart';
+import 'package:kriptonshare/core/error/ui_error.dart';
 import 'package:kriptonshare/features/data_room/domain/entities/data_room_entity.dart';
 import 'package:kriptonshare/features/data_room/domain/repositories/i_crypto_repository.dart';
 import 'package:kriptonshare/features/data_room/domain/repositories/i_data_room_repository.dart';
@@ -90,7 +91,7 @@ void main() {
 
       // Assert
       expect(notifier.state.isLoading, false);
-      expect(notifier.state.error, failure.message);
+      expect(notifier.state.error, UiErrorCode.createRoomFailed);
       expect(notifier.state.rooms, isEmpty);
     });
 
@@ -120,7 +121,7 @@ void main() {
 
       // Assert
       expect(notifier.state.isLoading, false);
-      expect(notifier.state.error, failure.message);
+      expect(notifier.state.error, UiErrorCode.unknown);
       expect(notifier.state.rooms, isEmpty);
     });
   });

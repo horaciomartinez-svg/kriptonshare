@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/error/ui_error.dart';
 import '../../domain/entities/data_room_entity.dart';
 import '../../domain/repositories/i_data_room_repository.dart';
 import '../../domain/repositories/i_crypto_repository.dart';
@@ -8,7 +9,7 @@ import '../../domain/repositories/i_crypto_repository.dart';
 class DataRoomState {
   final List<DataRoomEntity> rooms;
   final bool isLoading;
-  final String? error;
+  final UiErrorCode? error;
   final DataRoomEntity? selectedRoom;
   final String? generatedZkLink;
   final Uint8List? decryptedFile;
@@ -25,15 +26,16 @@ class DataRoomState {
   DataRoomState copyWith({
     List<DataRoomEntity>? rooms,
     bool? isLoading,
-    String? error,
+    UiErrorCode? error,
     DataRoomEntity? selectedRoom,
     String? generatedZkLink,
     Uint8List? decryptedFile,
+    bool clearError = false,
   }) {
     return DataRoomState(
       rooms: rooms ?? this.rooms,
       isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
+      error: clearError ? null : (error ?? this.error),
       selectedRoom: selectedRoom ?? this.selectedRoom,
       generatedZkLink: generatedZkLink ?? this.generatedZkLink,
       decryptedFile: decryptedFile ?? this.decryptedFile,
@@ -55,10 +57,10 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
 
   /// Carga rooms desde SQLite (Offline-First).
   Future<void> loadRooms(String userId) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, clearError: true);
     final result = await _dataRoomRepository.getUserDataRooms(userId);
     result.fold(
-      (failure) => state = state.copyWith(error: failure.message, isLoading: false),
+      (failure) => state = state.copyWith(error: UiErrorCode.unknown, isLoading: false),
       (rooms) => state = state.copyWith(rooms: rooms, isLoading: false),
     );
   }
@@ -73,7 +75,7 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
     bool? downloadEnabled,
     List<String>? allowedIPs,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, clearError: true);
     final result = await _dataRoomRepository.createDataRoom(
       name: name,
       expiresAt: expiresAt,
@@ -84,7 +86,7 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
       allowedIPs: allowedIPs,
     );
     result.fold(
-      (failure) => state = state.copyWith(error: failure.message, isLoading: false),
+      (failure) => state = state.copyWith(error: UiErrorCode.createRoomFailed, isLoading: false),
       (room) {
         final updatedRooms = [...state.rooms, room];
         state = state.copyWith(rooms: updatedRooms, isLoading: false);
@@ -102,7 +104,7 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
     String? storageObjectKey,
     int? maxDownloads,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, clearError: true);
 
     try {
       // 1. Generar clave y encriptar
@@ -136,7 +138,7 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
         rooms: [...state.rooms, room],
       );
     } catch (e) {
-      state = state.copyWith(error: e.toString(), isLoading: false);
+      state = state.copyWith(error: UiErrorCode.createRoomFailed, isLoading: false);
     }
   }
 
@@ -146,28 +148,33 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
     required String password,
     required List<int> encryptedData,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, clearError: true);
 
     try {
       if (!deepLink.hasFragment) {
-        throw Exception('Enlace inválido: fragmento ausente');
+        throw Exception('missing_fragment');
       }
 
       final keyResult = await _cryptoRepository.deriveKeyFromFragment(deepLink.fragment);
-      final key = keyResult.getOrElse(() => throw Exception('Clave inválida'));
+      final key = keyResult.getOrElse(() => throw Exception('invalid_key'));
 
       final decryptedResult = await _cryptoRepository.decrypt(
         encryptedData: encryptedData,
         key: key,
       );
-      final decrypted = decryptedResult.getOrElse(() => throw Exception('Error al descifrar'));
+      final decrypted = decryptedResult.getOrElse(() => throw Exception('decryption_failed'));
 
       state = state.copyWith(
         decryptedFile: Uint8List.fromList(decrypted),
         isLoading: false,
       );
     } catch (e) {
-      state = state.copyWith(error: e.toString(), isLoading: false);
+      final UiErrorCode code = switch (e.toString()) {
+        'Exception: missing_fragment' => UiErrorCode.invalidLinkFragment,
+        'Exception: invalid_key' => UiErrorCode.invalidKey,
+        _ => UiErrorCode.decryptionFailed,
+      };
+      state = state.copyWith(error: code, isLoading: false);
     }
   }
 
@@ -175,7 +182,7 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
   Future<void> revokeRoom(String roomId) async {
     final result = await _dataRoomRepository.revokeDataRoom(roomId);
     result.fold(
-      (failure) => state = state.copyWith(error: failure.message),
+      (failure) => state = state.copyWith(error: UiErrorCode.unknown),
       (_) {
         final updatedRooms = state.rooms.map((room) {
           if (room.id == roomId) {
@@ -192,7 +199,7 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
   Future<void> syncPending() async {
     final result = await _dataRoomRepository.syncOfflineData();
     result.fold(
-      (failure) => state = state.copyWith(error: failure.message),
+      (failure) => state = state.copyWith(error: UiErrorCode.unknown),
       (_) {
         // Sincronización exitosa
       },
@@ -206,6 +213,6 @@ class DataRoomNotifier extends StateNotifier<DataRoomState> {
 
   /// Limpiar error.
   void clearError() {
-    state = state.copyWith(error: null);
+    state = state.copyWith(clearError: true);
   }
 }

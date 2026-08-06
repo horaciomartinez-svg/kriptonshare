@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../../app/config/theme/app_theme.dart';
+import '../../../../../core/localization/formatters.dart';
 import '../../../domain/entities/file_entity.dart';
 import '../atoms/encryption_badge.dart';
 
@@ -14,11 +15,6 @@ class FileListTile extends StatelessWidget {
     this.onTap,
     this.onShare,
   });
-
-  String _formatBytes(int bytes) {
-    if (bytes >= 1048576) return '${(bytes / 1048576).toStringAsFixed(1)} MB';
-    return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  }
 
   IconData _iconForMime(String mime) {
     if (mime.startsWith('image/')) return Icons.image;
@@ -45,7 +41,7 @@ class FileListTile extends StatelessWidget {
         subtitle: Row(
           children: [
             Text(
-              '${_formatBytes(file.fileSizeBytes)}',
+              formatBytes(context, file.fileSizeBytes),
               style: const TextStyle(color: AppTheme.silver),
             ),
             const SizedBox(width: 8),

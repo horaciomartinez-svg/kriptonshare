@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../../core/utils/theme.dart';
 import '../../domain/entities/link_entity.dart';
 
@@ -19,6 +20,7 @@ class LinkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isActive = link.isActiveAndNotExpired;
     final remaining = link.expiresAt.difference(DateTime.now());
     final remainingHours = remaining.inHours;
@@ -27,16 +29,13 @@ class LinkCard extends StatelessWidget {
     Color statusColor;
 
     if (!isActive) {
-      statusText = 'EXPIRADO';
-      statusColor = KriptonTheme.alertRed;
-    } else if (remainingHours < 6) {
-      statusText = '${remainingHours}h restantes';
+      statusText = l10n.expiredTag;
       statusColor = KriptonTheme.alertRed;
     } else if (remainingHours < 24) {
-      statusText = '${remainingHours}h restantes';
-      statusColor = KriptonTheme.amber;
+      statusText = l10n.hoursRemaining(remainingHours.clamp(1, 23));
+      statusColor = remainingHours < 6 ? KriptonTheme.alertRed : KriptonTheme.amber;
     } else {
-      statusText = '${remainingHours ~/ 24}d restantes';
+      statusText = l10n.daysRemaining(remainingHours ~/ 24);
       statusColor = KriptonTheme.cryptoGreen;
     }
 
@@ -81,7 +80,7 @@ class LinkCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Data Room',
+                        l10n.dataRoom,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 4),
@@ -114,33 +113,33 @@ class LinkCard extends StatelessWidget {
                       }
                     },
                     itemBuilder: (context) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'share',
                         child: Row(
                           children: [
-                            Icon(Icons.share, color: KriptonTheme.electricLime, size: 18),
-                            SizedBox(width: 8),
-                            Text('Compartir'),
+                            const Icon(Icons.share, color: KriptonTheme.electricLime, size: 18),
+                            const SizedBox(width: 8),
+                            Text(l10n.share),
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'revoke',
                         child: Row(
                           children: [
-                            Icon(Icons.cancel, color: KriptonTheme.alertRed, size: 18),
-                            SizedBox(width: 8),
-                            Text('Revocar'),
+                            const Icon(Icons.cancel, color: KriptonTheme.alertRed, size: 18),
+                            const SizedBox(width: 8),
+                            Text(l10n.revoke),
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete, color: KriptonTheme.alertRed, size: 18),
-                            SizedBox(width: 8),
-                            Text('Eliminar'),
+                            const Icon(Icons.delete, color: KriptonTheme.alertRed, size: 18),
+                            const SizedBox(width: 8),
+                            Text(l10n.delete),
                           ],
                         ),
                       ),
@@ -185,7 +184,7 @@ class LinkCard extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  '${link.accessCount} vistas',
+                  l10n.viewsCount(link.accessCount),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: KriptonTheme.graphite,
                       ),

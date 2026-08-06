@@ -1,6 +1,5 @@
 import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
-import '../entities/file_entity.dart';
 import '../entities/folder_entity.dart';
 import '../entities/journey_telemetry_entity.dart';
 import '../entities/share_link_entity.dart';

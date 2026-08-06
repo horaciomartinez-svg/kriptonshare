@@ -1,5 +1,6 @@
 // lib/features/upload/presentation/screens/upload_screen.dart
 import 'package:flutter/material.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:file_selector/file_selector.dart';
@@ -8,6 +9,7 @@ import 'package:mime/mime.dart' show lookupMimeType;
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../../../../core/localization/formatters.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/file_provider.dart';
 import '../../../../utils/office_formats.dart';
@@ -31,10 +33,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   String? _shareLink;
   String? _errorMessage;
   double _progress = 0;
-  
+
   // Aguja del Slider: Inicializa estrictamente en 24 horas por defecto
   double _selectedDurationHours = AppConstants.defaultDurationHours.toDouble();
-  
+
   final _passwordController = TextEditingController();
   final _recipientController = TextEditingController();
 
@@ -46,9 +48,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   }
 
   Future<void> _pickFile() async {
+    final l10n = AppLocalizations.of(context);
     final user = ref.read(authStateProvider).valueOrNull;
-    final isPremium = user?.isPremium ?? false;
     final int maxLimit = user?.maxFileSizeBytes ?? AppConstants.freeMaxFileSizeBytes;
+    final String maxSize = formatBytes(context, maxLimit);
 
     try {
       final file = await openFile();
@@ -58,7 +61,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           setState(() {
             _selectedFile = null;
             _selectedFileSize = null;
-            _errorMessage = 'El archivo excede el límite de ${isPremium ? "100 MB" : "10 MB"} de tu plan';
+            _errorMessage = l10n.fileExceedsPlanLimit(maxSize);
           });
           return;
         }
@@ -69,15 +72,16 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         });
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Error al seleccionar archivo');
+      setState(() => _errorMessage = l10n.filePickError);
     }
   }
 
   // FEATURE CRÍTICO DEL MVP: CÁMARA DIRECTA A BÓVEDA SIN TRANSITAR POR GALERÍA PÚBLICA
   Future<void> _captureSecurePhoto() async {
+    final l10n = AppLocalizations.of(context);
     final user = ref.read(authStateProvider).valueOrNull;
-    final isPremium = user?.isPremium ?? false;
     final int maxLimit = user?.maxFileSizeBytes ?? AppConstants.freeMaxFileSizeBytes;
+    final String maxSize = formatBytes(context, maxLimit);
 
     try {
       final XFile? photo = await ImagePicker().pickImage(
@@ -88,7 +92,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       if (photo != null) {
         final length = await photo.length();
         if (length > maxLimit) {
-          setState(() => _errorMessage = 'La captura excede el límite de ${isPremium ? "100 MB" : "10 MB"} de tu plan');
+          setState(() => _errorMessage = l10n.captureExceedsPlanLimit(maxSize));
           return;
         }
         setState(() {
@@ -98,20 +102,21 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         });
       }
     } catch (_) {
-      setState(() => _errorMessage = 'Acceso a la cámara cancelado o denegado');
+      setState(() => _errorMessage = l10n.cameraAccessCancelled);
     }
   }
 
   Future<void> _uploadAndEncrypt() async {
+    final l10n = AppLocalizations.of(context);
     if (_selectedFile == null) return;
     if (_passwordController.text.isEmpty) {
-      setState(() => _errorMessage = 'Ingresa una contraseña de cifrado');
+      setState(() => _errorMessage = l10n.enterEncryptionPassword);
       return;
     }
 
     final user = ref.read(authStateProvider).valueOrNull;
     if (user == null) {
-      setState(() => _errorMessage = 'Sesión expirada');
+      setState(() => _errorMessage = l10n.sessionExpired);
       return;
     }
 
@@ -142,7 +147,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     try {
       final fileBytes = await _selectedFile!.readAsBytes();
       final mimeType = _selectedFile!.mimeType ?? lookupMimeType(_selectedFile!.name) ?? 'application/octet-stream';
-      
+
       final fileService = ref.read(fileServiceProvider);
       final link = await fileService.uploadAndCreateLink(
         fileBytes: fileBytes,
@@ -186,18 +191,38 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
   // FEATURE CRÍTICO DEL MVP: SHARE SHEET NATIVO UNIFICADO MULTIPLATAFORMA
   void _shareLinkToExternal(String url) {
+    final l10n = AppLocalizations.of(context);
     ref.invalidate(userLinksProvider);
     Share.share(
-      '🔒 KRIPTONSHARE - Sala de Datos Efímera Asegurada\n\nAccede al documento protegido bajo el siguiente enlace:\n$url\n\nNota: Este canal opera bajo Conocimiento Cero (Zero-Knowledge) y es autodestructivo.',
-      subject: 'Data Room Confidencial Compartido',
+      l10n.shareMessageTemplate(
+        url,
+        AppConstants.appLinkUrl(url),
+        AppConstants.maxDurationHours,
+      ),
+      subject: l10n.shareDataRoomTitle,
     );
   }
 
   // === COMPONENTE COMPACTO DEL SLIDER INTERACTIVO (ADAPTATIVO POR TIER) ===
   Widget _buildInteractiveDurationSlider(bool isPremium) {
+    final l10n = AppLocalizations.of(context);
     final double maxRange = isPremium
         ? AppConstants.premiumMaxDurationHours.toDouble() // 720h (30 días)
         : AppConstants.freeMaxDurationHours.toDouble();   // 48h (2 días)
+
+    String formattedDurationLabel(double hours) {
+      if (hours >= 24) {
+        return l10n.daysUnit(hours ~/ 24);
+      }
+      return l10n.hoursUnit(hours.toInt());
+    }
+
+    String sliderThumbLabel(double hours) {
+      if (hours >= 24) {
+        return '${(hours / 24).toInt()}d';
+      }
+      return '${hours.toInt()}h';
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -214,7 +239,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             children: [
               Row(
                 children: [
-                  Text('Expiración:', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 14)),
+                  Text(l10n.expirationLabel, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 14)),
                   if (isPremium) ...[
                     const SizedBox(width: 8),
                     Container(
@@ -223,9 +248,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                         color: KriptonTheme.electricLime.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text(
-                        'PREMIUM',
-                        style: TextStyle(color: KriptonTheme.electricLime, fontSize: 9, fontWeight: FontWeight.bold),
+                      child: Text(
+                        l10n.premiumBadge,
+                        style: const TextStyle(color: KriptonTheme.electricLime, fontSize: 9, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -239,9 +264,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                   border: Border.all(color: KriptonTheme.electricLime.withOpacity(0.5)),
                 ),
                 child: Text(
-                  _selectedDurationHours >= 24
-                      ? '${(_selectedDurationHours / 24).toInt()} Días'
-                      : '${_selectedDurationHours.toInt()} Horas',
+                  formattedDurationLabel(_selectedDurationHours),
                   style: const TextStyle(color: KriptonTheme.electricLime, fontFamily: 'SFMono', fontWeight: FontWeight.bold),
                 ),
               ),
@@ -260,7 +283,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               min: 1.0,
               max: maxRange,
               divisions: isPremium ? 29 : 47, // Días (30) o horas exactas (48)
-              label: _selectedDurationHours >= 24 ? '${(_selectedDurationHours / 24).toInt()}d' : '${_selectedDurationHours.toInt()}h',
+              label: sliderThumbLabel(_selectedDurationHours),
               onChanged: (_isEncrypting || _isConverting || _isUploading) ? null : (value) {
                 setState(() => _selectedDurationHours = value);
               },
@@ -269,12 +292,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('1 hora', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite)),
+              Text(l10n.oneHour, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite)),
               if (isPremium)
-                Text('Máx 30 días', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontWeight: FontWeight.bold))
+                Text(l10n.max30Days, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontWeight: FontWeight.bold))
               else ...[
-                Text('24h (Defecto)', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontSize: 10)),
-                Text('48 horas (Máx)', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite)),
+                Text(l10n.default24h, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontSize: 10)),
+                Text(l10n.max48Hours, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite)),
               ],
             ],
           ),
@@ -285,6 +308,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
   // === ESQUELETO PUBLICITARIO MIGRADO (40% / 40% / 20%) ===
   Widget _buildProcessingAdOverlay() {
+    final l10n = AppLocalizations.of(context);
     return Container(
       color: KriptonTheme.charcoalBlack,
       width: double.infinity,
@@ -307,7 +331,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                       const Icon(Icons.lock_outline, size: 48, color: KriptonTheme.electricLime)
                           .animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms),
                       const SizedBox(height: 12),
-                      const Text('Protegiendo tus archivos...', style: TextStyle(color: KriptonTheme.platinum, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(l10n.protectingFiles, style: const TextStyle(color: KriptonTheme.platinum, fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 16),
                       LinearProgressIndicator(
                         value: _progress,
@@ -317,10 +341,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                       const SizedBox(height: 10),
                       Text(
                         _isEncrypting
-                            ? '> Cifrando con AES-256...'
+                            ? l10n.encryptingAesStep
                             : _isConverting
-                                ? '> Generando vista previa segura...'
-                                : '> Sincronizando en R2...',
+                                ? l10n.generatingPreviewStep
+                                : l10n.syncingR2Step,
                         style: const TextStyle(color: KriptonTheme.cyanTelemetry, fontFamily: 'SFMono', fontSize: 11),
                       ),
                     ],
@@ -346,12 +370,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                           children: [
                             Container(width: 40, height: 40, color: KriptonTheme.ink, child: const Icon(Icons.business, color: KriptonTheme.silver, size: 20)),
                             const SizedBox(width: 10),
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('IBM Cloud Security', style: TextStyle(color: KriptonTheme.platinum, fontWeight: FontWeight.bold, fontSize: 13)),
-                                  Text('Protege la infraestructura de tu empresa.', style: TextStyle(color: KriptonTheme.silver, fontSize: 11)),
+                                  Text(l10n.adSampleTitle, style: const TextStyle(color: KriptonTheme.platinum, fontWeight: FontWeight.bold, fontSize: 13)),
+                                  Text(l10n.adSampleBody, style: const TextStyle(color: KriptonTheme.silver, fontSize: 11)),
                                 ],
                               ),
                             ),
@@ -367,7 +391,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          child: const Text('CONOCER MÁS', style: TextStyle(fontSize: 11)),
+                          child: Text(l10n.adSampleCta, style: const TextStyle(fontSize: 11)),
                         ),
                       ],
                     ),
@@ -380,11 +404,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('¿Envíos sin pausas?', style: TextStyle(color: KriptonTheme.silver, fontSize: 11)),
+                      Text(l10n.upsellTitle, style: const TextStyle(color: KriptonTheme.silver, fontSize: 11)),
                       TextButton(
                         onPressed: () {},
                         style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                        child: const Text('> Ve a Premium', style: TextStyle(color: KriptonTheme.platinum, fontWeight: FontWeight.bold, fontSize: 12)),
+                        child: Text(l10n.upsellCta, style: const TextStyle(color: KriptonTheme.platinum, fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                     ],
                   ),
@@ -399,6 +423,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isComplete = _shareLink != null;
     final user = ref.watch(authStateProvider).valueOrNull;
     final isPremium = user?.isPremium ?? false;
@@ -410,7 +435,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       appBar: AppBar(
-        title: const Text('Nuevo Data Room'),
+        title: Text(l10n.newDataRoom),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
       ),
       body: SingleChildScrollView(
@@ -452,7 +477,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                               child: Text(
-                                _selectedFile == null ? 'Adjuntar Archivo' : _selectedFile!.name,
+                                _selectedFile == null ? l10n.attachFile : _selectedFile!.name,
                                 style: TextStyle(color: _selectedFile == null ? KriptonTheme.silver : KriptonTheme.platinum, fontSize: 12),
                                 textAlign: TextAlign.center,
                                 maxLines: 2,
@@ -462,7 +487,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                             if (_selectedFile != null && _selectedFileSize != null) ...[
                               const SizedBox(height: 4),
                               Text(
-                                '${(_selectedFileSize! / 1024).toStringAsFixed(1)} KB',
+                                formatBytes(context, _selectedFileSize!),
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.silver, fontSize: 10),
                               ),
                             ],
@@ -482,14 +507,14 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: KriptonTheme.cardBorder),
                         ),
-                        child: const Column(
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.photo_camera_outlined, size: 32, color: KriptonTheme.silver),
-                            SizedBox(height: 8),
-                            Text('Cámara a Vault', style: TextStyle(color: KriptonTheme.platinum, fontSize: 12)),
-                            SizedBox(height: 4),
-                            Text('Sin galería pública', style: TextStyle(color: KriptonTheme.graphite, fontSize: 10)),
+                            const Icon(Icons.photo_camera_outlined, size: 32, color: KriptonTheme.silver),
+                            const SizedBox(height: 8),
+                            Text(l10n.cameraToVault, style: const TextStyle(color: KriptonTheme.platinum, fontSize: 12)),
+                            const SizedBox(height: 4),
+                            Text(l10n.noPublicGallery, style: const TextStyle(color: KriptonTheme.graphite, fontSize: 10)),
                           ],
                         ),
                       ),
@@ -512,14 +537,14 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: KriptonTheme.electricLime.withOpacity(0.3)),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.picture_as_pdf, color: KriptonTheme.electricLime, size: 18),
-                      SizedBox(width: 8),
+                      const Icon(Icons.picture_as_pdf, color: KriptonTheme.electricLime, size: 18),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Se generará una vista previa PDF segura para el receptor',
-                          style: TextStyle(color: KriptonTheme.electricLime, fontSize: 12),
+                          l10n.pdfPreviewGeneratedNotice,
+                          style: const TextStyle(color: KriptonTheme.electricLime, fontSize: 12),
                         ),
                       ),
                     ],
@@ -530,23 +555,23 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               TextFormField(
                 controller: _passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'Contraseña de cifrado', hintText: 'No se almacena en la nube', prefixIcon: Icon(Icons.lock)),
+                decoration: InputDecoration(labelText: l10n.encryptionPasswordLabel, hintText: l10n.passwordNotStoredHint, prefixIcon: const Icon(Icons.lock)),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _recipientController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(labelText: 'Email del receptor (opcional)', prefixIcon: Icon(Icons.person)),
+                decoration: InputDecoration(labelText: l10n.recipientEmailOptional, prefixIcon: const Icon(Icons.person)),
               ),
               const SizedBox(height: 20),
-              
+
               // INYECCIÓN DEL SLIDER DINÁMICO REFACTORIZADO
               _buildInteractiveDurationSlider(isPremium),
-              
+
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _selectedFile == null ? null : _uploadAndEncrypt,
-                child: const Text('Cifrar y generar enlace'),
+                child: Text(l10n.encryptAndGenerateLink),
               ),
             ],
             if (isComplete) ...[
@@ -557,7 +582,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                   children: [
                     const Icon(Icons.check_circle, size: 64, color: KriptonTheme.cryptoGreen),
                     const SizedBox(height: 16),
-                    Text('Data Room listo en Cloudflare', style: Theme.of(context).textTheme.displayMedium),
+                    Text(l10n.dataRoomReadyBanner, style: Theme.of(context).textTheme.displayMedium),
                     if (_conversionFailed) ...[
                       const SizedBox(height: 12),
                       Container(
@@ -567,14 +592,14 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: KriptonTheme.amber.withOpacity(0.3)),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.info_outline, color: KriptonTheme.amber, size: 18),
-                            SizedBox(width: 8),
+                            const Icon(Icons.info_outline, color: KriptonTheme.amber, size: 18),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'El archivo se compartió, pero no se pudo generar la vista previa. El receptor podrá descargarlo si tú lo permites.',
-                                style: TextStyle(color: KriptonTheme.amber, fontSize: 12),
+                                l10n.previewGenerationFailedNotice,
+                                style: const TextStyle(color: KriptonTheme.amber, fontSize: 12),
                               ),
                             ),
                           ],
@@ -586,7 +611,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                     const SizedBox(height: 20),
                     Row(
                       children: [
-                        Expanded(child: ElevatedButton(onPressed: () => _shareLinkToExternal(_shareLink!), child: const Text('Compartir'))),
+                        Expanded(child: ElevatedButton(onPressed: () => _shareLinkToExternal(_shareLink!), child: Text(l10n.share))),
                       ],
                     ),
                   ],

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/localization/language_selector_modal.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/biometric_service.dart';
 import '../../utils/constants.dart';
@@ -67,7 +69,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
         setState(() {
           _errorMessage = error is Exception
               ? error.toString().replaceFirst('Exception: ', '')
-              : 'Credenciales inválidas. Intenta de nuevo.';
+              : AppLocalizations.of(context).loginInvalidCredentials;
         });
         return;
       }
@@ -75,14 +77,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
       if (!mounted) return;
 
       // Si el desbloqueo biométrico está habilitado, pedirlo como segundo paso.
+      final l10n = AppLocalizations.of(context);
       final biometricService = await BiometricService.create();
       final biometricEnabled = biometricService.isBiometricEnabled;
       final biometricAvailable = await biometricService.isBiometricAvailable();
 
       if (biometricEnabled && biometricAvailable) {
         final didAuthenticate = await biometricService.authenticate(
-          localizedReason:
-              'Verifica tu identidad para completar el inicio de sesión',
+          localizedReason: l10n.biometricLoginReason,
         );
         if (!didAuthenticate) {
           // Si cancela la huella, cerramos la sesión recién iniciada para
@@ -90,7 +92,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
           await ref.read(authStateProvider.notifier).signOut();
           if (mounted) {
             setState(() {
-              _errorMessage = 'Autenticación biométrica cancelada.';
+              _errorMessage = AppLocalizations.of(context).biometricAuthCancelled;
             });
           }
           return;
@@ -107,7 +109,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Credenciales inválidas. Intenta de nuevo.';
+          _errorMessage = AppLocalizations.of(context).loginInvalidCredentials;
         });
       }
     } finally {
@@ -122,7 +124,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
 
     if (_registerPasswordController.text != _registerConfirmController.text) {
       setState(() {
-        _errorMessage = 'Las contraseñas no coinciden';
+        _errorMessage = AppLocalizations.of(context).passwordsDoNotMatch;
       });
       return;
     }
@@ -144,7 +146,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error al crear cuenta. Intenta con otro email.';
+          _errorMessage = AppLocalizations.of(context).registerError;
         });
       }
     } finally {
@@ -156,6 +158,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       body: SafeArea(
@@ -164,7 +168,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 48),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  icon: const Icon(Icons.language, color: KriptonTheme.silver),
+                  tooltip: l10n.selectLanguage,
+                  onPressed: () => LanguageSelectorModal.show(context),
+                ),
+              ),
+              const SizedBox(height: 16),
               // Logo
               Center(
                 child: Container(
@@ -193,7 +206,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
               const SizedBox(height: 24),
               Center(
                 child: Text(
-                  'KRIPTONSHARE',
+                  l10n.appName,
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 22),
                 ),
               )
@@ -203,7 +216,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  'Tu dispositivo es el único custodio',
+                  l10n.authTagline,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: KriptonTheme.silver,
                       ),
@@ -211,7 +224,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
               )
                   .animate()
                   .fade(delay: 400.ms),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
               
               // Error message
               if (_errorMessage != null)
@@ -253,9 +266,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
                   indicatorColor: KriptonTheme.electricLime,
                   labelColor: KriptonTheme.electricLime,
                   unselectedLabelColor: KriptonTheme.silver,
-                  tabs: const [
-                    Tab(text: 'Iniciar sesión'),
-                    Tab(text: 'Crear cuenta'),
+                  tabs: [
+                    Tab(text: l10n.loginTab),
+                    Tab(text: l10n.registerTab),
                   ],
                 ),
               ),
@@ -281,6 +294,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
   }
 
   Widget _buildLoginForm() {
+    final l10n = AppLocalizations.of(context);
     return Form(
       key: _loginFormKey,
       child: Column(
@@ -290,14 +304,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
             controller: _loginEmailController,
             keyboardType: TextInputType.emailAddress,
             style: const TextStyle(color: KriptonTheme.platinum),
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              hintText: 'tu@email.com',
-              prefixIcon: Icon(Icons.email_outlined, color: KriptonTheme.silver),
+            decoration: InputDecoration(
+              labelText: l10n.emailLabel,
+              hintText: l10n.emailHint,
+              prefixIcon: const Icon(Icons.email_outlined, color: KriptonTheme.silver),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) return 'Email requerido';
-              if (!value.contains('@')) return 'Email inválido';
+              if (value == null || value.isEmpty) return l10n.emailRequired;
+              if (!value.contains('@')) return l10n.emailInvalid;
               return null;
             },
           ),
@@ -306,14 +320,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
             controller: _loginPasswordController,
             obscureText: true,
             style: const TextStyle(color: KriptonTheme.platinum),
-            decoration: const InputDecoration(
-              labelText: 'Contraseña',
+            decoration: InputDecoration(
+              labelText: l10n.passwordLabel,
               hintText: '••••••••',
-              prefixIcon: Icon(Icons.lock_outline, color: KriptonTheme.silver),
+              prefixIcon: const Icon(Icons.lock_outline, color: KriptonTheme.silver),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) return 'Contraseña requerida';
-              if (value.length < 6) return 'Mínimo 6 caracteres';
+              if (value == null || value.isEmpty) return l10n.passwordRequired;
+              if (value.length < 6) return l10n.passwordMinLength(6);
               return null;
             },
           ),
@@ -329,11 +343,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
                       valueColor: AlwaysStoppedAnimation(KriptonTheme.charcoalBlack),
                     ),
                   )
-                : const Text('Iniciar sesión'),
+                : Text(l10n.loginButton),
           ),
           const SizedBox(height: 16),
           Text(
-            'Plan gratuito: 10 MB máximo · ${AppConstants.maxLinksPerMonth} links/mes · ${AppConstants.maxDurationHours}h de duración',
+            l10n.freePlanInfo(
+              AppConstants.maxFileSizeBytes ~/ (1024 * 1024),
+              AppConstants.maxLinksPerMonth,
+              AppConstants.maxDurationHours,
+            ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: KriptonTheme.graphite,
                   fontSize: 11,
@@ -346,6 +364,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
   }
 
   Widget _buildRegisterForm() {
+    final l10n = AppLocalizations.of(context);
     return Form(
       key: _registerFormKey,
       child: Column(
@@ -355,14 +374,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
             controller: _registerEmailController,
             keyboardType: TextInputType.emailAddress,
             style: const TextStyle(color: KriptonTheme.platinum),
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              hintText: 'tu@email.com',
-              prefixIcon: Icon(Icons.email_outlined, color: KriptonTheme.silver),
+            decoration: InputDecoration(
+              labelText: l10n.emailLabel,
+              hintText: l10n.emailHint,
+              prefixIcon: const Icon(Icons.email_outlined, color: KriptonTheme.silver),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) return 'Email requerido';
-              if (!value.contains('@')) return 'Email inválido';
+              if (value == null || value.isEmpty) return l10n.emailRequired;
+              if (!value.contains('@')) return l10n.emailInvalid;
               return null;
             },
           ),
@@ -371,14 +390,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
             controller: _registerPasswordController,
             obscureText: true,
             style: const TextStyle(color: KriptonTheme.platinum),
-            decoration: const InputDecoration(
-              labelText: 'Contraseña',
+            decoration: InputDecoration(
+              labelText: l10n.passwordLabel,
               hintText: '••••••••',
-              prefixIcon: Icon(Icons.lock_outline, color: KriptonTheme.silver),
+              prefixIcon: const Icon(Icons.lock_outline, color: KriptonTheme.silver),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) return 'Contraseña requerida';
-              if (value.length < 8) return 'Mínimo 8 caracteres';
+              if (value == null || value.isEmpty) return l10n.passwordRequired;
+              if (value.length < 8) return l10n.passwordMinLength(8);
               return null;
             },
           ),
@@ -387,13 +406,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
             controller: _registerConfirmController,
             obscureText: true,
             style: const TextStyle(color: KriptonTheme.platinum),
-            decoration: const InputDecoration(
-              labelText: 'Confirmar contraseña',
+            decoration: InputDecoration(
+              labelText: l10n.confirmPasswordLabel,
               hintText: '••••••••',
-              prefixIcon: Icon(Icons.lock_outline, color: KriptonTheme.silver),
+              prefixIcon: const Icon(Icons.lock_outline, color: KriptonTheme.silver),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) return 'Confirmación requerida';
+              if (value == null || value.isEmpty) return l10n.confirmPasswordRequired;
               return null;
             },
           ),
@@ -409,11 +428,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
                       valueColor: AlwaysStoppedAnimation(KriptonTheme.charcoalBlack),
                     ),
                   )
-                : const Text('Crear cuenta gratis'),
+                : Text(l10n.registerButton),
           ),
           const SizedBox(height: 16),
           Text(
-            'Al registrarte, aceptas los términos de soberanía de datos. KRIPTONSHARE nunca almacena tus archivos en texto plano.',
+            l10n.termsNotice,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: KriptonTheme.graphite,
                   fontSize: 11,

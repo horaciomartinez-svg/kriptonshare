@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/localization/formatters.dart';
+import '../../core/localization/language_selector_modal.dart';
 import '../../models/kripton_file.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/file_provider.dart';
@@ -26,6 +29,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final userAsync = ref.watch(authStateProvider);
     final linksAsync = ref.watch(userLinksProvider);
     final receivedAsync = ref.watch(receivedFilesProvider);
@@ -33,12 +37,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       appBar: AppBar(
-        title: const Text('KRIPTONSHARE'),
+        title: Text(l10n.appName),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.language, color: KriptonTheme.silver),
+            tooltip: l10n.selectLanguage,
+            onPressed: () => LanguageSelectorModal.show(context),
+          ),
           IconButton(
             icon: const Icon(Icons.analytics_outlined, color: KriptonTheme.silver),
             onPressed: () => context.push('/analytics'),
-            tooltip: 'Analytics',
+            tooltip: l10n.analyticsTooltip,
           ),
           IconButton(
             icon: const Icon(Icons.person_outline, color: KriptonTheme.silver),
@@ -65,7 +74,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 children: [
                   // Welcome
                   Text(
-                    'Bienvenido',
+                    l10n.welcome,
                     style: Theme.of(context).textTheme.displayLarge?.copyWith(
                           fontSize: 24,
                         ),
@@ -96,20 +105,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   Row(
                     children: [
                       _buildStatCard(
-                        'Capacidad',
+                        l10n.capacity,
                         '${AppConstants.maxFileSizeBytes ~/ (1024 * 1024)} MB',
                         Icons.storage,
                       ),
                       const SizedBox(width: 12),
                       _buildStatCard(
-                        'Duración',
+                        l10n.duration,
                         '${AppConstants.maxDurationHours}h',
                         Icons.timer,
                       ),
                       const SizedBox(width: 12),
                       _buildStatCard(
-                        'Plan',
-                        user.isPremium ? 'Premium' : 'Free',
+                        l10n.plan,
+                        user.isPremium ? l10n.premium : l10n.free,
                         Icons.verified,
                       ),
                     ],
@@ -123,7 +132,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Archivos recibidos',
+                        l10n.receivedFiles,
                         style: Theme.of(context).textTheme.displayMedium?.copyWith(
                               fontSize: 18,
                             ),
@@ -154,12 +163,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'No has recibido archivos',
+                                l10n.noReceivedFiles,
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Los enlaces enviados a tu correo aparecerán aquí',
+                                l10n.receivedFilesHint,
                                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                       color: KriptonTheme.silver,
                                     ),
@@ -202,7 +211,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     error: (error, _) => Center(
                       child: Text(
-                        'Error: $error',
+                        l10n.errorWithMessage(error.toString()),
                         style: const TextStyle(color: KriptonTheme.alertRed),
                       ),
                     ),
@@ -215,14 +224,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Enlaces activos',
+                        l10n.activeLinks,
                         style: Theme.of(context).textTheme.displayMedium?.copyWith(
                               fontSize: 18,
                             ),
                       ),
                       TextButton(
                         onPressed: () => context.push('/links'),
-                        child: const Text('Ver todos'),
+                        child: Text(l10n.viewAll),
                       ),
                     ],
                   ),
@@ -255,12 +264,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'Sin enlaces activos',
+                                l10n.noActiveLinks,
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Crea tu primer Data Room seguro',
+                                l10n.createFirstDataRoom,
                                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                       color: KriptonTheme.silver,
                                     ),
@@ -294,7 +303,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     error: (error, _) => Center(
                       child: Text(
-                        'Error: $error',
+                        l10n.errorWithMessage(error.toString()),
                         style: const TextStyle(color: KriptonTheme.alertRed),
                       ),
                     ),
@@ -336,18 +345,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               break;
           }
         },
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            label: 'Dashboard',
+            icon: const Icon(Icons.dashboard_outlined),
+            label: l10n.dashboardTab,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.link),
-            label: 'Enlaces',
+            icon: const Icon(Icons.link),
+            label: l10n.linksTab,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
+            icon: const Icon(Icons.person_outline),
+            label: l10n.profileTab,
           ),
         ],
       ),
@@ -403,6 +412,7 @@ class _ReceivedFileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -446,7 +456,7 @@ class _ReceivedFileCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${(file.fileSizeBytes / 1024).toStringAsFixed(1)} KB · Expira ${_formatExpiresAt(file.linkExpiresAt ?? file.expiresAt)}',
+                    '${formatBytes(context, file.fileSizeBytes)} · ${l10n.expiresLabel} ${_formatExpiresAt(context, l10n, file.linkExpiresAt ?? file.expiresAt)}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: KriptonTheme.silver,
                         ),
@@ -464,12 +474,12 @@ class _ReceivedFileCard extends StatelessWidget {
     );
   }
 
-  String _formatExpiresAt(DateTime expiresAt) {
+  String _formatExpiresAt(BuildContext context, AppLocalizations l10n, DateTime expiresAt) {
     final now = DateTime.now();
     final diff = expiresAt.difference(now);
-    if (diff.isNegative) return 'expirado';
-    if (diff.inHours < 1) return 'en ${diff.inMinutes}m';
-    if (diff.inHours < 24) return 'en ${diff.inHours}h';
-    return 'en ${diff.inDays}d';
+    if (diff.isNegative) return l10n.expiredTag;
+    if (diff.inHours < 1) return l10n.expiresInMinutes(diff.inMinutes);
+    if (diff.inHours < 24) return l10n.expiresInHours(diff.inHours);
+    return l10n.expiresInDays(diff.inDays);
   }
 }

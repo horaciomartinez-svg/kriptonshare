@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/theme.dart';
@@ -14,21 +15,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<Map<String, String>> _slides = [
-    {
-      'title': 'Cifrado Zero-Knowledge',
-      'body': 'Tus archivos se encriptan localmente con AES-256 antes de subir a la nube. Nadie más que tú posee el control de las llaves.',
-    },
-    {
-      'title': 'Enlaces Efímeros',
-      'body': 'Configura la autodestrucción física de tus documentos. Elige la duración exacta de validez del link de acceso seguro.',
-    },
-    {
-      'title': 'Seguridad Forense',
-      'body': 'Mitiga el espionaje corporativo y las filtraciones físicas con marcas de agua dinámicas y bloqueo de capturas de pantalla.',
-    },
-  ];
-
   Future<void> _finishOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_completed', true);
@@ -43,6 +29,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final slides = [
+      _OnboardingSlide(l10n.onboardingTitle1, l10n.onboardingBody1),
+      _OnboardingSlide(l10n.onboardingTitle2, l10n.onboardingBody2),
+      _OnboardingSlide(l10n.onboardingTitle3, l10n.onboardingBody3),
+    ];
+
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       body: SafeArea(
@@ -54,20 +47,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: PageView.builder(
                   controller: _pageController,
                   onPageChanged: (index) => setState(() => _currentPage = index),
-                  itemCount: _slides.length,
+                  itemCount: slides.length,
                   itemBuilder: (context, index) => Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.shield_outlined, size: 80, color: KriptonTheme.electricLime),
                       const SizedBox(height: 32),
                       Text(
-                        _slides[index]['title']!,
+                        slides[index].title,
                         style: Theme.of(context).textTheme.displayMedium,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        _slides[index]['body']!,
+                        slides[index].body,
                         style: const TextStyle(color: KriptonTheme.silver, fontSize: 14, height: 1.5),
                         textAlign: TextAlign.center,
                       ),
@@ -80,11 +73,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   TextButton(
                     onPressed: _finishOnboarding,
-                    child: const Text('OMITIR', style: TextStyle(color: KriptonTheme.graphite)),
+                    child: Text(l10n.onboardingSkip, style: const TextStyle(color: KriptonTheme.graphite)),
                   ),
                   Row(
                     children: List.generate(
-                      _slides.length,
+                      slides.length,
                       (index) => Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: 8,
@@ -98,7 +91,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   TextButton(
                     onPressed: () {
-                      if (_currentPage == _slides.length - 1) {
+                      if (_currentPage == slides.length - 1) {
                         _finishOnboarding();
                       } else {
                         _pageController.nextPage(
@@ -108,7 +101,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       }
                     },
                     child: Text(
-                      _currentPage == _slides.length - 1 ? 'EMPEZAR' : 'SIGUIENTE',
+                      _currentPage == slides.length - 1 ? l10n.onboardingStart : l10n.onboardingNext,
                       style: const TextStyle(color: KriptonTheme.electricLime),
                     ),
                   ),
@@ -120,4 +113,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
+}
+
+class _OnboardingSlide {
+  final String title;
+  final String body;
+
+  const _OnboardingSlide(this.title, this.body);
 }

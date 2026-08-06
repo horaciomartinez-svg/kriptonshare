@@ -48,7 +48,7 @@ class UploadRepositoryImpl implements IUploadRepository {
     // 1. Validar conectividad antes de operaciones de red
     final isConnected = await _networkInfo.isConnected;
     if (!isConnected) {
-      return const Left(NetworkFailure('Sin conexión a internet'));
+      return const Left(NetworkFailure('No internet connection'));
     }
 
     try {
@@ -101,7 +101,7 @@ class UploadRepositoryImpl implements IUploadRepository {
         try {
           final accessToken = _supabase.auth.currentSession?.accessToken;
           if (accessToken == null) {
-            throw const ConversionException('unauthorized', 'Sin sesión');
+            throw const ConversionException('unauthorized', 'No active session');
           }
           final user = _supabase.auth.currentUser!;
           final isPremium = user.appMetadata['subscription_tier'] == 'premium' ||
@@ -131,7 +131,7 @@ class UploadRepositoryImpl implements IUploadRepository {
           viewerSizeBytes = result.pdfBytes.length;
           conversionStatus = 'ready';
         } on ConversionException catch (e) {
-          debugPrint('[CONVERSION clean] Falló (${e.code}): ${e.message}. Continúa sin preview.');
+          debugPrint('[CONVERSION clean] Failed (${e.code}): ${e.message}. Continuing without preview.');
           conversionStatus = 'failed';
           viewerStorageKey = null;
         }
@@ -184,15 +184,15 @@ class UploadRepositoryImpl implements IUploadRepository {
         ),
       );
     } on SocketException catch (e) {
-      return Left(NetworkFailure('Error de red: ${e.message}'));
+      return Left(NetworkFailure('Network error: ${e.message}'));
     } on TimeoutException catch (e) {
-      return Left(NetworkFailure('Tiempo de espera agotado: ${e.message}'));
+      return Left(NetworkFailure('Timeout: ${e.message}'));
     } on PostgrestException catch (e) {
       return Left(_mapSupabaseError(e.message, e.code));
     } on StorageException catch (e) {
       return Left(_mapSupabaseError(e.message, e.statusCode));
     } catch (e) {
-      return Left(ServerFailure('Error inesperado al subir archivo: $e'));
+      return Left(ServerFailure('Unexpected error uploading file: $e'));
     }
   }
 
@@ -204,22 +204,22 @@ class UploadRepositoryImpl implements IUploadRepository {
         msg.contains('new row violates row-level security') ||
         code == '42501') {
       return const ServerFailure(
-        'Permiso denegado. Verifica las políticas RLS en Supabase.',
+        'Permission denied. Check RLS policies in Supabase.',
       );
     }
 
     if (msg.contains('bucket not found') || msg.contains('object not found')) {
       return const ServerFailure(
-        'Bucket o objeto de Storage no encontrado. Verifica la configuración.',
+        'Storage bucket or object not found. Check configuration.',
       );
     }
 
     if (msg.contains('jwt') || msg.contains('unauthorized')) {
       return const ServerFailure(
-        'Sesión no válida. Inicia sesión nuevamente.',
+        'Invalid session. Sign in again.',
       );
     }
 
-    return ServerFailure('Error de Supabase: ${message ?? 'desconocido'}');
+    return ServerFailure('Supabase error: ${message ?? 'unknown'}');
   }
 }

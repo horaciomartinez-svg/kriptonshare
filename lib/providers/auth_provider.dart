@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
+import '../core/localization/locale_provider.dart';
+import '../core/localization/supported_locales.dart';
 import '../models/user_model.dart';
 import '../utils/constants.dart';
 
@@ -68,7 +71,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
 
       final user = response.user;
       if (user == null) {
-        throw const AuthException('No se pudo iniciar sesión');
+        throw const AuthException('Sign in failed');
       }
 
       try {
@@ -78,6 +81,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
             .eq('id', user.id)
             .single();
         state = AsyncValue.data(KriptonUser.fromJson(userData));
+        await _ref.read(localeProvider.notifier).reconcileWithRemote();
       } on PostgrestException catch (e) {
         // Si el registro no existe, intentar crearlo automáticamente.
         // Esto suele ocurrir cuando el UUID en public.users no coincide
@@ -90,13 +94,14 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
               .eq('id', user.id)
               .single();
           state = AsyncValue.data(KriptonUser.fromJson(userData));
+          await _ref.read(localeProvider.notifier).reconcileWithRemote();
         } else {
           rethrow;
         }
       } catch (e) {
         throw Exception(
-          'Usuario autenticado pero no encontrado en la tabla users. '
-          'Asegúrate de ejecutar test_users_setup.sql con el UUID correcto.',
+          'Authenticated user not found in the users table. '
+          'Make sure to run test_users_setup.sql with the correct UUID.',
         );
       }
     } catch (e, st) {
@@ -114,6 +119,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
       );
 
       if (response.user != null) {
+        // Propagar el idioma seleccionado localmente al registro remoto.
+        final prefs = await SharedPreferences.getInstance();
+        final preferredLanguage =
+            prefs.getString(kLocaleStorageKey) ?? kFallbackLocale.languageCode;
+
         // Create user record in users table
         await client.from('users').insert({
           'id': response.user!.id,
@@ -124,6 +134,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
           'total_storage_used_bytes': 0,
           'max_storage_premium_bytes': AppConstants.premiumMaxStorageBytes,
           'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
+          'preferred_language': preferredLanguage,
         });
 
         final userData = await client
@@ -165,6 +176,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
   /// Útil cuando el UUID en auth.users no coincide con public.users.
   Future<void> _ensureUserRecord(SupabaseClient client, String userId, String email) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final preferredLanguage =
+          prefs.getString(kLocaleStorageKey) ?? kFallbackLocale.languageCode;
+
       await client.from('users').insert({
         'id': userId,
         'email': email,
@@ -174,6 +189,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
         'total_storage_used_bytes': 0,
         'max_storage_premium_bytes': AppConstants.premiumMaxStorageBytes,
         'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
+        'preferred_language': preferredLanguage,
       });
     } on PostgrestException catch (e) {
       // Si ya existe (por race condition), ignorar.

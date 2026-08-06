@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/localization/formatters.dart';
 import '../../../../core/utils/theme.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../analytics_providers.dart';
@@ -48,20 +51,15 @@ class _AnalyticsDashboardScreenState
     return '${minutes}m ${remainingSeconds}s';
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final state = ref.watch(analyticsNotifierProvider);
 
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       appBar: AppBar(
-        title: const Text('Analytics'),
+        title: Text(l10n.analyticsTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -77,6 +75,7 @@ class _AnalyticsDashboardScreenState
   }
 
   Widget _buildBody(AnalyticsState state) {
+    final l10n = AppLocalizations.of(context);
     if (state.isLoading && state.metrics == null) {
       return const Center(
         child: CircularProgressIndicator(
@@ -93,14 +92,14 @@ class _AnalyticsDashboardScreenState
             const Icon(Icons.error_outline, color: KriptonTheme.alertRed, size: 48),
             const SizedBox(height: 16),
             Text(
-              'Error: ${state.error}',
+              l10n.errorWithMessage(state.error!),
               style: const TextStyle(color: KriptonTheme.alertRed),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _refresh,
-              child: const Text('Reintentar'),
+              child: Text(l10n.retry),
             ),
           ],
         ),
@@ -109,10 +108,10 @@ class _AnalyticsDashboardScreenState
 
     final metrics = state.metrics;
     if (metrics == null) {
-      return const Center(
+      return Center(
         child: Text(
-          'No hay datos disponibles',
-          style: TextStyle(color: KriptonTheme.silver),
+          l10n.noDataAvailable,
+          style: const TextStyle(color: KriptonTheme.silver),
         ),
       );
     }
@@ -124,7 +123,7 @@ class _AnalyticsDashboardScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Dashboard',
+            l10n.analyticsTitle,
             style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 24),
           )
               .animate()
@@ -132,7 +131,7 @@ class _AnalyticsDashboardScreenState
               .slideX(begin: -0.1, end: 0),
           const SizedBox(height: 4),
           Text(
-            'Métricas de tus Data Rooms',
+            l10n.dataRoomsMetrics,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: KriptonTheme.silver,
                 ),
@@ -147,7 +146,7 @@ class _AnalyticsDashboardScreenState
 
           // Top links
           Text(
-            'Top Links',
+            l10n.topLinks,
             style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 18),
           ),
           const SizedBox(height: 12),
@@ -159,7 +158,7 @@ class _AnalyticsDashboardScreenState
           // Events section
           if (state.selectedLinkId != null) ...[
             Text(
-              'Eventos del link',
+              l10n.linkEvents,
               style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 18),
             ),
             const SizedBox(height: 12),
@@ -176,7 +175,7 @@ class _AnalyticsDashboardScreenState
             child: ElevatedButton.icon(
               onPressed: () => context.push('/expired-links'),
               icon: const Icon(Icons.timer_off),
-              label: const Text('Ver enlaces expirados'),
+              label: Text(l10n.viewExpiredLinks),
             ),
           ),
         ],
@@ -185,29 +184,30 @@ class _AnalyticsDashboardScreenState
   }
 
   Widget _buildMetricsGrid(DashboardMetricsEntity metrics) {
+    final l10n = AppLocalizations.of(context);
     final items = [
-      _MetricItem('Links totales', metrics.totalLinks.toString(), Icons.link),
-      _MetricItem('Activos', metrics.activeLinks.toString(), Icons.check_circle),
-      _MetricItem('Expirados', metrics.expiredLinks.toString(), Icons.timer_off),
-      _MetricItem('Vistas totales', metrics.totalViews.toString(), Icons.visibility),
+      _MetricItem(l10n.totalLinks, metrics.totalLinks.toString(), Icons.link),
+      _MetricItem(l10n.activeLabel, metrics.activeLinks.toString(), Icons.check_circle),
+      _MetricItem(l10n.expiredLabel, metrics.expiredLinks.toString(), Icons.timer_off),
+      _MetricItem(l10n.totalViews, metrics.totalViews.toString(), Icons.visibility),
       _MetricItem(
-        'Descargas',
+        l10n.downloadsLabel,
         metrics.totalDownloads.toString(),
         Icons.download,
       ),
       _MetricItem(
-        'Duración promedio',
+        l10n.avgDuration,
         _formatDuration(metrics.averageViewDurationMs),
         Icons.schedule,
       ),
       _MetricItem(
-        'Eventos 24h',
+        l10n.events24h,
         metrics.eventsLast24h.toString(),
         Icons.flash_on,
       ),
       _MetricItem(
-        'Almacenamiento',
-        _formatBytes(metrics.storageUsedBytes),
+        l10n.storageLabel,
+        formatBytes(context, metrics.storageUsedBytes),
         Icons.storage,
       ),
     ];
@@ -269,6 +269,7 @@ class _AnalyticsDashboardScreenState
   }
 
   Widget _buildTopLinksList(AnalyticsState state) {
+    final l10n = AppLocalizations.of(context);
     final topLinks = state.metrics?.topLinks ?? [];
 
     if (topLinks.isEmpty) {
@@ -284,12 +285,12 @@ class _AnalyticsDashboardScreenState
             const Icon(Icons.bar_chart, size: 48, color: KriptonTheme.graphite),
             const SizedBox(height: 16),
             Text(
-              'Sin actividad aún',
+              l10n.noActivityYet,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'Los links más vistos aparecerán aquí',
+              l10n.topLinksEmptyHint,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: KriptonTheme.silver,
                   ),
@@ -335,7 +336,7 @@ class _AnalyticsDashboardScreenState
               ),
             ),
             title: Text(
-              link.fileName ?? 'Documento sin nombre',
+              link.fileName ?? l10n.unnamedDocument,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: KriptonTheme.platinum,
                     fontWeight: FontWeight.w500,
@@ -344,7 +345,7 @@ class _AnalyticsDashboardScreenState
               overflow: TextOverflow.ellipsis,
             ),
             subtitle: Text(
-              '${link.views} vistas · ${link.downloads} descargas',
+              l10n.viewsDownloadsSummary(link.views, link.downloads),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: KriptonTheme.silver,
                   ),
@@ -369,6 +370,7 @@ class _AnalyticsDashboardScreenState
   }
 
   Widget _buildEventsList(AnalyticsState state) {
+    final l10n = AppLocalizations.of(context);
     final events = state.events;
 
     if (state.isLoading && events.isEmpty) {
@@ -387,10 +389,10 @@ class _AnalyticsDashboardScreenState
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: KriptonTheme.cardBorder, width: 1),
         ),
-        child: const Center(
+        child: Center(
           child: Text(
-            'No hay eventos registrados para este link',
-            style: TextStyle(color: KriptonTheme.silver),
+            l10n.noEventsForLink,
+            style: const TextStyle(color: KriptonTheme.silver),
           ),
         ),
       );
@@ -433,7 +435,7 @@ class _AnalyticsDashboardScreenState
                     ),
                     if (event.pageNumber != null)
                       Text(
-                        'Página ${event.pageNumber}',
+                        l10n.pageN(event.pageNumber!),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: KriptonTheme.silver,
                             ),
@@ -477,28 +479,20 @@ class _AnalyticsDashboardScreenState
   }
 
   String _formatEventType(String eventType) {
-    switch (eventType) {
-      case 'page_view':
-        return 'Vista de página';
-      case 'download_complete':
-        return 'Descarga completada';
-      case 'download_start':
-        return 'Inicio de descarga';
-      case 'screenshot_blocked':
-        return 'Screenshot bloqueado';
-      default:
-        return eventType;
-    }
+    final l10n = AppLocalizations.of(context);
+    return switch (eventType) {
+      'page_view' => l10n.eventPageView,
+      'download_complete' => l10n.eventDownloadComplete,
+      'download_start' => l10n.eventDownloadStart,
+      'screenshot_blocked' => l10n.eventScreenshotBlocked,
+      _ => eventType,
+    };
   }
 
   String _formatEventDate(DateTime date) {
+    final locale = Localizations.localeOf(context).toString();
     final local = date.toLocal();
-    final day = local.day.toString().padLeft(2, '0');
-    final month = local.month.toString().padLeft(2, '0');
-    final year = local.year;
-    final hour = local.hour.toString().padLeft(2, '0');
-    final minute = local.minute.toString().padLeft(2, '0');
-    return '$day/$month/$year $hour:$minute';
+    return DateFormat('dd/MM/yyyy HH:mm', locale).format(local);
   }
 }
 

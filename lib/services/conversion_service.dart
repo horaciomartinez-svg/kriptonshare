@@ -41,7 +41,7 @@ class ConversionService {
     if (fileBytes.length > maxBytes) {
       throw ConversionException(
         'too_large',
-        'El archivo excede el límite de ${maxBytes ~/ (1024 * 1024)} MB de tu plan.',
+        'File exceeds the ${maxBytes ~/ (1024 * 1024)} MB limit of your plan.',
       );
     }
     try {
@@ -80,8 +80,8 @@ class ConversionService {
             : 'network',
       };
       final message = limitBytes != null
-          ? 'El archivo excede el límite de ${limitBytes ~/ (1024 * 1024)} MB de tu plan.'
-          : 'Error de conversión (HTTP ${status ?? '-'})';
+          ? 'File exceeds the ${limitBytes ~/ (1024 * 1024)} MB limit of your plan.'
+          : 'Conversion error (HTTP ${status ?? '-'})';
       throw ConversionException(code, message);
     }
   }

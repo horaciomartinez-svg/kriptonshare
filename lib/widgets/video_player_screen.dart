@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
@@ -38,6 +39,7 @@ class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
   }
 
   Future<void> _initPlayer() async {
+    final l10n = AppLocalizations.of(context);
     try {
       final tempDir = await getTemporaryDirectory();
       final safeName = path.basenameWithoutExtension(widget.fileName);
@@ -58,7 +60,7 @@ class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = 'No se pudo reproducir el video: $e';
+          _error = l10n.videoPlaybackError(e.toString());
         });
       }
     }

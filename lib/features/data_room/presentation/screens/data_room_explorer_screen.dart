@@ -1,17 +1,17 @@
-import 'dart:typed_data';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
 import '../../../../app/config/theme/app_theme.dart';
 import '../../../../app/constants/storage_constants.dart';
+import '../../../../core/localization/language_selector_modal.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../data_room_providers.dart';
 import '../../domain/entities/file_entity.dart';
 import '../../domain/entities/folder_entity.dart';
 import '../../domain/entities/share_link_entity.dart';
-import '../../domain/usecases/batch_upload_to_folder_usecase.dart';
 import '../notifiers/data_room_explorer_notifier.dart';
 import '../notifiers/upload_batch_notifier.dart';
 import '../widgets/organisms/drive_explorer_view.dart';
@@ -42,25 +42,26 @@ class _DataRoomExplorerScreenState extends ConsumerState<DataRoomExplorerScreen>
   }
 
   Future<void> _createFolder() async {
+    final l10n = AppLocalizations.of(context);
     final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.ink,
-        title: const Text('Nueva carpeta virtual', style: TextStyle(color: AppTheme.platinum)),
+        title: Text(l10n.newVirtualFolder, style: const TextStyle(color: AppTheme.platinum)),
         content: TextField(
           controller: controller,
           style: const TextStyle(color: AppTheme.platinum),
-          decoration: const InputDecoration(labelText: 'Nombre'),
+          decoration: InputDecoration(labelText: l10n.folderNameLabel),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Crear'),
+            child: Text(l10n.createFolder),
           ),
         ],
       ),
@@ -81,6 +82,7 @@ class _DataRoomExplorerScreenState extends ConsumerState<DataRoomExplorerScreen>
   }
 
   Future<void> _uploadFile({String? folderId, bool multiple = false}) async {
+    final l10n = AppLocalizations.of(context);
     final user = ref.read(authStateProvider).valueOrNull;
     if (user == null) return;
 
@@ -90,14 +92,14 @@ class _DataRoomExplorerScreenState extends ConsumerState<DataRoomExplorerScreen>
     if (multiple && targetFolderId == null) {
       final explorer = ref.read(dataRoomExplorerProvider);
       if (explorer.folders.isEmpty) {
-        _showError('Crea una carpeta primero para la subida múltiple');
+        _showError(l10n.createFirstDataRoom);
         return;
       }
       targetFolderId = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
           backgroundColor: AppTheme.ink,
-          title: const Text('Subir a carpeta', style: TextStyle(color: AppTheme.platinum)),
+          title: Text(l10n.selectDestinationFolder, style: const TextStyle(color: AppTheme.platinum)),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
@@ -132,7 +134,7 @@ class _DataRoomExplorerScreenState extends ConsumerState<DataRoomExplorerScreen>
       final bytes = await xfile.readAsBytes();
       final mime = lookupMimeType(xfile.name) ?? 'application/octet-stream';
       if (bytes.length > StorageConstants.premiumMaxFileBytes) {
-        _showError('${xfile.name} excede 100 MB');
+        _showError(l10n.batchFileSkippedTooLarge(xfile.name));
         continue;
       }
       items.add(BatchUploadItem(filename: xfile.name, bytes: bytes, mimeType: mime));
@@ -217,15 +219,21 @@ class _DataRoomExplorerScreenState extends ConsumerState<DataRoomExplorerScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final user = ref.watch(authStateProvider).valueOrNull;
     final explorer = ref.watch(dataRoomExplorerProvider);
 
     return DataRoomLayout(
-      title: 'Mi Bóveda Data Room',
+      title: l10n.dataRoomExplorerTitle,
       usedBytes: user?.totalStorageUsedBytes ?? 0,
       maxBytes: user?.maxStorageBytes ?? StorageConstants.premiumBaseStorageBytes,
       onUpgradeStorage: () => context.go('/storage-management'),
       actions: [
+        IconButton(
+          icon: const Icon(Icons.language, color: AppTheme.platinum),
+          tooltip: l10n.selectLanguage,
+          onPressed: () => LanguageSelectorModal.show(context),
+        ),
         IconButton(
           icon: Icon(_viewMode == ExplorerViewMode.list ? Icons.grid_view : Icons.view_list,
               color: AppTheme.platinum),
@@ -248,17 +256,17 @@ class _DataRoomExplorerScreenState extends ConsumerState<DataRoomExplorerScreen>
                 ElevatedButton.icon(
                   onPressed: _isUploading ? null : () => _uploadFile(),
                   icon: const Icon(Icons.upload_file),
-                  label: const Text('Subir archivo'),
+                  label: Text(l10n.uploadFileMax),
                 ),
                 ElevatedButton.icon(
                   onPressed: _isUploading ? null : () => _uploadFile(multiple: true),
                   icon: const Icon(Icons.drive_folder_upload),
-                  label: const Text('Subida múltiple'),
+                  label: Text(l10n.batchUploadAction),
                 ),
                 OutlinedButton.icon(
                   onPressed: _createFolder,
                   icon: const Icon(Icons.create_new_folder, color: AppTheme.platinum),
-                  label: const Text('Nueva carpeta', style: TextStyle(color: AppTheme.platinum)),
+                  label: Text(l10n.newVirtualFolder, style: const TextStyle(color: AppTheme.platinum)),
                 ),
               ],
             ),

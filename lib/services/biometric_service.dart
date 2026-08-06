@@ -56,7 +56,7 @@ class BiometricService {
     try {
       return await _localAuth.authenticate(
         localizedReason: localizedReason ??
-            'Verifica tu identidad para acceder a KRIPTONSHARE',
+            'Verify your identity to access KRIPTONSHARE',
         options: const AuthenticationOptions(
           biometricOnly: false,
           stickyAuth: true,
@@ -67,15 +67,15 @@ class BiometricService {
       // Propaga códigos conocidos para que la UI pueda mostrar mensajes útiles.
       switch (e.code) {
         case auth_error.notAvailable:
-          throw Exception('La biometría no está disponible.');
+          throw Exception('Biometrics not available.');
         case auth_error.notEnrolled:
-          throw Exception('No hay huella o rostro configurado.');
+          throw Exception('No fingerprint or face configured.');
         case auth_error.passcodeNotSet:
-          throw Exception('Configura un PIN/patrón en el dispositivo.');
+          throw Exception('Set a PIN/pattern on the device.');
         case auth_error.lockedOut:
-          throw Exception('Demasiados intentos fallidos. Intenta más tarde.');
+          throw Exception('Too many failed attempts. Try again later.');
         default:
-          throw Exception('Error de autenticación: ${e.message}');
+          throw Exception('Authentication error: ${e.message}');
       }
     }
   }

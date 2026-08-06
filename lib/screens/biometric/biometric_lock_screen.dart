@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -47,7 +48,7 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
 
       if (!didAuthenticate) {
         setState(() {
-          _errorMessage = 'Autenticación cancelada.';
+          _errorMessage = AppLocalizations.of(context).authCancelled;
         });
         return;
       }
@@ -60,7 +61,7 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
         await service.setBiometricEnabled(false);
         if (mounted) {
           _showStatusAndRedirect(
-            'No hay credenciales guardadas. Inicia sesión manualmente.',
+            AppLocalizations.of(context).noSavedCredentials,
             '/auth',
           );
         }
@@ -77,7 +78,7 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
 
       if (currentState.hasError || currentState.valueOrNull == null) {
         _showStatusAndRedirect(
-          'Las credenciales guardadas ya no son válidas. Inicia sesión manualmente.',
+          AppLocalizations.of(context).invalidSavedCredentials,
           '/auth',
         );
         return;
@@ -111,6 +112,8 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       body: SafeArea(
@@ -140,7 +143,7 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
                   .fade(),
               const SizedBox(height: 40),
               Text(
-                'KRIPTONSHARE bloqueado',
+                l10n.lockTitle,
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
                       fontSize: 24,
                     ),
@@ -148,7 +151,7 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Usa tu huella o rostro para desbloquear la app.',
+                l10n.lockSubtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: KriptonTheme.silver,
                     ),
@@ -195,15 +198,15 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
                       )
                     : const Icon(Icons.fingerprint),
                 label: Text(_isAuthenticating
-                    ? 'Verificando...'
-                    : 'Desbloquear con biometría'),
+                    ? l10n.lockVerifying
+                    : l10n.unlockWithBiometrics),
               ),
               const SizedBox(height: 16),
               TextButton(
                 onPressed: _signOut,
-                child: const Text(
-                  'Cerrar sesión',
-                  style: TextStyle(color: KriptonTheme.silver),
+                child: Text(
+                  l10n.signOut,
+                  style: const TextStyle(color: KriptonTheme.silver),
                 ),
               ),
               const Spacer(),

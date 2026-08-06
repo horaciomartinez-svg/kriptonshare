@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../../l10n/app_localizations.dart';
 import '../../../../../app/config/theme/app_theme.dart';
 import '../../../domain/entities/file_entity.dart';
 import '../../../domain/entities/folder_entity.dart';
@@ -29,15 +30,16 @@ class DriveExplorerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return CustomScrollView(
       slivers: [
         if (folders.isNotEmpty) ...[
-          const SliverPadding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             sliver: SliverToBoxAdapter(
               child: Text(
-                'CARPETAS VIRTUALES',
-                style: TextStyle(
+                l10n.virtualFoldersSection.toUpperCase(),
+                style: const TextStyle(
                   color: AppTheme.silver,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -81,12 +83,12 @@ class DriveExplorerView extends StatelessWidget {
                 ),
         ],
         if (unfiledDocuments.isNotEmpty) ...[
-          const SliverPadding(
-            padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
             sliver: SliverToBoxAdapter(
               child: Text(
-                'ARCHIVOS INDIVIDUALES EN BÓVEDA',
-                style: TextStyle(
+                l10n.unfiledFilesSection.toUpperCase(),
+                style: const TextStyle(
                   color: AppTheme.silver,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -110,11 +112,11 @@ class DriveExplorerView extends StatelessWidget {
           ),
         ],
         if (folders.isEmpty && unfiledDocuments.isEmpty)
-          const SliverFillRemaining(
+          SliverFillRemaining(
             child: Center(
               child: Text(
-                'Tu Data Room está vacío',
-                style: TextStyle(color: AppTheme.silver),
+                l10n.emptyDataRoomHint,
+                style: const TextStyle(color: AppTheme.silver),
               ),
             ),
           ),

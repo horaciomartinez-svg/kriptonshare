@@ -46,7 +46,7 @@ class FolderRemoteDataSource {
         .from('files')
         .select()
         .eq('owner_id', ownerId)
-        .is_('folder_id', null)
+        .isFilter('folder_id', null)
         .eq('is_deleted', false)
         .eq('status', 'active')
         .order('created_at', ascending: false);

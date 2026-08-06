@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'dart:math' as math;
 import '../../utils/theme.dart';
 
@@ -14,8 +15,10 @@ class LinkGauge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final remaining = total - used;
-    final percentage = used / total;
+    final safeTotal = total > 0 ? total : 1;
+    final percentage = used / safeTotal;
     final color = percentage < 0.6
         ? KriptonTheme.electricLime
         : percentage < 0.8
@@ -38,7 +41,7 @@ class LinkGauge extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Enlaces mensuales',
+                l10n.monthlyLinks,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               Text(
@@ -63,14 +66,14 @@ class LinkGauge extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '$remaining restantes',
+            l10n.remainingLinks(remaining.clamp(0, total)),
             style: Theme.of(context).textTheme.displayMedium?.copyWith(
                   fontSize: 18,
                   color: color,
                 ),
           ),
           Text(
-            'Plan gratuito',
+            l10n.freePlanLabel,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: KriptonTheme.graphite,
                 ),
@@ -138,7 +141,7 @@ class CircularGaugePainter extends CustomPainter {
     // Center text
     final textPainter = TextPainter(
       text: TextSpan(
-        text: '${(percentage * 100).toInt()}%',
+        text: '${(safePercentage * 100).toInt()}%',
         style: TextStyle(
           color: color,
           fontSize: 18,

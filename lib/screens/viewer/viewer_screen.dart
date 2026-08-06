@@ -4,10 +4,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pdfrx/pdfrx.dart';
 
+import '../../core/localization/formatters.dart';
 import '../../features/telemetry/telemetry_providers.dart';
 import '../../models/kripton_file.dart';
 import '../../providers/auth_provider.dart';
@@ -50,8 +52,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   void initState() {
     super.initState();
     _initializeSecureView();
-    _loadFileMetadata();
     _pdfController.addListener(_onPdfPageChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadFileMetadata());
   }
 
   Future<void> _initializeSecureView() async {
@@ -69,11 +71,13 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   }
 
   Future<void> _loadFileMetadata() async {
+    final l10n = AppLocalizations.of(context);
+
     final linkId = widget.linkId;
     if (linkId == null || linkId.isEmpty) {
       setState(() {
         _status = _ViewerStatus.error;
-        _errorMessage = 'ID de enlace no proporcionado';
+        _errorMessage = l10n.linkIdMissing;
       });
       return;
     }
@@ -86,7 +90,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       if (file == null) {
         setState(() {
           _status = _ViewerStatus.error;
-          _errorMessage = 'Enlace inválido, expirado o revocado';
+          _errorMessage = l10n.linkInvalidExpiredRevoked;
         });
         return;
       }
@@ -99,8 +103,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         if (currentEmail == null || currentEmail.toLowerCase() != recipient.toLowerCase()) {
           setState(() {
             _status = _ViewerStatus.error;
-            _errorMessage =
-                'Este archivo fue enviado a $recipient. Inicia sesión con esa cuenta para acceder.';
+            _errorMessage = l10n.recipientOnlyNotice(recipient);
           });
           return;
         }
@@ -113,13 +116,15 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     } catch (e) {
       setState(() {
         _status = _ViewerStatus.error;
-        _errorMessage = 'Error al cargar el documento: $e';
+        _errorMessage = l10n.documentLoadError(e.toString());
       });
     }
   }
 
   Future<void> _decryptAndView() async {
     if (_passwordController.text.isEmpty || _file == null) return;
+
+    final l10n = AppLocalizations.of(context);
 
     setState(() {
       _status = _ViewerStatus.decrypting;
@@ -159,7 +164,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         _pdfLoadTimer?.cancel();
         _pdfLoadTimer = Timer(const Duration(seconds: 3), () {
           if (mounted && !_pdfController.isReady) {
-            debugPrint('[VIEWER] El PDF no se renderizó a tiempo, activando fallback');
+            debugPrint('[VIEWER] PDF did not render in time, enabling fallback');
             setState(() => _pdfRenderFailed = true);
           }
         });
@@ -176,7 +181,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       if (mounted) {
         setState(() {
           _status = _ViewerStatus.password;
-          _errorMessage = 'El archivo descifrado no es válido. Verifica la contraseña.';
+          _errorMessage = l10n.invalidDecryptedFile;
         });
       }
     } on ArgumentError catch (e) {
@@ -184,7 +189,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       if (mounted) {
         setState(() {
           _status = _ViewerStatus.password;
-          _errorMessage = 'Datos de archivo incompletos o corruptos.';
+          _errorMessage = l10n.incompleteFileData;
         });
       }
     } catch (e) {
@@ -192,7 +197,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       if (mounted) {
         setState(() {
           _status = _ViewerStatus.password;
-          _errorMessage = 'Contraseña incorrecta o archivo corrupto';
+          _errorMessage = l10n.wrongPasswordOrCorrupt;
         });
       }
     }
@@ -268,12 +273,14 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: KriptonTheme.charcoalBlack,
         appBar: AppBar(
-          title: const Text('Documento seguro'),
+          title: Text(l10n.secureDocument),
           leading: IconButton(
             icon: const Icon(Icons.close),
             onPressed: () => context.go('/dashboard'),
@@ -306,6 +313,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   }
 
   Widget _buildPasswordPrompt() {
+    final l10n = AppLocalizations.of(context);
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -319,7 +328,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'Has recibido un archivo cifrado',
+            l10n.encryptedFileReceived,
             style: Theme.of(context).textTheme.displayLarge,
             textAlign: TextAlign.center,
           ),
@@ -335,7 +344,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${(_file!.fileSizeBytes / 1024).toStringAsFixed(1)} KB · ${_file!.mimeType}',
+              l10n.fileSizeAndType(formatBytes(context, _file!.fileSizeBytes), _file!.mimeType),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: KriptonTheme.graphite,
                   ),
@@ -344,7 +353,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           ],
           const SizedBox(height: 16),
           Text(
-            'Ingresa la contraseña que te proporcionó el emisor para descifrarlo',
+            l10n.senderPasswordPrompt,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: KriptonTheme.silver,
                 ),
@@ -355,16 +364,16 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             controller: _passwordController,
             obscureText: true,
             style: const TextStyle(color: KriptonTheme.platinum),
-            decoration: const InputDecoration(
-              labelText: 'Contraseña de descifrado',
-              prefixIcon: Icon(Icons.vpn_key, color: KriptonTheme.silver),
+            decoration: InputDecoration(
+              labelText: l10n.decryptionPasswordLabel,
+              prefixIcon: const Icon(Icons.vpn_key, color: KriptonTheme.silver),
             ),
             onFieldSubmitted: (_) => _decryptAndView(),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _decryptAndView,
-            child: const Text('Descifrar y ver'),
+            child: Text(l10n.decryptAndView),
           ),
           if (_errorMessage != null) ...[
             const SizedBox(height: 16),
@@ -387,7 +396,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Este documento se autodestruye tras la caducidad. No se almacena en tu dispositivo.',
+                    l10n.selfDestructNotice,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: KriptonTheme.silver,
                         ),
@@ -402,17 +411,17 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   }
 
   Widget _buildDecrypting() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(
+          const CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation(KriptonTheme.electricLime),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
-            'Descifrando documento...',
-            style: TextStyle(color: KriptonTheme.silver),
+            AppLocalizations.of(context).decryptingDocument,
+            style: const TextStyle(color: KriptonTheme.silver),
           ),
         ],
       ),
@@ -420,11 +429,13 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   }
 
   Widget _buildDocumentViewer() {
+    final l10n = AppLocalizations.of(context);
+
     if (_decryptedBytes == null || _file == null) {
-      return const Center(
+      return Center(
         child: Text(
-          'Error inesperado',
-          style: TextStyle(color: KriptonTheme.alertRed),
+          l10n.unexpectedError,
+          style: const TextStyle(color: KriptonTheme.alertRed),
         ),
       );
     }
@@ -473,7 +484,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         errorBannerBuilder: (context, error, stackTrace, documentRef) {
           debugPrint('[VIEWER] Error renderizando PDF: $error');
           return _buildPdfFallback(
-            'No se pudo abrir el PDF:\n${error.toString()}',
+            AppLocalizations.of(context).pdfOpenError(error.toString()),
           );
         },
         loadingBannerBuilder: (context, bytesDownloaded, totalBytes) =>
@@ -486,7 +497,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
       if (_pdfRenderFailed) {
         content = _buildPdfFallback(
-          'El visor nativo no pudo mostrar este PDF. Por seguridad no se permite abrirlo fuera de la app.',
+          l10n.pdfViewerFallback,
         );
       } else {
         // Usamos PdfViewer.data para evitar problemas de URI de archivo
@@ -518,7 +529,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               ),
               const SizedBox(height: 24),
               Text(
-                'Video descifrado',
+                l10n.decryptedVideo,
                 style: Theme.of(context).textTheme.displayLarge,
                 textAlign: TextAlign.center,
               ),
@@ -535,7 +546,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                   );
                 },
                 icon: const Icon(Icons.play_arrow),
-                label: const Text('Reproducir video'),
+                label: Text(l10n.playVideo),
               ),
             ],
           ),
@@ -557,7 +568,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Formato protegido',
+              l10n.protectedFormat,
               style: Theme.of(context).textTheme.displayLarge,
               textAlign: TextAlign.center,
             ),
@@ -571,7 +582,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${(_decryptedBytes!.length / 1024).toStringAsFixed(1)} KB · ${_file!.mimeType}',
+              l10n.fileSizeAndType(formatBytes(context, _decryptedBytes!.length), _file!.mimeType),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: KriptonTheme.graphite,
                   ),
@@ -580,8 +591,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             const SizedBox(height: 32),
             Text(
               _file!.conversionStatus == 'failed'
-                  ? 'No se pudo generar la vista previa segura de este documento. Puedes pedir al emisor que lo vuelva a subir o que lo convierta a PDF.'
-                  : 'Los documentos de Microsoft Office y otros formatos no se visualizan directamente dentro de la app por seguridad.',
+                  ? l10n.pdfViewerFallback
+                  : l10n.officeNotViewable,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: KriptonTheme.silver,
                   ),
@@ -589,7 +600,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Para compartir este contenido de forma segura, conviértelo a PDF antes de subirlo.',
+              l10n.convertToPdfAdvice,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: KriptonTheme.platinum,
                     fontWeight: FontWeight.w600,
@@ -614,7 +625,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               ),
               child: CustomPaint(
                 painter: WatermarkPainter(
-                  text: _file!.recipientEmail ?? 'KRIPTONSHARE | CONFIDENCIAL',
+                  text: _file!.recipientEmail != null
+                      ? l10n.confidentialUserWatermark(_file!.recipientEmail!)
+                      : l10n.confidentialBanner,
                   secondaryText: DateTime.now().toIso8601String().substring(0, 16),
                   opacity: 0.15,
                 ),
@@ -645,7 +658,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'MODO SEGURO',
+                  l10n.secureMode,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: KriptonTheme.alertRed,
                         fontSize: 10,
@@ -661,6 +674,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   }
 
   Widget _buildPdfFallback(String message) {
+    final l10n = AppLocalizations.of(context);
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -682,7 +697,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => context.go('/dashboard'),
-              child: const Text('Volver al inicio'),
+              child: Text(l10n.backToHome),
             ),
           ],
         ),
@@ -691,6 +706,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   }
 
   Widget _buildError() {
+    final l10n = AppLocalizations.of(context);
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -704,7 +721,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            _errorMessage ?? 'Error desconocido',
+            _errorMessage ?? l10n.unknownError,
             style: const TextStyle(
               color: KriptonTheme.alertRed,
               fontSize: 16,
@@ -714,7 +731,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () => context.go('/dashboard'),
-            child: const Text('Volver al inicio'),
+            child: Text(l10n.backToHome),
           ),
         ],
       ),

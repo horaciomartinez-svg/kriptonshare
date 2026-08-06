@@ -2,13 +2,14 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../app/config/theme/app_theme.dart';
+import '../../../../core/localization/formatters.dart';
 import '../../../../services/screenshot_service.dart';
-import '../../../../utils/constants.dart';
 import '../../../../widgets/video_player_screen.dart';
 import '../../data_room_providers.dart';
 import '../../domain/entities/file_entity.dart';
@@ -109,11 +110,6 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
     super.dispose();
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes >= 1048576) return '${(bytes / 1048576).toStringAsFixed(1)} MB';
-    return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  }
-
   IconData _iconForMime(String mime) {
     if (mime.startsWith('image/')) return Icons.image;
     if (mime.startsWith('video/')) return Icons.videocam;
@@ -125,8 +121,9 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
   }
 
   Future<void> _openFileInLobby(FileEntity file) async {
+    final l10n = AppLocalizations.of(context);
     if (_passwordController.text.isEmpty) {
-      _showError('Ingresa la contraseña del Data Room');
+      _showError(l10n.enterDataRoomPassword);
       return;
     }
 
@@ -152,9 +149,9 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
     ref.read(folderNotifierProvider.notifier).clearSelectedFile();
   }
 
-  void _onPdfPageChanged(int page) {
+  void _onPdfPageChanged(int? page) {
     final selectedFile = ref.read(folderNotifierProvider).selectedFile;
-    if (selectedFile != null) {
+    if (selectedFile != null && page != null) {
       _logJourneyEvent(
         'page_view',
         fileId: selectedFile.id,
@@ -179,6 +176,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final folderState = ref.watch(folderNotifierProvider);
     final decryptedState = ref.watch(lazyDecryptionProvider);
     final folder = folderState.folder;
@@ -194,10 +192,10 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
     if (folder == null) {
       return Scaffold(
         backgroundColor: AppTheme.charcoalDeep,
-        appBar: AppBar(title: const Text('Data Room')),
+        appBar: AppBar(title: Text(l10n.dataRoom)),
         body: Center(
           child: Text(
-            folderState.error ?? 'No se encontró el Data Room',
+            folderState.error ?? l10n.dataRoomNotFound,
             style: const TextStyle(color: AppTheme.silver),
           ),
         ),
@@ -245,7 +243,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
           backgroundColor: AppTheme.charcoalDeep,
           appBar: AppBar(title: Text(selectedFile.originalFilename)),
           body: Center(
-            child: Text('Error: $err', style: const TextStyle(color: AppTheme.silver)),
+            child: Text(l10n.errorWithMessage(err.toString()), style: const TextStyle(color: AppTheme.silver)),
           ),
         ),
       );
@@ -255,6 +253,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
   }
 
   Widget _buildLobby(FolderEntity folder) {
+    final l10n = AppLocalizations.of(context);
     return ViewerSecureLayout(
       title: folder.name,
       onClose: () => context.go('/dashboard'),
@@ -269,7 +268,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${folder.files.length} Archivos Cifrados · ${_formatBytes(folder.totalSizeBytes)}',
+              l10n.encryptedFilesCount(folder.files.length, formatBytes(context, folder.totalSizeBytes)),
               style: const TextStyle(color: AppTheme.silver),
             ),
             const SizedBox(height: 16),
@@ -277,15 +276,15 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
               controller: _passwordController,
               obscureText: true,
               style: const TextStyle(color: AppTheme.platinum),
-              decoration: const InputDecoration(
-                labelText: 'Contraseña del Data Room',
-                prefixIcon: Icon(Icons.vpn_key, color: AppTheme.silver),
+              decoration: InputDecoration(
+                labelText: l10n.dataRoomPasswordLabel,
+                prefixIcon: const Icon(Icons.vpn_key, color: AppTheme.silver),
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Selecciona un archivo para descifrarlo en memoria RAM',
-              style: TextStyle(color: AppTheme.silver),
+            Text(
+              l10n.selectFileToDecrypt,
+              style: const TextStyle(color: AppTheme.silver),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -305,7 +304,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
                         style: const TextStyle(color: AppTheme.platinum),
                       ),
                       subtitle: Text(
-                        '${_formatBytes(file.fileSizeBytes)} · Cifrado AES-256',
+                        l10n.aes256Encrypted(formatBytes(context, file.fileSizeBytes)),
                         style: const TextStyle(color: AppTheme.silver),
                       ),
                       trailing: const Icon(
@@ -318,9 +317,9 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
                 },
               ),
             ),
-            const Text(
-              'Los documentos se descifran exclusivamente en RAM volátil y cuentan con auditoría de lectura activa.',
-              style: TextStyle(color: AppTheme.silver, fontSize: 12),
+            Text(
+              l10n.ramDecryptionNotice,
+              style: const TextStyle(color: AppTheme.silver, fontSize: 12),
               textAlign: TextAlign.center,
             ),
           ],
@@ -340,6 +339,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
   }
 
   Widget _buildFileViewer(FileEntity file, Uint8List bytes) {
+    final l10n = AppLocalizations.of(context);
     final mime = file.mimeType;
 
     if (mime.startsWith('image/')) {
@@ -388,7 +388,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
                   );
                 },
                 icon: const Icon(Icons.play_arrow),
-                label: const Text('Reproducir video'),
+                label: Text(l10n.playVideo),
               ),
             ],
           ),
@@ -406,7 +406,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
           onPageChanged: _onPdfPageChanged,
           errorBannerBuilder: (context, error, stackTrace, documentRef) => Center(
             child: Text(
-              'Error al abrir PDF:\n$error',
+              l10n.pdfOpenError(error.toString()),
               style: const TextStyle(color: AppTheme.silver),
               textAlign: TextAlign.center,
             ),
@@ -423,7 +423,7 @@ class _DataRoomLobbyScreenState extends ConsumerState<DataRoomLobbyScreen> {
           const Icon(Icons.lock_outline, size: 64, color: AppTheme.electricLime),
           const SizedBox(height: 16),
           Text(
-            'Formato protegido',
+            l10n.protectedFormat,
             style: Theme.of(context).textTheme.displayLarge,
             textAlign: TextAlign.center,
           ),

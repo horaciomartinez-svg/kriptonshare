@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import '../../../../core/localization/formatters.dart';
 import '../../../../core/services/revenue_cat_service.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../utils/theme.dart';
@@ -32,18 +34,9 @@ class _StorageManagementScreenState
     }
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes >= 1073741824) {
-      return '${(bytes / 1073741824).toStringAsFixed(2)} GB';
-    }
-    if (bytes >= 1048576) {
-      return '${(bytes / 1048576).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  }
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final user = ref.watch(authStateProvider).valueOrNull;
     final upsell = ref.watch(storageUpsellNotifierProvider);
 
@@ -55,7 +48,7 @@ class _StorageManagementScreenState
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       appBar: AppBar(
-        title: const Text('Bóveda y Almacenamiento Data Room'),
+        title: Text(l10n.storageManagementTitle),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => context.go('/dashboard'),
@@ -76,7 +69,7 @@ class _StorageManagementScreenState
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  isPremium ? 'PREMIUM ACTIVO' : 'PLAN GRATUITO',
+                  isPremium ? l10n.premiumActive : l10n.freePlanBadge,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: isPremium ? KriptonTheme.electricLime : KriptonTheme.silver,
@@ -87,12 +80,15 @@ class _StorageManagementScreenState
               ),
               const SizedBox(height: 24),
               Text(
-                'Capacidad del Data Room',
+                l10n.dataRoomCapacity,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
-                '${_formatBytes(used)} / ${_formatBytes(max)} Usados',
+                l10n.storageUsedOf(
+                  formatBytes(context, used),
+                  formatBytes(context, max),
+                ),
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 16),
@@ -119,27 +115,27 @@ class _StorageManagementScreenState
                   onPressed: upsell.isLoading
                       ? null
                       : () => _buyAddon(upsell.offerings),
-                  child: const Text('Expandir Data Room (+1 GB por \$5/mes)'),
+                  child: Text(l10n.expandDataRoomAddon),
                 ),
                 const SizedBox(height: 32),
               ],
               if (!isPremium) ...[
                 Text(
-                  'Opciones de Suscripción',
+                  l10n.subscriptionOptions,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
                 _PricingCard(
-                  title: 'Mensual',
-                  price: '\$19.00 / mes',
+                  title: l10n.monthlyPlan,
+                  price: l10n.monthlyPrice,
                   selected: true,
                   onTap: () {},
                 ),
                 const SizedBox(height: 12),
                 _PricingCard(
-                  title: 'Anual',
-                  price: '\$189.00 / año',
-                  subtitle: 'Ahorras \$39 USD/año',
+                  title: l10n.annualPlan,
+                  price: l10n.annualPrice,
+                  subtitle: l10n.annualSavings,
                   selected: false,
                   onTap: () {},
                 ),
@@ -148,7 +144,7 @@ class _StorageManagementScreenState
                   onPressed: upsell.isLoading
                       ? null
                       : () => _buySubscription(upsell.offerings),
-                  child: const Text('Suscribirse a Premium'),
+                  child: Text(l10n.subscribeToPremium),
                 ),
                 const SizedBox(height: 32),
               ],
@@ -166,14 +162,14 @@ class _StorageManagementScreenState
                     : () => ref
                         .read(storageUpsellNotifierProvider.notifier)
                         .restorePurchases(),
-                child: const Text('Restaurar Compras'),
+                child: Text(l10n.restorePurchases),
               ),
               if (kDebugMode) ...[
                 const SizedBox(height: 32),
                 const Divider(color: KriptonTheme.cardBorder),
                 const SizedBox(height: 16),
                 Text(
-                  'MODO PRUEBA (debug)',
+                  l10n.testModeLabel,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: KriptonTheme.amber,
                         fontWeight: FontWeight.w700,
@@ -181,7 +177,7 @@ class _StorageManagementScreenState
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Activa Premium sin RevenueCat ni Google Cloud para evaluar la interfaz.',
+                  l10n.testModeDescription,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
@@ -195,8 +191,8 @@ class _StorageManagementScreenState
                   ),
                   child: Text(
                     isPremium
-                        ? 'Desactivar Premium de prueba'
-                        : 'Activar Premium de prueba',
+                        ? l10n.deactivateTestPremium
+                        : l10n.activateTestPremium,
                   ),
                 ),
               ],
@@ -212,14 +208,15 @@ class _StorageManagementScreenState
   }
 
   Future<void> _togglePremiumSimulation(bool enable) async {
+    final l10n = AppLocalizations.of(context);
     await ref.read(authStateProvider.notifier).setPremiumSimulation(enable);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             enable
-                ? 'Premium de prueba activado'
-                : 'Premium de prueba desactivado',
+                ? l10n.testPremiumActivated
+                : l10n.testPremiumDeactivated,
           ),
         ),
       );
@@ -227,10 +224,11 @@ class _StorageManagementScreenState
   }
 
   Future<void> _buySubscription(Offerings? offerings) async {
+    final l10n = AppLocalizations.of(context);
     final package = offerings?.current?.availablePackages.firstOrNull;
     if (package == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay ofertas disponibles')),
+        SnackBar(content: Text(l10n.noOfferingsAvailable)),
       );
       return;
     }
@@ -241,12 +239,13 @@ class _StorageManagementScreenState
       await ref.read(authStateProvider.notifier).refreshUser();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Suscripción activada')),
+        SnackBar(content: Text(l10n.subscriptionActivated)),
       );
     }
   }
 
   Future<void> _buyAddon(Offerings? offerings) async {
+    final l10n = AppLocalizations.of(context);
     // Buscar un offering de add-ons si existe; de lo contrario usar el primero.
     final packages = offerings?.all.entries
         .expand((e) => e.value.availablePackages)
@@ -254,7 +253,7 @@ class _StorageManagementScreenState
     final package = packages?.firstOrNull;
     if (package == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay add-ons disponibles')),
+        SnackBar(content: Text(l10n.noAddonsAvailable)),
       );
       return;
     }
@@ -265,7 +264,7 @@ class _StorageManagementScreenState
       await ref.read(authStateProvider.notifier).refreshUser();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Almacenamiento ampliado')),
+        SnackBar(content: Text(l10n.storageExpanded)),
       );
     }
   }

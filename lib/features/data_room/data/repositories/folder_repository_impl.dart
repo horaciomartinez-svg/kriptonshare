@@ -32,7 +32,7 @@ class FolderRepositoryImpl implements IFolderRepository {
       });
       return Right(_mapFolder(data, const []));
     } catch (e) {
-      return Left(ServerFailure('Error creando carpeta: $e'));
+      return Left(ServerFailure('Error creating folder: $e'));
     }
   }
 
@@ -47,7 +47,7 @@ class FolderRepositoryImpl implements IFolderRepository {
       }
       return Right(folders);
     } catch (e) {
-      return Left(ServerFailure('Error leyendo carpetas: $e'));
+      return Left(ServerFailure('Error reading folders: $e'));
     }
   }
 
@@ -56,12 +56,12 @@ class FolderRepositoryImpl implements IFolderRepository {
     try {
       final folder = await _remote.getFolderById(folderId);
       if (folder == null) {
-        return const Left(ServerFailure('Carpeta no encontrada'));
+        return const Left(ServerFailure('Folder not found'));
       }
       final files = await _remote.getFilesByFolderId(folderId);
       return Right(_mapFolder(folder, files));
     } catch (e) {
-      return Left(ServerFailure('Error leyendo carpeta: $e'));
+      return Left(ServerFailure('Error reading folder: $e'));
     }
   }
 
@@ -70,17 +70,17 @@ class FolderRepositoryImpl implements IFolderRepository {
     try {
       final link = await _remote.getShareLinkById(shareLinkId);
       if (link == null) {
-        return const Left(ServerFailure('Enlace inválido, expirado o revocado'));
+        return const Left(ServerFailure('Invalid, expired or revoked link'));
       }
       final folderId = link['folder_id'] as String;
       final folder = await _remote.getFolderById(folderId);
       if (folder == null) {
-        return const Left(ServerFailure('Carpeta no encontrada'));
+        return const Left(ServerFailure('Folder not found'));
       }
       final files = await _remote.getFilesByFolderId(folderId);
       return Right(_mapFolder(folder, files));
     } catch (e) {
-      return Left(ServerFailure('Error leyendo enlace de carpeta: $e'));
+      return Left(ServerFailure('Error reading folder link: $e'));
     }
   }
 
@@ -99,7 +99,7 @@ class FolderRepositoryImpl implements IFolderRepository {
       );
       final isValid = validation['is_valid'] as bool? ?? false;
       if (!isValid) {
-        return Left(ValidationFailure(validation['message'] as String? ?? 'Expiración inválida'));
+        return Left(ValidationFailure(validation['message'] as String? ?? 'Invalid expiration'));
       }
 
       final linkId = _uuid.v4();
@@ -118,7 +118,7 @@ class FolderRepositoryImpl implements IFolderRepository {
     } on ValidationFailure catch (e) {
       return Left(e);
     } catch (e) {
-      return Left(ServerFailure('Error creando enlace de carpeta: $e'));
+      return Left(ServerFailure('Error creating folder link: $e'));
     }
   }
 
@@ -128,7 +128,7 @@ class FolderRepositoryImpl implements IFolderRepository {
       await _remote.logJourneyEvent(event.toJson());
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure('Error registrando telemetry: $e'));
+      return Left(ServerFailure('Error logging telemetry: $e'));
     }
   }
 

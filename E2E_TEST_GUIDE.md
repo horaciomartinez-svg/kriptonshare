@@ -250,3 +250,50 @@ flutter build apk --debug
 ```
 
 Si `flutter analyze` reporta errores, corrígelos antes de desplegar la migración o ejecutar la prueba E2E.
+
+---
+
+## 8. Validación de internacionalización (i18n/l10n v2.1)
+
+La app está preparada para 5 idiomas: **es, en, fr, de, pt**. El idioma por defecto es el inglés (`en`) y se puede cambiar desde la pantalla de **Perfil**.
+
+### 8.1 Generar las traducciones
+
+Después de cualquier cambio en `lib/l10n/*.arb`:
+
+```bash
+flutter gen-l10n
+```
+
+### 8.2 Verificar cobertura de traducciones
+
+```bash
+flutter analyze
+flutter test test/core/localization/locale_provider_test.dart
+```
+
+### 8.3 Flujo mínimo a validar en otros idiomas
+
+1. Cambia el idioma del dispositivo o selecciona uno distinto en **Perfil → Idioma**.
+2. Navega por:
+   - **Dashboard**
+   - **Nuevo Data Room** (`/upload`)
+   - **Enlaces activos** (`/links`)
+   - **Bóveda y Almacenamiento** (`/storage-management`)
+   - **Analytics** (`/analytics`)
+   - **Mi Bóveda Data Room** (`/data-room`)
+3. Verifica que no queden literales en español en las pantallas refactorizadas.
+4. Comprueba que fechas, tamaños de archivo y separadores decimales respeten el locale (p. ej. `2,5 MB` en alemán/francés).
+
+### 8.4 Configuraciones pendientes (no bloqueantes para la prueba)
+
+- **RevenueCat ↔ Supabase billing sync**: la UI de suscripción y el modo de prueba funcionan sin la configuración real de RevenueCat o Google Play Console.
+- **Google Play Console / App Links verificados**: los deep links `https://kriptonshare.com/...` pueden requerir verificación en producción; en debug se puede usar el fallback `kriptonshare://...`.
+
+Aplica la migración de idioma si aún no existe la columna `preferred_language`:
+
+```bash
+supabase migration up
+# o manualmente en SQL Editor:
+# supabase/migrations/20260728000000_add_preferred_language.sql
+```

@@ -1,16 +1,18 @@
 # PLAN DE ARQUITECTURA DE SOFTWARE E INTERNACIONALIZACIÓN (i18n/l10n) — KRIPTONSHARE
 
-## Módulo: Detección, Configuración y Selección de Idioma Dinámico — Versión 2.0 (Actualización Integral)
+## Módulo: Detección, Configuración y Selección de Idioma Dinámico — Versión 2.1 (Actualización Integral + Virtual Data Room)
 
 | Campo | Detalle |
 |---|---|
 | **Documento** | Plan de Arquitectura de Software e Internacionalización (i18n/l10n) |
-| **Versión** | 2.0 — Actualización completa basada en auditoría del repositorio real |
+| **Versión** | 2.1 — Integra las cadenas del Virtual Data Room (VDR) a la v2.0 auditada |
 | **Repositorio** | `github.com/horaciomartinez-svg/kriptonshare` |
 | **Stack verificado** | Flutter 3.x / Dart 3.x (`sdk: '>=3.0.0 <4.0.0'`), Riverpod 2.5, GoRouter 14, Supabase Flutter 2.8, Cloudflare R2 |
 | **Idiomas objetivo** | Español (es) · Inglés (en) · Francés (fr) · Alemán (de) · Portugués (pt) |
-| **Fecha** | 28 de julio de 2026 |
+| **Fecha** | 29 de julio de 2026 |
 | **Documento base** | Plan de Arquitectura KRIPTONSHARE e Internacionalización (i18n_l10n) 27Jul26 (v1.0, PDF) |
+| **Actualización integrada** | `KRIPTONSHARE Actualización Arquitectura Virtual Data Room 29Jul26.md` (v2.0) — ya implementada en el repositorio vía KIMI CODE CLI; sus textos de UI se incorporan a los 5 archivos ARB (Módulo 5) |
+| **Cobertura de cadenas** | **317 claves ARB** (261 de la v2.0 + 56 nuevas del VDR) en los 5 idiomas |
 
 ---
 
@@ -39,7 +41,8 @@ KRIPTONSHARE es un **Data Room efímero con soberanía de datos** (cifrado AES-2
 
 1. **La aplicación no tiene hoy ninguna infraestructura de i18n**: no existe `flutter_localizations` en `pubspec.yaml`, no existe `l10n.yaml`, no existe el directorio `lib/l10n/` y `MaterialApp.router` (en `lib/main.dart`) no declara `locale`, `supportedLocales` ni `localizationsDelegates`.
 2. **Existen ~250 cadenas de texto visibles al usuario, hardcodeadas en 20 archivos Dart**, predominantemente en español con residuos en inglés (`'Failed to create room'`, `'Expires: ...'`, `'ACTIVE'`, `'EXPIRED'`). Este documento entrega el **inventario completo y los 5 archivos ARB listos para copiar al repositorio** (Módulo 5).
-3. **La tabla `public.users` de Supabase no tiene la columna `preferred_language`**: se entrega la migración SQL lista para ejecutar (Módulo 2), alineada con las migraciones existentes en `supabase/migrations/`.
+3. **La tabla `public.users` de Supabase no tiene la columna `preferred_language`**: se entrega la migración SQL lista para ejecutar (Módulo 2), alineada con las migraciones existentes en `supabase/migrations/`. **Nota v2.1:** la migración `20260729000000_vdr_architecture_update.sql` (ya aplicada con la actualización del VDR) también crea `preferred_language` de forma idempotente; ambas rutas convergen sin conflicto.
+4. **Nuevo en v2.1 — Textos del Virtual Data Room (VDR):** la actualización arquitectónica del 29Jul26 (ya codificada en el repositorio) incorporó nuevas secciones con texto visible: el **Data Room Explorer** estilo Google Drive del emisor, la **carga múltiple en lote**, el **share sheet** (archivo individual / carpeta completa, correo obligatorio, watermark, expiración ≤ 30 días), el **lobby receptor** con modal de captura de correo y descifrado perezoso en RAM, los **mensajes de validación de expiración** de la función SQL `validate_share_link_expiration()` y los **nuevos eventos de telemetría** (`lobby_enter`, `file_open`, `lobby_exit`). Esta v2.1 agrega las **56 claves ARB correspondientes, traducidas a los 5 idiomas**, elevando el inventario maestro a **317 claves por idioma**.
 
 El resultado es una arquitectura **offline-first**: detección automática del idioma del SO, persistencia local en `SharedPreferences`, sincronización remota opcional con Supabase (`users.preferred_language`) para consistencia entre dispositivos, y reconstrucción reactiva de toda la UI vía Riverpod sin reiniciar la app.
 
@@ -87,8 +90,8 @@ lib/
 | Archivos ARB | ❌ No existen | Crear 5 archivos (Módulo 5) |
 | `shared_preferences` | ✅ Presente (`^2.3.0`) | Reutilizar para `selected_user_locale` |
 | Riverpod | ✅ Presente (`flutter_riverpod ^2.5.1`) | Crear `LocaleNotifier` |
-| Cadenas hardcodeadas | ⚠️ ~250 cadenas en 20 archivos | Refactor completo (Módulo 7) |
-| Columna `users.preferred_language` | ❌ No existe en `supabase/schema.sql` | Migración SQL (Módulo 2) |
+| Cadenas hardcodeadas | ⚠️ ~250 cadenas en 20 archivos + ~60 cadenas nuevas del VDR (29Jul26) | Refactor completo (Módulo 7) |
+| Columna `users.preferred_language` | ✅ Creada por la migración VDR `20260729000000` (idempotente) | Migración SQL (Módulo 2) converge sin conflicto |
 
 ### 0.3 Mapa de rutas y puntos de integración del selector de idioma
 
@@ -109,6 +112,9 @@ Rutas registradas en `lib/providers/router_provider.dart` (GoRouter):
 | `/biometric` | `BiometricSettingsScreen` | No (hereda) |
 | `/storage-management` | `StorageManagementScreen` | No (hereda) |
 | `/folder-room/:folderLinkId` | `DataRoomLobbyScreen` | No (flujo de receptor, hereda) |
+| `/data-room` | `DataRoomExplorerScreen` (VDR 29Jul26) | **SÍ — recomendado** (icono en AppBar, ya previsto en el wireframe del Explorer) |
+| `/f/:linkId` | `DataRoomLobbyScreen` (carpeta completa) | No (flujo de receptor, hereda locale del dispositivo receptor) |
+| `/d/:linkId` | `ViewerScreen` (archivo individual) | No (flujo de receptor, hereda) |
 
 ### 0.4 Tokens visuales reales (verificados en `lib/utils/theme.dart`)
 
@@ -525,7 +531,7 @@ Para widgets sin `BuildContext` (notifiers que emiten mensajes de error), ver **
 
 ### 5.1 Metodología del inventario
 
-Las **261 claves** siguientes cubren la totalidad de las cadenas visibles al usuario detectadas en la auditoría del código fuente (20 archivos Dart: `lib/screens/**`, `lib/widgets/**`, `lib/features/**/presentation/**`, más mensajes de error emitidos por notifiers y providers). Convenciones:
+Las **317 claves** siguientes cubren la totalidad de las cadenas visibles al usuario detectadas en la auditoría del código fuente (20 archivos Dart: `lib/screens/**`, `lib/widgets/**`, `lib/features/**/presentation/**`, más mensajes de error emitidos por notifiers y providers), **más las 56 claves nuevas del Virtual Data Room** introducidas por la actualización arquitectónica del 29Jul26 (`data_room_explorer_screen.dart`, `upload_batch_notifier.dart`, share sheet de archivo/carpeta, `recipient_email_modal.dart`, `viewer_secure_layout.dart` con watermark dinámico, y los mensajes de la función SQL `validate_share_link_expiration()`). El detalle del incremento VDR se documenta en la sección 5.8. Convenciones:
 
 - **Nombrado:** `camelCase`, prefijo semántico por dominio (`onboarding*`, `biometric*`, `error*`, etc.).
 - **Plantilla:** `app_en.arb` (único archivo con metadatos `@key` de placeholders; el resto hereda).
@@ -845,7 +851,77 @@ Las **261 claves** siguientes cubren la totalidad de las cadenas visibles al usu
   "errorInvalidKey": "Invalid key",
   "errorDecryptionFailed": "Decryption error",
   "errorDecryptionWithDetail": "Decryption error: {error}",
-  "@errorDecryptionWithDetail": { "placeholders": { "error": { "type": "String" } } }
+  "@errorDecryptionWithDetail": { "placeholders": { "error": { "type": "String" } } },
+
+  "dataRoomExplorerTitle": "My Data Room Vault",
+  "premiumCapacityLabel": "PREMIUM DATA ROOM CAPACITY",
+  "storageUsedSummary": "{used} of {max} used ({percent}%)",
+  "@storageUsedSummary": { "placeholders": { "used": { "type": "String" }, "max": { "type": "String" }, "percent": { "type": "int" } } },
+  "expandVaultAddon": "Expand Vault (+1 GB for $5/month)",
+  "uploadFileMax": "Upload file (≤ 100 MB)",
+  "newVirtualFolder": "New virtual folder",
+  "batchUploadAction": "Batch upload to folder",
+  "batchUploadHint": "Multiple selection",
+  "virtualFoldersSection": "Virtual folders",
+  "unfiledFilesSection": "Individual files in vault",
+  "folderCardSummary": "{count} files · {size}",
+  "@folderCardSummary": { "placeholders": { "count": { "type": "int" }, "size": { "type": "String" } } },
+  "linkStatusActiveExpires": "Link: Active (expires in {days} days)",
+  "@linkStatusActiveExpires": { "placeholders": { "days": { "type": "int" } } },
+  "sendAction": "Send",
+  "sortByName": "Name",
+  "sortByLastModified": "Last modified",
+  "sortBySize": "Size",
+  "gridView": "Grid view",
+  "listView": "List view",
+  "emptyDataRoomTitle": "Your Data Room is empty",
+  "emptyDataRoomHint": "Upload encrypted files or create your first virtual folder",
+  "folderNameLabel": "Folder name",
+  "folderDescriptionLabel": "Description (optional)",
+  "createFolder": "Create folder",
+  "folderCreated": "Folder created",
+  "batchUploadTitle": "Batch upload",
+  "batchProgressSummary": "{completed} of {total} files uploaded",
+  "@batchProgressSummary": { "placeholders": { "completed": { "type": "int" }, "total": { "type": "int" } } },
+  "batchCompletedMessage": "{count} files encrypted in Data Room",
+  "@batchCompletedMessage": { "placeholders": { "count": { "type": "int" } } },
+  "batchFileSkippedTooLarge": "{filename} exceeds 100 MB and was skipped",
+  "@batchFileSkippedTooLarge": { "placeholders": { "filename": { "type": "String" } } },
+  "selectDestinationFolder": "Select destination folder",
+  "filesSelected": "{count} files selected",
+  "@filesSelected": { "placeholders": { "count": { "type": "int" } } },
+
+  "dataRoomLobbyTitle": "DATA ROOM: {name}",
+  "@dataRoomLobbyTitle": { "placeholders": { "name": { "type": "String" } } },
+  "linkExpiresInLabel": "Link expires in: {days} days",
+  "@linkExpiresInLabel": { "placeholders": { "days": { "type": "int" } } },
+  "recipientEmailRequiredTitle": "Enter your email to access the documents",
+  "accessAction": "Access",
+  "availableDocumentsSection": "Documents available in the folder",
+  "encryptedAtOrigin": "Encrypted at source",
+  "openAndDecryptInRam": "Open and decrypt in RAM",
+  "ramDecryptionNotice": "Documents are decrypted exclusively in volatile RAM and are covered by active read auditing.",
+
+  "shareSheetTitle": "Share securely",
+  "shareSingleFile": "Single file",
+  "shareFullFolder": "Full folder",
+  "requireRecipientEmailLabel": "Require recipient email",
+  "requireRecipientEmailSubtitle": "The recipient must enter their email before accessing",
+  "enableWatermarkLabel": "Dynamic watermark",
+  "enableWatermarkSubtitle": "Overlays recipient email, IP and date on the document",
+  "expirationPremiumNotice": "Premium: links can last up to 30 days",
+  "copyLink": "Copy link",
+  "shareQrCode": "Share QR code",
+
+  "errorExpirationMustBeFuture": "The expiration date must be in the future.",
+  "errorExpirationPremiumMax": "Premium: the maximum link expiration is 30 days.",
+  "errorExpirationFreemiumMax": "Free plan: the maximum link expiration is 48 hours.",
+  "expirationPremiumValid": "Valid Premium expiration (≤ 30 days).",
+  "expirationFreemiumValid": "Valid Free expiration (≤ 48 h).",
+
+  "eventLobbyEnter": "Lobby entered",
+  "eventFileOpen": "File opened",
+  "eventLobbyExit": "Lobby exited"
 }
 ```
 
@@ -1130,7 +1206,68 @@ Las **261 claves** siguientes cubren la totalidad de las cadenas visibles al usu
   "errorInvalidLinkFragment": "Enlace inválido: fragmento ausente",
   "errorInvalidKey": "Clave inválida",
   "errorDecryptionFailed": "Error al descifrar",
-  "errorDecryptionWithDetail": "Error descifrando: {error}"
+  "errorDecryptionWithDetail": "Error descifrando: {error}",
+
+  "dataRoomExplorerTitle": "Mi Bóveda Data Room",
+  "premiumCapacityLabel": "CAPACIDAD DATA ROOM PREMIUM",
+  "storageUsedSummary": "{used} de {max} usados ({percent}%)",
+  "expandVaultAddon": "Expandir Bóveda (+1 GB por $5/mes)",
+  "uploadFileMax": "Subir archivo (≤ 100 MB)",
+  "newVirtualFolder": "Nueva carpeta virtual",
+  "batchUploadAction": "Subida múltiple a carpeta",
+  "batchUploadHint": "Selección en lote",
+  "virtualFoldersSection": "Carpetas virtuales",
+  "unfiledFilesSection": "Archivos individuales en Bóveda",
+  "folderCardSummary": "{count} archivos · {size}",
+  "linkStatusActiveExpires": "Enlace: Activo (expira en {days} días)",
+  "sendAction": "Enviar",
+  "sortByName": "Nombre",
+  "sortByLastModified": "Última modificación",
+  "sortBySize": "Tamaño",
+  "gridView": "Vista de cuadrícula",
+  "listView": "Vista de lista",
+  "emptyDataRoomTitle": "Tu Data Room está vacío",
+  "emptyDataRoomHint": "Sube archivos cifrados o crea tu primera carpeta virtual",
+  "folderNameLabel": "Nombre de la carpeta",
+  "folderDescriptionLabel": "Descripción (opcional)",
+  "createFolder": "Crear carpeta",
+  "folderCreated": "Carpeta creada",
+  "batchUploadTitle": "Subida múltiple",
+  "batchProgressSummary": "{completed} de {total} archivos subidos",
+  "batchCompletedMessage": "{count} archivos cifrados en Data Room",
+  "batchFileSkippedTooLarge": "{filename} excede 100 MB y fue omitido",
+  "selectDestinationFolder": "Selecciona la carpeta de destino",
+  "filesSelected": "{count} archivos seleccionados",
+
+  "dataRoomLobbyTitle": "DATA ROOM: {name}",
+  "linkExpiresInLabel": "Enlace expira en: {days} días",
+  "recipientEmailRequiredTitle": "Ingrese su correo para acceder a los documentos",
+  "accessAction": "Acceder",
+  "availableDocumentsSection": "Documentos disponibles en la carpeta",
+  "encryptedAtOrigin": "Cifrado en Origen",
+  "openAndDecryptInRam": "Abrir y descifrar en memoria RAM",
+  "ramDecryptionNotice": "Los documentos se descifran exclusivamente en RAM volátil y cuentan con auditoría de lectura activa.",
+
+  "shareSheetTitle": "Compartir de forma segura",
+  "shareSingleFile": "Archivo individual",
+  "shareFullFolder": "Carpeta completa",
+  "requireRecipientEmailLabel": "Correo del receptor obligatorio",
+  "requireRecipientEmailSubtitle": "El receptor deberá ingresar su correo antes de acceder",
+  "enableWatermarkLabel": "Marca de agua dinámica",
+  "enableWatermarkSubtitle": "Superpone correo, IP y fecha del receptor sobre el documento",
+  "expirationPremiumNotice": "Premium: los enlaces pueden durar hasta 30 días",
+  "copyLink": "Copiar enlace",
+  "shareQrCode": "Compartir código QR",
+
+  "errorExpirationMustBeFuture": "La fecha de expiración debe ser futura.",
+  "errorExpirationPremiumMax": "Premium: La expiración máxima de un enlace es de 30 días.",
+  "errorExpirationFreemiumMax": "Plan Gratis: La expiración máxima de un enlace es de 48 horas.",
+  "expirationPremiumValid": "Expiración Premium válida (≤ 30 días).",
+  "expirationFreemiumValid": "Expiración Freemium válida (≤ 48 h).",
+
+  "eventLobbyEnter": "Ingreso al lobby",
+  "eventFileOpen": "Archivo abierto",
+  "eventLobbyExit": "Salida del lobby"
 }
 ```
 
@@ -1415,7 +1552,68 @@ Las **261 claves** siguientes cubren la totalidad de las cadenas visibles al usu
   "errorInvalidLinkFragment": "Lien invalide : fragment manquant",
   "errorInvalidKey": "Clé invalide",
   "errorDecryptionFailed": "Erreur de déchiffrement",
-  "errorDecryptionWithDetail": "Erreur de déchiffrement : {error}"
+  "errorDecryptionWithDetail": "Erreur de déchiffrement : {error}",
+
+  "dataRoomExplorerTitle": "Mon coffre Data Room",
+  "premiumCapacityLabel": "CAPACITÉ DATA ROOM PREMIUM",
+  "storageUsedSummary": "{used} sur {max} utilisés ({percent} %)",
+  "expandVaultAddon": "Agrandir le coffre (+1 Go pour 5 $/mois)",
+  "uploadFileMax": "Téléverser un fichier (≤ 100 Mo)",
+  "newVirtualFolder": "Nouveau dossier virtuel",
+  "batchUploadAction": "Téléversement groupé vers le dossier",
+  "batchUploadHint": "Sélection multiple",
+  "virtualFoldersSection": "Dossiers virtuels",
+  "unfiledFilesSection": "Fichiers individuels dans le coffre",
+  "folderCardSummary": "{count} fichiers · {size}",
+  "linkStatusActiveExpires": "Lien : Actif (expire dans {days} jours)",
+  "sendAction": "Envoyer",
+  "sortByName": "Nom",
+  "sortByLastModified": "Dernière modification",
+  "sortBySize": "Taille",
+  "gridView": "Vue en grille",
+  "listView": "Vue en liste",
+  "emptyDataRoomTitle": "Votre Data Room est vide",
+  "emptyDataRoomHint": "Téléversez des fichiers chiffrés ou créez votre premier dossier virtuel",
+  "folderNameLabel": "Nom du dossier",
+  "folderDescriptionLabel": "Description (facultatif)",
+  "createFolder": "Créer le dossier",
+  "folderCreated": "Dossier créé",
+  "batchUploadTitle": "Téléversement groupé",
+  "batchProgressSummary": "{completed} fichiers sur {total} téléversés",
+  "batchCompletedMessage": "{count} fichiers chiffrés dans le Data Room",
+  "batchFileSkippedTooLarge": "{filename} dépasse 100 Mo et a été ignoré",
+  "selectDestinationFolder": "Sélectionnez le dossier de destination",
+  "filesSelected": "{count} fichiers sélectionnés",
+
+  "dataRoomLobbyTitle": "DATA ROOM : {name}",
+  "linkExpiresInLabel": "Le lien expire dans : {days} jours",
+  "recipientEmailRequiredTitle": "Saisissez votre e-mail pour accéder aux documents",
+  "accessAction": "Accéder",
+  "availableDocumentsSection": "Documents disponibles dans le dossier",
+  "encryptedAtOrigin": "Chiffré à la source",
+  "openAndDecryptInRam": "Ouvrir et déchiffrer en mémoire RAM",
+  "ramDecryptionNotice": "Les documents sont déchiffrés exclusivement en RAM volatile et font l'objet d'un audit de lecture actif.",
+
+  "shareSheetTitle": "Partager en toute sécurité",
+  "shareSingleFile": "Fichier unique",
+  "shareFullFolder": "Dossier complet",
+  "requireRecipientEmailLabel": "E-mail du destinataire obligatoire",
+  "requireRecipientEmailSubtitle": "Le destinataire devra saisir son e-mail avant d'accéder",
+  "enableWatermarkLabel": "Filigrane dynamique",
+  "enableWatermarkSubtitle": "Superpose l'e-mail, l'IP et la date du destinataire sur le document",
+  "expirationPremiumNotice": "Premium : les liens peuvent durer jusqu'à 30 jours",
+  "copyLink": "Copier le lien",
+  "shareQrCode": "Partager le code QR",
+
+  "errorExpirationMustBeFuture": "La date d'expiration doit être future.",
+  "errorExpirationPremiumMax": "Premium : la durée d'expiration maximale d'un lien est de 30 jours.",
+  "errorExpirationFreemiumMax": "Plan gratuit : la durée d'expiration maximale d'un lien est de 48 heures.",
+  "expirationPremiumValid": "Expiration Premium valide (≤ 30 jours).",
+  "expirationFreemiumValid": "Expiration gratuite valide (≤ 48 h).",
+
+  "eventLobbyEnter": "Entrée dans le lobby",
+  "eventFileOpen": "Fichier ouvert",
+  "eventLobbyExit": "Sortie du lobby"
 }
 ```
 
@@ -1700,7 +1898,68 @@ Las **261 claves** siguientes cubren la totalidad de las cadenas visibles al usu
   "errorInvalidLinkFragment": "Ungültiger Link: Fragment fehlt",
   "errorInvalidKey": "Ungültiger Schlüssel",
   "errorDecryptionFailed": "Fehler bei der Entschlüsselung",
-  "errorDecryptionWithDetail": "Fehler beim Entschlüsseln: {error}"
+  "errorDecryptionWithDetail": "Fehler beim Entschlüsseln: {error}",
+
+  "dataRoomExplorerTitle": "Mein Data-Room-Tresor",
+  "premiumCapacityLabel": "PREMIUM-DATA-ROOM-KAPAZITÄT",
+  "storageUsedSummary": "{used} von {max} belegt ({percent} %)",
+  "expandVaultAddon": "Tresor erweitern (+1 GB für 5 $/Monat)",
+  "uploadFileMax": "Datei hochladen (≤ 100 MB)",
+  "newVirtualFolder": "Neuer virtueller Ordner",
+  "batchUploadAction": "Stapel-Upload in Ordner",
+  "batchUploadHint": "Mehrfachauswahl",
+  "virtualFoldersSection": "Virtuelle Ordner",
+  "unfiledFilesSection": "Einzelne Dateien im Tresor",
+  "folderCardSummary": "{count} Dateien · {size}",
+  "linkStatusActiveExpires": "Link: Aktiv (läuft in {days} Tagen ab)",
+  "sendAction": "Senden",
+  "sortByName": "Name",
+  "sortByLastModified": "Zuletzt geändert",
+  "sortBySize": "Größe",
+  "gridView": "Rasteransicht",
+  "listView": "Listenansicht",
+  "emptyDataRoomTitle": "Ihr Data Room ist leer",
+  "emptyDataRoomHint": "Laden Sie verschlüsselte Dateien hoch oder erstellen Sie Ihren ersten virtuellen Ordner",
+  "folderNameLabel": "Ordnername",
+  "folderDescriptionLabel": "Beschreibung (optional)",
+  "createFolder": "Ordner erstellen",
+  "folderCreated": "Ordner erstellt",
+  "batchUploadTitle": "Stapel-Upload",
+  "batchProgressSummary": "{completed} von {total} Dateien hochgeladen",
+  "batchCompletedMessage": "{count} Dateien im Data Room verschlüsselt",
+  "batchFileSkippedTooLarge": "{filename} überschreitet 100 MB und wurde übersprungen",
+  "selectDestinationFolder": "Zielordner auswählen",
+  "filesSelected": "{count} Dateien ausgewählt",
+
+  "dataRoomLobbyTitle": "DATA ROOM: {name}",
+  "linkExpiresInLabel": "Link läuft ab in: {days} Tagen",
+  "recipientEmailRequiredTitle": "Geben Sie Ihre E-Mail ein, um auf die Dokumente zuzugreifen",
+  "accessAction": "Zugreifen",
+  "availableDocumentsSection": "Im Ordner verfügbare Dokumente",
+  "encryptedAtOrigin": "An der Quelle verschlüsselt",
+  "openAndDecryptInRam": "Im RAM öffnen und entschlüsseln",
+  "ramDecryptionNotice": "Dokumente werden ausschließlich im flüchtigen RAM entschlüsselt und unterliegen einer aktiven Leseprotokollierung.",
+
+  "shareSheetTitle": "Sicher teilen",
+  "shareSingleFile": "Einzelne Datei",
+  "shareFullFolder": "Gesamter Ordner",
+  "requireRecipientEmailLabel": "Empfänger-E-Mail erforderlich",
+  "requireRecipientEmailSubtitle": "Der Empfänger muss vor dem Zugriff seine E-Mail eingeben",
+  "enableWatermarkLabel": "Dynamisches Wasserzeichen",
+  "enableWatermarkSubtitle": "Blendet E-Mail, IP und Datum des Empfängers über dem Dokument ein",
+  "expirationPremiumNotice": "Premium: Links können bis zu 30 Tage gültig sein",
+  "copyLink": "Link kopieren",
+  "shareQrCode": "QR-Code teilen",
+
+  "errorExpirationMustBeFuture": "Das Ablaufdatum muss in der Zukunft liegen.",
+  "errorExpirationPremiumMax": "Premium: Die maximale Link-Laufzeit beträgt 30 Tage.",
+  "errorExpirationFreemiumMax": "Kostenloser Plan: Die maximale Link-Laufzeit beträgt 48 Stunden.",
+  "expirationPremiumValid": "Gültiger Premium-Ablauf (≤ 30 Tage).",
+  "expirationFreemiumValid": "Gültiger kostenloser Ablauf (≤ 48 Std.).",
+
+  "eventLobbyEnter": "Lobby betreten",
+  "eventFileOpen": "Datei geöffnet",
+  "eventLobbyExit": "Lobby verlassen"
 }
 ```
 
@@ -1985,7 +2244,68 @@ Las **261 claves** siguientes cubren la totalidad de las cadenas visibles al usu
   "errorInvalidLinkFragment": "Link inválido: fragmento ausente",
   "errorInvalidKey": "Chave inválida",
   "errorDecryptionFailed": "Erro ao descriptografar",
-  "errorDecryptionWithDetail": "Erro ao descriptografar: {error}"
+  "errorDecryptionWithDetail": "Erro ao descriptografar: {error}",
+
+  "dataRoomExplorerTitle": "Meu Vault Data Room",
+  "premiumCapacityLabel": "CAPACIDADE DO DATA ROOM PREMIUM",
+  "storageUsedSummary": "{used} de {max} usados ({percent}%)",
+  "expandVaultAddon": "Expandir Vault (+1 GB por US$ 5/mês)",
+  "uploadFileMax": "Enviar arquivo (≤ 100 MB)",
+  "newVirtualFolder": "Nova pasta virtual",
+  "batchUploadAction": "Envio em lote para a pasta",
+  "batchUploadHint": "Seleção em lote",
+  "virtualFoldersSection": "Pastas virtuais",
+  "unfiledFilesSection": "Arquivos individuais no Vault",
+  "folderCardSummary": "{count} arquivos · {size}",
+  "linkStatusActiveExpires": "Link: Ativo (expira em {days} dias)",
+  "sendAction": "Enviar",
+  "sortByName": "Nome",
+  "sortByLastModified": "Última modificação",
+  "sortBySize": "Tamanho",
+  "gridView": "Visualização em grade",
+  "listView": "Visualização em lista",
+  "emptyDataRoomTitle": "Seu Data Room está vazio",
+  "emptyDataRoomHint": "Envie arquivos criptografados ou crie sua primeira pasta virtual",
+  "folderNameLabel": "Nome da pasta",
+  "folderDescriptionLabel": "Descrição (opcional)",
+  "createFolder": "Criar pasta",
+  "folderCreated": "Pasta criada",
+  "batchUploadTitle": "Envio em lote",
+  "batchProgressSummary": "{completed} de {total} arquivos enviados",
+  "batchCompletedMessage": "{count} arquivos criptografados no Data Room",
+  "batchFileSkippedTooLarge": "{filename} excede 100 MB e foi ignorado",
+  "selectDestinationFolder": "Selecione a pasta de destino",
+  "filesSelected": "{count} arquivos selecionados",
+
+  "dataRoomLobbyTitle": "DATA ROOM: {name}",
+  "linkExpiresInLabel": "Link expira em: {days} dias",
+  "recipientEmailRequiredTitle": "Digite seu e-mail para acessar os documentos",
+  "accessAction": "Acessar",
+  "availableDocumentsSection": "Documentos disponíveis na pasta",
+  "encryptedAtOrigin": "Criptografado na origem",
+  "openAndDecryptInRam": "Abrir e descriptografar na memória RAM",
+  "ramDecryptionNotice": "Os documentos são descriptografados exclusivamente em RAM volátil e contam com auditoria de leitura ativa.",
+
+  "shareSheetTitle": "Compartilhar com segurança",
+  "shareSingleFile": "Arquivo individual",
+  "shareFullFolder": "Pasta completa",
+  "requireRecipientEmailLabel": "E-mail do destinatário obrigatório",
+  "requireRecipientEmailSubtitle": "O destinatário deverá digitar seu e-mail antes de acessar",
+  "enableWatermarkLabel": "Marca d'água dinâmica",
+  "enableWatermarkSubtitle": "Sobrepõe e-mail, IP e data do destinatário no documento",
+  "expirationPremiumNotice": "Premium: os links podem durar até 30 dias",
+  "copyLink": "Copiar link",
+  "shareQrCode": "Compartilhar código QR",
+
+  "errorExpirationMustBeFuture": "A data de expiração deve ser futura.",
+  "errorExpirationPremiumMax": "Premium: a expiração máxima de um link é de 30 dias.",
+  "errorExpirationFreemiumMax": "Plano gratuito: a expiração máxima de um link é de 48 horas.",
+  "expirationPremiumValid": "Expiração Premium válida (≤ 30 dias).",
+  "expirationFreemiumValid": "Expiração gratuita válida (≤ 48 h).",
+
+  "eventLobbyEnter": "Entrada no lobby",
+  "eventFileOpen": "Arquivo aberto",
+  "eventLobbyExit": "Saída do lobby"
 }
 ```
 
@@ -1993,11 +2313,11 @@ Las **261 claves** siguientes cubren la totalidad de las cadenas visibles al usu
 
 | Idioma | Archivo | Claves | Rol |
 |---|---|---|---|
-| Inglés | `app_en.arb` | 261 (100%) | Plantilla + fallback |
-| Español | `app_es.arb` | 261 (100%) | Idioma base de mercado |
-| Francés | `app_fr.arb` | 261 (100%) | Expansión |
-| Alemán | `app_de.arb` | 261 (100%) | Expansión |
-| Portugués | `app_pt.arb` | 261 (100%) | Expansión |
+| Inglés | `app_en.arb` | 317 (100%) | Plantilla + fallback |
+| Español | `app_es.arb` | 317 (100%) | Idioma base de mercado |
+| Francés | `app_fr.arb` | 317 (100%) | Expansión |
+| Alemán | `app_de.arb` | 317 (100%) | Expansión |
+| Portugués | `app_pt.arb` | 317 (100%) | Expansión |
 
 **Regla de CI:** el pipeline (`.github/workflows/flutter_ci.yml`) debe fallar si algún ARB secundario tiene menos claves que la plantilla. Comando de validación sugerido (agregar al Makefile):
 
@@ -2008,6 +2328,26 @@ l10n-check: ## Verifica paridad de claves ARB contra la plantilla
 	bad=[f for f in glob.glob('lib/l10n/app_*.arb') if f!='lib/l10n/app_en.arb' and set(json.load(open(f)).keys())!=t]; \
 	sys.exit(1 if bad else 0)" && echo "ARB OK: paridad de claves en 5 idiomas"
 ```
+
+### 5.8 Inventario incremental del Virtual Data Room (actualización 29Jul26) — v2.1
+
+Las **56 claves nuevas** ya están integradas en los 5 bloques ARB anteriores (secciones 5.2 a 5.6). Esta tabla las documenta como delta trazable contra la especificación `KRIPTONSHARE Actualización Arquitectura Virtual Data Room 29Jul26.md`, para facilitar la revisión y la implementación con KIMI CODE CLI:
+
+| Dominio VDR | Claves nuevas | Origen en la especificación VDR |
+|---|---|---|
+| **Explorer emisor (Drive-like)** | `dataRoomExplorerTitle`, `premiumCapacityLabel`, `storageUsedSummary`, `expandVaultAddon`, `uploadFileMax`, `newVirtualFolder`, `batchUploadAction`, `batchUploadHint`, `virtualFoldersSection`, `unfiledFilesSection`, `folderCardSummary`, `linkStatusActiveExpires`, `sendAction`, `sortByName`, `sortByLastModified`, `sortBySize`, `gridView`, `listView`, `emptyDataRoomTitle`, `emptyDataRoomHint` | §8.4 Pantalla 1 — Data Room Explorer (wireframe y jerarquía UI) |
+| **Creación de carpeta** | `folderNameLabel`, `folderDescriptionLabel`, `createFolder`, `folderCreated` | §6.2–6.3 `createFolder` / `create_folder_usecase.dart` |
+| **Carga múltiple en lote** | `batchUploadTitle`, `batchProgressSummary`, `batchCompletedMessage`, `batchFileSkippedTooLarge`, `selectDestinationFolder`, `filesSelected` | §6.5 `upload_batch_notifier.dart` y Flujo B (§7.2) |
+| **Lobby receptor (PaperMark parity)** | `dataRoomLobbyTitle`, `linkExpiresInLabel`, `recipientEmailRequiredTitle`, `accessAction`, `availableDocumentsSection`, `encryptedAtOrigin`, `openAndDecryptInRam`, `ramDecryptionNotice` | §8.5 Pantalla 2 — Receiver Lobby & Secure Viewer, Flujo D (§7.4) |
+| **Share sheet (archivo/carpeta, ≤ 30 días)** | `shareSheetTitle`, `shareSingleFile`, `shareFullFolder`, `requireRecipientEmailLabel`, `requireRecipientEmailSubtitle`, `enableWatermarkLabel`, `enableWatermarkSubtitle`, `expirationPremiumNotice`, `copyLink`, `shareQrCode` | §7.3 Flujo C y §6.2 `share_link_entity.dart` (`link_type`, `require_recipient_email`, `enable_watermark`) |
+| **Validación de expiración (servidor)** | `errorExpirationMustBeFuture`, `errorExpirationPremiumMax`, `errorExpirationFreemiumMax`, `expirationPremiumValid`, `expirationFreemiumValid` | §5.2 función SQL `validate_share_link_expiration()` — el cliente mapea los mensajes RPC a estas claves (ver Módulo 7.4) |
+| **Telemetría Journey Analytics** | `eventLobbyEnter`, `eventFileOpen`, `eventLobbyExit` | §9.1 payload `event_type` (`lobby_enter`, `file_open`, `lobby_exit`); `page_view` ya existía como `eventPageView` |
+
+**Notas de implementación del incremento:**
+
+1. **Claves reutilizadas (no duplicar):** el Explorer y el share sheet consumen claves ya existentes de la v2.0 — `share`, `cancel`, `createLink`, `emailLabel`, `emailInvalid`, `max30Days`, `dataRoomCapacity`, `storageUsedOf`, `expandDataRoomAddon` (CTA del medidor en Storage Management), `confidentialBanner` y `confidentialUserWatermark` (marca de agua: el email/IP/fecha son datos forenses no traducibles; solo la palabra CONFIDENCIAL/CONFIDENTIAL se localiza).
+2. **Mensajes RPC del servidor:** la función `validate_share_link_expiration()` devuelve textos en español desde PostgreSQL. El cliente **no debe renderizarlos crudos**: el datasource mapea el resultado `is_valid = false` a los códigos tipados (`UiErrorCode`, Módulo 7.4) y la UI renderiza las claves `errorExpiration*`, garantizando que el mensaje final siga el idioma del dispositivo.
+3. **Tokens no traducibles:** `AES-256-GCM`, `KRIPTONSHARE`, nombres de archivo, URLs (`kriptonshare.com/f/…`, `/d/…`), precios en USD y valores enum (`single_file`, `full_folder`, `lobby_enter`, etc.) permanecen fuera de los ARB, conforme a las convenciones de la sección 5.1.
 
 ---
 
@@ -2211,8 +2551,15 @@ ListTile(
 | 18 | `lib/widgets/data_room_card.dart` (legacy) | 9 | Idénticas a #13 | P2 |
 | 19 | `lib/widgets/link_gauge.dart` | 6 | `monthlyLinks`, `remainingLinks`, `freePlanLabel` | P2 |
 | 20 | `lib/widgets/video_player_screen.dart` | 1 | `videoPlaybackError` | P2 |
+| 21 | `lib/features/data_room/presentation/screens/data_room_explorer_screen.dart` (VDR) | 20 | `dataRoomExplorerTitle`…`emptyDataRoomHint`, selector de idioma en AppBar | **P1** |
+| 22 | `lib/features/data_room/presentation/widgets/molecules/folder_grid_card.dart` + `file_list_tile.dart` + `storage_gauge_card.dart` (VDR) | 6 | `folderCardSummary`, `linkStatusActiveExpires`, `sendAction`, `encryptedAtOrigin`, `storageUsedSummary`, `expandVaultAddon` | P2 |
+| 23 | `lib/features/data_room/presentation/notifiers/upload_batch_notifier.dart` + UI de progreso (VDR) | 6 | `batchUploadTitle`, `batchProgressSummary`, `batchCompletedMessage`, `batchFileSkippedTooLarge`, `selectDestinationFolder`, `filesSelected` | **P1** |
+| 24 | Share sheet de compartición archivo/carpeta (VDR, Flujo C) | 10 | `shareSheetTitle`…`shareQrCode` | **P1** |
+| 25 | `lib/features/data_room/presentation/widgets/organisms/recipient_email_modal.dart` (VDR) | 4 | `recipientEmailRequiredTitle`, `emailLabel`, `emailInvalid`, `accessAction` | **P1** |
+| 26 | `lib/features/data_room/presentation/widgets/templates/viewer_secure_layout.dart` + `atoms/dynamic_watermark_text.dart` (VDR) | 4 | `confidentialUserWatermark`, `openAndDecryptInRam`, `ramDecryptionNotice`, `availableDocumentsSection` | P2 |
+| 27 | `lib/features/data_room/presentation/screens/data_room_lobby_screen.dart` (actualización VDR) | 2 nuevas | `dataRoomLobbyTitle`, `linkExpiresInLabel` (las 14 claves previas se mantienen) | **P1** |
 
-> Las cadenas puramente técnicas (logs `[VIEWER]`, `[R2 UPLOAD]`, rutas Supabase `select`, headers HTTP) **no se traducen**: son telemetría de desarrollador, no UI.
+> Las cadenas puramente técnicas (logs `[VIEWER]`, `[R2 UPLOAD]`, rutas Supabase `select`, headers HTTP) **no se traducen**: son telemetría de desarrollador, no UI. Tampoco se traducen los mensajes crudos de la función SQL `validate_share_link_expiration()`: el cliente los mapea a códigos tipados (Módulo 7.4) y renderiza las claves `errorExpiration*`.
 
 ### 7.2 Patrón de reemplazo (ejemplo real: `upload_screen.dart`)
 
@@ -2250,6 +2597,8 @@ enum UiErrorCode {
   createRoomFailed, invalidLinkFragment, invalidKey, decryptionFailed,
   userNotAuthenticated, quotaExceeded, uploadNotAllowed,
   signInFailed, userRecordMissing,
+  // v2.1 — validación de expiración de enlaces (VDR 29Jul26)
+  expirationMustBeFuture, expirationPremiumMax, expirationFreemiumMax,
 }
 
 extension UiErrorCodeL10n on UiErrorCode {
@@ -2263,6 +2612,10 @@ extension UiErrorCodeL10n on UiErrorCode {
     UiErrorCode.uploadNotAllowed     => l10n.errorUploadNotAllowed,
     UiErrorCode.signInFailed         => l10n.errorSignInFailed,
     UiErrorCode.userRecordMissing    => l10n.errorUserRecordMissing,
+    // v2.1 — VDR
+    UiErrorCode.expirationMustBeFuture => l10n.errorExpirationMustBeFuture,
+    UiErrorCode.expirationPremiumMax   => l10n.errorExpirationPremiumMax,
+    UiErrorCode.expirationFreemiumMax  => l10n.errorExpirationFreemiumMax,
   };
 }
 ```
@@ -2392,8 +2745,8 @@ Extender `E2E_TEST_GUIDE.md` con el escenario:
 | **F0 — Fundaciones** | pubspec + `l10n.yaml` + 5 ARB + `core/localization/*` | Módulos 3 y 5 aplicados; `flutter gen-l10n` genera `AppLocalizations` | Compila; `LocaleNotifier` con tests verdes |
 | **F1 — Migración BD** | Ejecutar migración `20260728000000_add_preferred_language.sql` | Columna `preferred_language` activa + índice | `SELECT preferred_language FROM users` OK; RLS verificado |
 | **F2 — Núcleo visible (P0)** | `main.dart`, Login, Dashboard + selector en 3 puntos | Idioma conmutable en tiempo real en toda la app (textos P0 traducidos) | E2E pasos 1-3 del Módulo 9.4 |
-| **F3 — Flujos de receptor (P1)** | Viewer, Data Room Lobby, Links, Upload, Perfil, Onboarding, Biometric lock | 100% de cadenas P1 en ARB | Sin literales ES/EN en archivos P1 |
-| **F4 — Resto (P2)** | Analytics, Storage, Expired links, cards, gauge, biometric settings, errores tipados | 100% de cobertura; enum `UiErrorCode` | `l10n-check` en CI verde; goldens sin overflow |
+| **F3 — Flujos de receptor y VDR (P1)** | Viewer, Data Room Lobby (+ actualización VDR), **Data Room Explorer**, **share sheet archivo/carpeta**, **modal de correo receptor**, **carga en lote**, Links, Upload, Perfil, Onboarding, Biometric lock | 100% de cadenas P1 en ARB, incluidas las 56 claves VDR | Sin literales ES/EN en archivos P1; RPC de expiración mapeado a códigos tipados |
+| **F4 — Resto (P2)** | Analytics, Storage, Expired links, cards, gauge, biometric settings, widgets VDR (folder/file tiles, watermark layout), errores tipados | 100% de cobertura (317 claves); enum `UiErrorCode` completo | `l10n-check` en CI verde; goldens sin overflow |
 | **F5 — Reconciliación remota** | Gancho en `auth_provider` + pruebas multi-dispositivo | Sync Supabase operativo | E2E paso 4-5 del Módulo 9.4 |
 
 **Orden recomendado de merge:** cada fase es un PR independiente sobre `main`. F0 no rompe nada (los literales actuales siguen funcionando mientras no se consuman claves); F2 en adelante son refactors mecánicos pantalla por pantalla.
@@ -2414,23 +2767,27 @@ Extender `E2E_TEST_GUIDE.md` con el escenario:
 | 8 | Cadenas en capas sin contexto (notifiers) | Textos sin traducir en errores | Enum `UiErrorCode` (Módulo 7.4) — refactor obligatorio en F4 |
 | 9 | Alemán/francés: formalidad de tratamiento | Tono inapropiado para B2B | `app_de.arb` usa "Sie" (formal) y `app_fr.arb` usa "vous" — decisión deliberada por el posicionamiento B2B de seguridad; español mantiene "tú" (coherente con el tono actual de la app) |
 | 10 | Futuros idiomas RTL (árabe, hebreo) | Rediseño de layouts | La arquitectura (ARB + delegates + `Localizations.localeOf`) ya es compatible; solo requeriría `GlobalMaterialLocalizations` (ya incluido) y auditoría visual RTL |
+| 11 | Mensajes de la función SQL `validate_share_link_expiration()` llegan en español desde el servidor | El receptor o emisor vería errores siempre en español, rompiendo la experiencia i18n | El datasource **nunca renderiza el texto RPC crudo**: mapea `is_valid = false` a `UiErrorCode.expiration*` (Módulo 7.4) y la UI traduce con las claves `errorExpiration*` en los 5 idiomas |
+| 12 | Watermark dinámico VDR mezcla email + IP + fecha + "CONFIDENCIAL" | Componente forense desalineado con el idioma | Solo la palabra CONFIDENCIAL se localiza (`confidentialUserWatermark`); email, IP y fecha ISO son evidencia forense y **no se traducen ni se reformatean** |
+| 13 | Textos largos del VDR en alemán ("Im RAM öffnen und entschlüsseln", "Empfänger-E-Mail erforderlich") | Overflow en tarjetas y botones del Explorer/lobby | Incluir `data_room_explorer_screen` y `viewer_secure_layout` en los golden tests por idioma (Módulo 9.3); usar `Expanded` en las filas de archivo |
 
 ---
 
 ## DICTAMEN DE CONFORMIDAD ARQUITECTÓNICA
 
-El presente diseño v2.0 — auditado contra el código fuente real del repositorio `horaciomartinez-svg/kriptonshare` — resuelve integralmente la internacionalización dinámica de KRIPTONSHARE en 5 idiomas:
+El presente diseño v2.1 — auditado contra el código fuente real del repositorio `horaciomartinez-svg/kriptonshare` y actualizado con la arquitectura del Virtual Data Room (29Jul26) — resuelve integralmente la internacionalización dinámica de KRIPTONSHARE en 5 idiomas:
 
 1. **Detección automática:** idioma del SO vía `PlatformDispatcher` desde el primer frame, con fallback internacional a inglés.
-2. **Persistencia y override:** selección manual desde **Login, Dashboard y Perfil**, persistida en `SharedPreferences` (`selected_user_locale`) y conservada entre sesiones y cierres de sesión.
-3. **Sincronización multi-dispositivo:** reconciliación bidireccional con `public.users.preferred_language` (Supabase) tras cada login, con degradación offline-first sin fallos.
+2. **Persistencia y override:** selección manual desde **Login, Dashboard, Perfil y el AppBar del Data Room Explorer (VDR)**, persistida en `SharedPreferences` (`selected_user_locale`) y conservada entre sesiones y cierres de sesión.
+3. **Sincronización multi-dispositivo:** reconciliación bidireccional con `public.users.preferred_language` (Supabase) tras cada login, con degradación offline-first sin fallos; la columna ya existe en producción gracias a la migración VDR `20260729000000`, idempotente con la migración i18n del Módulo 2.
 4. **Reconstrucción reactiva:** `Riverpod` en el widget raíz reconstruye `MaterialApp.router` instantáneamente ante cualquier cambio de idioma, conservando la pila de `GoRouter` y el estado de las pantallas.
-5. **Cobertura total de textos:** las 261 claves del inventario maestro cubren el 100% de las cadenas de UI detectadas en los 20 archivos auditados, con los 5 archivos ARB completos y validados por paridad de claves en CI.
+5. **Cobertura total de textos:** las **317 claves** del inventario maestro cubren el 100% de las cadenas de UI detectadas en los 20 archivos auditados **más las 56 claves nuevas del Virtual Data Room** (Explorer Drive-like, carga en lote, share sheet archivo/carpeta ≤ 30 días, modal de correo receptor, watermark dinámico, validación de expiración y telemetría Journey), con los 5 archivos ARB completos y validados por paridad de claves en CI.
 6. **Escalabilidad ARB/ICU:** textos tipados y desacoplados del código, con placeholders, pluralización ICU disponible y formato regional real (fechas/números) vía `intl` para los 5 mercados objetivo.
 7. **Coherencia visual:** el selector y todos los componentes nuevos consumen los tokens reales de `KriptonTheme` (`#0A0A0F`, `#39FF14`, `#E8E8E8`), preservando la identidad institucional de KRIPTONSHARE.
+8. **Consistencia servidor–cliente:** los mensajes de validación de expiración generados en PostgreSQL se mapean a códigos tipados y se renderizan en el idioma del dispositivo; los datos forenses del watermark (email/IP/fecha ISO) permanecen intactos y solo la leyenda CONFIDENCIAL se localiza.
 
-**Estado:** Aprobado para implementación según el Roadmap del Módulo 10 (F0 → F5).
+**Estado:** Aprobado para implementación según el Roadmap del Módulo 10 (F0 → F5), con las claves VDR integradas en F3/F4.
 
 ---
 
-*Documento generado a partir del Plan v1.0 (PDF, 27Jul26) y la auditoría del repositorio en su revisión de julio 2026. KRIPTONSHARE — Data Room Efímero con soberanía de datos.*
+*Documento generado a partir del Plan v1.0 (PDF, 27Jul26), la auditoría del repositorio en su revisión de julio 2026 y la especificación de Actualización de la Arquitectura del Virtual Data Room (29Jul26). KRIPTONSHARE — Data Room Efímero con soberanía de datos.*

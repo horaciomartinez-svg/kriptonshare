@@ -375,7 +375,7 @@ class DataRoomRepositoryImpl implements IDataRoomRepository {
       );
       final canUpload = limitResult['can_upload'] as bool? ?? false;
       if (!canUpload) {
-        return Left(ValidationFailure(limitResult['message'] as String? ?? 'Límite excedido'));
+        return Left(ValidationFailure(limitResult['message'] as String? ?? 'Limit exceeded'));
       }
 
       // 2. Cifrar en Isolate
@@ -461,7 +461,7 @@ class DataRoomRepositoryImpl implements IDataRoomRepository {
       );
       final isValid = validation['is_valid'] as bool? ?? false;
       if (!isValid) {
-        return Left(ValidationFailure(validation['message'] as String? ?? 'Expiración inválida'));
+        return Left(ValidationFailure(validation['message'] as String? ?? 'Invalid expiration'));
       }
 
       final linkId = _uuid.v4();

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../l10n/app_localizations.dart';
+import 'package:intl/intl.dart';
 import '../../domain/entities/data_room_entity.dart';
 import '../../utils/theme.dart';
 
@@ -18,11 +20,17 @@ class DataRoomCard extends StatelessWidget {
     this.onDelete,
   });
 
+  String _formatDate(BuildContext context, DateTime date) {
+    final locale = Localizations.localeOf(context).toString();
+    return DateFormat('dd/MM/yyyy HH:mm', locale).format(date.toLocal());
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isExpired = room.expiresAt.isBefore(DateTime.now());
     final isActive = room.isActive && !isExpired;
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       shape: RoundedRectangleBorder(
@@ -48,12 +56,12 @@ class DataRoomCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _buildStatusIndicator(isActive),
+                  _buildStatusIndicator(context, isActive),
                 ],
               ),
               const SizedBox(height: 8),
               Text(
-                'Expires: ${_formatDate(room.expiresAt)}',
+                l10n.expiresOn(_formatDate(context, room.expiresAt)),
                 style: TextStyle(
                   fontSize: 14,
                   color: KriptonTheme.platinum.withAlpha(179),
@@ -106,7 +114,8 @@ class DataRoomCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusIndicator(bool isActive) {
+  Widget _buildStatusIndicator(BuildContext context, bool isActive) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -114,7 +123,7 @@ class DataRoomCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        isActive ? 'ACTIVE' : 'EXPIRED',
+        isActive ? l10n.activeTag : l10n.expiredTag,
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -122,9 +131,5 @@ class DataRoomCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

@@ -142,12 +142,12 @@ class FileService {
       if (result is List && result.isNotEmpty) {
         final row = result.first as Map<String, dynamic>;
         final allowed = row['can_upload'] as bool;
-        final message = row['message'] as String? ?? 'Límite de cuotas excedido';
+        final message = row['message'] as String? ?? 'Quota limit exceeded';
         if (!allowed) throw Exception(message);
         return true;
       }
     } catch (e) {
-      debugPrint('[canUpload] RPC error, fallback a validación cliente: $e');
+      debugPrint('[canUpload] RPC error, falling back to client-side validation: $e');
     }
 
     // 2. Fallback cliente si la RPC no está disponible o falla
@@ -183,11 +183,11 @@ class FileService {
     void Function(String status)? onConversionStatus,
   }) async {
     final user = _ref.read(authStateProvider).valueOrNull;
-    if (user == null) throw Exception('Usuario no autenticado');
+    if (user == null) throw Exception('User not authenticated');
 
     final allowed = await canUpload(fileBytes.length, user.id);
     if (!allowed) {
-      throw Exception('No se puede completar la subida. Verifica los límites de tu plan.');
+      throw Exception('Upload cannot be completed. Check your plan limits.');
     }
 
     // Prueba temporal de conectividad R2
@@ -232,7 +232,7 @@ class FileService {
       try {
         final accessToken = _client.auth.currentSession?.accessToken;
         if (accessToken == null) {
-          throw const ConversionException('unauthorized', 'Sin sesión');
+          throw const ConversionException('unauthorized', 'No active session');
         }
         final result = await ConversionService().convertOfficeToPdf(
           fileBytes: fileBytes,
@@ -257,7 +257,7 @@ class FileService {
         conversionStatus = 'ready';
         onConversionStatus?.call(conversionStatus);
       } on ConversionException catch (e) {
-        debugPrint('[CONVERSION] Falló (${e.code}): ${e.message}. Continúa sin preview.');
+        debugPrint('[CONVERSION] Failed (${e.code}): ${e.message}. Continuing without preview.');
         conversionStatus = 'failed';   // fallback: comportamiento actual
         viewerStorageKey = null;
         onConversionStatus?.call(conversionStatus);
@@ -294,7 +294,7 @@ class FileService {
       });
     } catch (e) {
       // Best-effort: si falla el insert, intentar limpiar ambos objetos R2.
-      debugPrint('[UPLOAD] Falló insert de metadatos, limpiando objetos R2: $e');
+      debugPrint('[UPLOAD] Metadata insert failed, cleaning up R2 objects: $e');
       await _deleteR2Object(storageKey);
       if (viewerStorageKey != null) await _deleteR2Object(viewerStorageKey);
       rethrow;
@@ -326,7 +326,7 @@ class FileService {
 
   Future<List<ShareLink>> getUserLinks() async {
     final user = _ref.read(authStateProvider).valueOrNull;
-    if (user == null) throw Exception('Usuario no autenticado');
+    if (user == null) throw Exception('User not authenticated');
     final response = await _client.from('share_links').select().eq('created_by', user.id).order('created_at', ascending: false);
     return (response as List).map((json) => ShareLink.fromJson(json)).toList();
   }
@@ -335,7 +335,7 @@ class FileService {
   /// básica del archivo (nombre, tamaño y fecha de expiración).
   Future<List<ExpiredLinkItem>> getExpiredLinksWithMetadata() async {
     final user = _ref.read(authStateProvider).valueOrNull;
-    if (user == null) throw Exception('Usuario no autenticado');
+    if (user == null) throw Exception('User not authenticated');
 
     final now = DateTime.now().toIso8601String();
     final response = await _client
@@ -354,7 +354,7 @@ class FileService {
         linkId: row['id'] as String,
         fileName: (file?['original_filename'] as String?)?.isNotEmpty == true
             ? file!['original_filename'] as String
-            : 'Documento sin nombre',
+            : 'Unnamed document',
         fileSizeBytes: file?['file_size_bytes'] as int? ?? 0,
         expiredAt: DateTime.parse(row['expires_at'] as String),
       );
@@ -363,7 +363,7 @@ class FileService {
 
   Future<List<KriptonFile>> getReceivedFiles() async {
     final user = _ref.read(authStateProvider).valueOrNull;
-    if (user == null) throw Exception('Usuario no autenticado');
+    if (user == null) throw Exception('User not authenticated');
     debugPrint('[getReceivedFiles] Current user email: ${user.email}');
 
     // 1. Intentar la RPC preferida (SECURITY DEFINER, case-insensitive)

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/localization/formatters.dart';
+import '../../core/localization/language_selector_modal.dart';
+import '../../core/localization/locale_provider.dart';
+import '../../core/localization/supported_locales.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
@@ -11,12 +16,13 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final userAsync = ref.watch(authStateProvider);
 
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       appBar: AppBar(
-        title: const Text('Perfil'),
+        title: Text(l10n.profileTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -75,7 +81,7 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
                   child: Text(
-                    user.isPremium ? 'PREMIUM' : 'FREE',
+                    user.isPremium ? l10n.premium.toUpperCase() : l10n.free.toUpperCase(),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: user.isPremium
                               ? KriptonTheme.electricLime
@@ -101,51 +107,51 @@ class ProfileScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Tu plan actual',
+                        l10n.yourCurrentPlan,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 16),
                       _buildPlanRow(
                         context,
-                        'Tamaño máximo por archivo',
+                        l10n.maxFileSize,
                         '${AppConstants.maxFileSizeBytes ~/ (1024 * 1024)} MB',
                         Icons.file_present,
                       ),
                       const SizedBox(height: 12),
                       _buildPlanRow(
                         context,
-                        'Almacenamiento Data Room',
+                        l10n.dataRoomStorage,
                         user.isPremium
-                            ? '${(user.maxStorageBytes / 1024 / 1024 / 1024).toStringAsFixed(0)} GB'
-                            : 'No disponible',
+                            ? formatBytes(context, user.maxStorageBytes)
+                            : l10n.notAvailable,
                         Icons.storage,
                       ),
                       const SizedBox(height: 12),
                       _buildPlanRow(
                         context,
-                        'Enlaces mensuales',
+                        l10n.monthlyLinks,
                         '${AppConstants.maxLinksPerMonth}',
                         Icons.link,
                       ),
                       const SizedBox(height: 12),
                       _buildPlanRow(
                         context,
-                        'Duración máxima',
-                        '${AppConstants.maxDurationHours} horas',
+                        l10n.maxDuration,
+                        l10n.hoursValue(AppConstants.maxDurationHours),
                         Icons.timer,
                       ),
                       const SizedBox(height: 12),
                       _buildPlanRow(
                         context,
-                        'Cifrado',
+                        l10n.encryptionLabel,
                         'AES-256-GCM',
                         Icons.security,
                       ),
                       const SizedBox(height: 12),
                       _buildPlanRow(
                         context,
-                        'Marca de agua',
-                        'Institucional pasiva',
+                        l10n.watermarkLabel,
+                        l10n.institutionalPassiveWatermark,
                         Icons.branding_watermark,
                       ),
                     ],
@@ -171,10 +177,49 @@ class ProfileScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Seguridad',
+                        l10n.securityTitle,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 16),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: KriptonTheme.electricLime.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.language,
+                            color: KriptonTheme.electricLime,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          l10n.language,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: KriptonTheme.platinum,
+                                fontWeight: FontWeight.w500,
+                              ),
+                        ),
+                        subtitle: Text(
+                          kSupportedLocales
+                              .firstWhere((s) =>
+                                  s.locale.languageCode ==
+                                  ref.watch(localeProvider).languageCode)
+                              .nativeName,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: KriptonTheme.electricLime,
+                              ),
+                        ),
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: KriptonTheme.silver,
+                        ),
+                        onTap: () => LanguageSelectorModal.show(context),
+                      ),
+                      const SizedBox(height: 8),
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Container(
@@ -191,14 +236,14 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                         ),
                         title: Text(
-                          'Biometría',
+                          l10n.biometricsLabel,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: KriptonTheme.platinum,
                                 fontWeight: FontWeight.w500,
                               ),
                         ),
                         subtitle: Text(
-                          'Configura huella o Face ID',
+                          l10n.configureBiometrics,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: KriptonTheme.silver,
                               ),
@@ -228,14 +273,14 @@ class ProfileScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Desbloquea capacidad total',
+                        l10n.unlockFullCapacity,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               color: KriptonTheme.platinum,
                             ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '100 MB por archivo, enlaces ilimitados, caducidad personalizable, marca de agua forense dinámica.',
+                        l10n.premiumBenefits,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: KriptonTheme.platinum.withOpacity(0.8),
                             ),
@@ -247,7 +292,7 @@ class ProfileScreen extends ConsumerWidget {
                           backgroundColor: KriptonTheme.platinum,
                           foregroundColor: KriptonTheme.charcoalBlack,
                         ),
-                        child: const Text('Gestionar Bóveda Premium'),
+                        child: Text(l10n.managePremiumVault),
                       ),
                     ],
                   ),
@@ -263,7 +308,7 @@ class ProfileScreen extends ConsumerWidget {
                     if (context.mounted) context.go('/auth');
                   },
                   icon: const Icon(Icons.logout),
-                  label: const Text('Cerrar sesión'),
+                  label: Text(l10n.signOut),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: KriptonTheme.alertRed,
                     side: const BorderSide(color: KriptonTheme.alertRed),
@@ -280,7 +325,7 @@ class ProfileScreen extends ConsumerWidget {
         ),
         error: (error, _) => Center(
           child: Text(
-            'Error: $error',
+            l10n.errorWithMessage(error.toString()),
             style: const TextStyle(color: KriptonTheme.alertRed),
           ),
         ),
@@ -299,18 +344,18 @@ class ProfileScreen extends ConsumerWidget {
               break;
           }
         },
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            label: 'Dashboard',
+            icon: const Icon(Icons.dashboard_outlined),
+            label: l10n.dashboardTab,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.link),
-            label: 'Enlaces',
+            icon: const Icon(Icons.link),
+            label: l10n.linksTab,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
+            icon: const Icon(Icons.person_outline),
+            label: l10n.profileTab,
           ),
         ],
       ),

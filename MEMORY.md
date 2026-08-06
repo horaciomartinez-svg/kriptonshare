@@ -1,5 +1,31 @@
 # KRIPTONSHARE — Memoria de sesión
 
+## 2026-08-02
+
+### Tarea
+Implementar la arquitectura i18n/l10n v2.1 en 5 idiomas (es/en/fr/de/pt) según `KRIPTONSHARE_Plan_Arquitectura_i18n_l10n_v2.md`.
+
+### Cambios realizados
+1. **Configuración base**: `flutter_localizations`, `l10n.yaml`, 5 archivos ARB (~190 claves) y claves adicionales para badges/preview/access audit.
+2. **Core localization**: `LocaleNotifier` con SharedPreferences + reconciliación remota, formatters locale-aware, selector modal y `UiErrorCode`.
+3. **Integración global**: `main.dart` y `auth_provider.dart` conectados a la arquitectura de localización.
+4. **Pantallas refactorizadas**: Splash, Auth, Dashboard, Profile, Onboarding, Biometric lock/settings, Viewer, Upload, Links, Expired links, Link card/gauge, Data Room card/lobby/storage, Analytics, VDR widgets y video player.
+4.1 **Limpieza de literales en español en servicios/repositorios**: auth, file provider, conversion, biometric, upload repository, folder/data_room repositories.
+5. **Notifiers tipificados**: `DataRoomNotifier` usa `UiErrorCode?` en vez de `String`.
+6. **Base de datos**: migración idempotente `20260728000000_add_preferred_language.sql`.
+7. **Tests**: `test/core/localization/locale_provider_test.dart`.
+8. **Documentación**: sección i18n en `E2E_TEST_GUIDE.md`.
+
+### Configuraciones dejadas pendientes
+- RevenueCat ↔ Supabase billing sync.
+- Google Play Console / App Links verificados.
+
+### Resultado final del día (noche)
+- **`flutter analyze`: No issues found** (63 → 0).
+- **`flutter test`: 71/71 verdes**.
+- Lección clave: con `nullable-getter: false` en `l10n.yaml`, `AppLocalizations.of()` nunca devuelve null → el `!` es siempre innecesario. No reintroducirlo.
+
+
 ## 2026-07-29
 
 ### Tarea

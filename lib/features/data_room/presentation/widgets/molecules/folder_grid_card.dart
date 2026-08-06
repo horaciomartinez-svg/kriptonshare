@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../../l10n/app_localizations.dart';
 import '../../../../../app/config/theme/app_theme.dart';
+import '../../../../../core/localization/formatters.dart';
 import '../../../domain/entities/folder_entity.dart';
 
 class FolderGridCard extends StatelessWidget {
@@ -14,13 +16,9 @@ class FolderGridCard extends StatelessWidget {
     this.onShare,
   });
 
-  String _formatBytes(int bytes) {
-    if (bytes >= 1048576) return '${(bytes / 1048576).toStringAsFixed(1)} MB';
-    return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  }
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -59,7 +57,7 @@ class FolderGridCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${folder.files.length} archivos · ${_formatBytes(folder.totalSizeBytes)}',
+                l10n.folderCardSummary(folder.files.length, formatBytes(context, folder.totalSizeBytes)),
                 style: const TextStyle(color: AppTheme.silver, fontSize: 12),
               ),
             ],

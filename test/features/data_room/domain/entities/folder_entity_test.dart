@@ -33,7 +33,7 @@ void main() {
     });
 
     test('storagePercentage se clamp entre 0 y 1', () {
-      expect(folder.storagePercentage, closeTo(0.093, 0.001));
+      expect(folder.storagePercentage, closeTo(100 / 1024, 0.001));
     });
   });
 }

@@ -1,11 +1,15 @@
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'l10n/app_localizations.dart';
+
+import 'core/localization/locale_provider.dart';
 
 import 'core/network/network_info.dart';
 import 'core/utils/theme.dart';
@@ -13,9 +17,7 @@ import 'utils/constants.dart';
 import 'features/data_room/data/repositories/crypto_repository_impl.dart';
 import 'features/data_room/data_room_providers.dart';
 import 'features/data_room/domain/repositories/i_crypto_repository.dart';
-import 'features/data_room/domain/repositories/i_data_room_repository.dart';
 import 'features/data_room/presentation/notifiers/data_room_notifier.dart';
-import 'providers/local_database_provider.dart';
 import 'features/qna/data/datasources/supabase_chat_datasource.dart';
 import 'features/qna/data/repositories/qna_repository_impl.dart';
 import 'features/qna/domain/repositories/i_qna_repository.dart';
@@ -156,6 +158,7 @@ class _KriptonShareAppState extends ConsumerState<KriptonShareApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    final locale = ref.watch(localeProvider);
     _router = router;
 
     // Process any deep link that arrived before the router was ready.
@@ -168,6 +171,14 @@ class _KriptonShareAppState extends ConsumerState<KriptonShareApp> {
       debugShowCheckedModeBanner: false,
       theme: KriptonTheme.darkTheme,
       routerConfig: router,
+      locale: locale,
+      supportedLocales: LocaleNotifier.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
     );
   }
 }

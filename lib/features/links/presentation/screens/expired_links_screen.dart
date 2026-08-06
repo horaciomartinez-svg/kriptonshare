@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/localization/formatters.dart';
 import '../../../../core/utils/theme.dart';
 import '../../../../providers/file_provider.dart';
 
@@ -12,15 +14,9 @@ import '../../../../providers/file_provider.dart';
 class ExpiredLinksScreen extends ConsumerWidget {
   const ExpiredLinksScreen({super.key});
 
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
-  String _formatDate(DateTime date) {
-    final local = date.toLocal();
-    return DateFormat('dd/MM/yyyy HH:mm').format(local);
+  String _formatDate(BuildContext context, DateTime date) {
+    final locale = Localizations.localeOf(context).toString();
+    return DateFormat('dd/MM/yyyy HH:mm', locale).format(date.toLocal());
   }
 
   Future<void> _refresh(WidgetRef ref) async {
@@ -29,12 +25,13 @@ class ExpiredLinksScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final expiredAsync = ref.watch(expiredLinksProvider);
 
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       appBar: AppBar(
-        title: const Text('Enlaces expirados'),
+        title: Text(l10n.expiredLinksTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -96,7 +93,10 @@ class ExpiredLinksScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${_formatBytes(item.fileSizeBytes)} · Expiró el ${_formatDate(item.expiredAt)}',
+                              l10n.sizeExpiredOn(
+                                formatBytes(context, item.fileSizeBytes),
+                                _formatDate(context, item.expiredAt),
+                              ),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: KriptonTheme.silver,
                                   ),
@@ -122,14 +122,14 @@ class ExpiredLinksScreen extends ConsumerWidget {
                 const Icon(Icons.error_outline, color: KriptonTheme.alertRed, size: 48),
                 const SizedBox(height: 16),
                 Text(
-                  'Error: $error',
+                  l10n.errorWithMessage(error.toString()),
                   style: const TextStyle(color: KriptonTheme.alertRed),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () => _refresh(ref),
-                  child: const Text('Reintentar'),
+                  child: Text(l10n.retry),
                 ),
               ],
             ),
@@ -145,6 +145,7 @@ class _EmptyBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -156,12 +157,12 @@ class _EmptyBody extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Sin enlaces expirados',
+            l10n.noExpiredLinks,
             style: Theme.of(context).textTheme.displayMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Todos tus Data Rooms están activos',
+            l10n.allDataRoomsActive,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: KriptonTheme.silver,
                 ),

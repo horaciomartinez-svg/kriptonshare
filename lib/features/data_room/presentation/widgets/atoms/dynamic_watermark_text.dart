@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../../../../app/config/theme/app_theme.dart';
 
 class DynamicWatermarkText extends StatelessWidget {
   final String recipientEmail;

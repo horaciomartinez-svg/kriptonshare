@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -89,22 +90,24 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
   }
 
   Future<void> _revokeLink(String linkId) async {
+    final l10n = AppLocalizations.of(context);
     final user = ref.read(authStateProvider).valueOrNull;
     if (user == null) return;
 
     try {
       await ref.read(linksNotifierProvider.notifier).revokeLink(linkId, user.id);
       if (mounted) {
-        _showSnackBar('Enlace revocado', KriptonTheme.kryptonGreen);
+        _showSnackBar(l10n.linkRevoked, KriptonTheme.kryptonGreen);
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Error: $e', KriptonTheme.alertRed);
+        _showSnackBar(l10n.errorWithMessage(e.toString()), KriptonTheme.alertRed);
       }
     }
   }
 
   Future<void> _deleteFile(String fileId) async {
+    final l10n = AppLocalizations.of(context);
     final user = ref.read(authStateProvider).valueOrNull;
     if (user == null) return;
 
@@ -120,24 +123,21 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
           .read(linksNotifierProvider.notifier)
           .deleteFile(fileId, user.id);
       if (mounted) {
-        _showSnackBar('Documento eliminado', KriptonTheme.kryptonGreen);
+        _showSnackBar(l10n.documentDeleted, KriptonTheme.kryptonGreen);
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Error: $e', KriptonTheme.alertRed);
+        _showSnackBar(l10n.errorWithMessage(e.toString()), KriptonTheme.alertRed);
       }
     }
   }
 
   void _shareLink(String linkId) {
+    final l10n = AppLocalizations.of(context);
     final url = AppConstants.shareUrl(linkId);
     final appUrl = AppConstants.appLinkUrl(linkId);
     Share.share(
-      'Documento seguro via KRIPTONSHARE\n\n'
-      '$url\n\n'
-      'Si el link no abre la app, usa:\n'
-      '$appUrl\n\n'
-      'Este enlace expira en ${AppConstants.maxDurationHours}h.',
+      l10n.shareMessageTemplate(url, appUrl, AppConstants.maxDurationHours),
     );
   }
 
@@ -162,12 +162,13 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final state = ref.watch(linksNotifierProvider);
 
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       appBar: AppBar(
-        title: const Text('Enlaces activos'),
+        title: Text(l10n.activeLinks),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -193,18 +194,18 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
               context.push('/profile');
           }
         },
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            label: 'Dashboard',
+            icon: const Icon(Icons.dashboard_outlined),
+            label: l10n.dashboardTab,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.link),
-            label: 'Enlaces',
+            icon: const Icon(Icons.link),
+            label: l10n.linksTab,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
+            icon: const Icon(Icons.person_outline),
+            label: l10n.profileTab,
           ),
         ],
       ),
@@ -287,15 +288,16 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: TextField(
         controller: controller,
         onChanged: onChanged,
         style: const TextStyle(color: KriptonTheme.platinum),
-        decoration: const InputDecoration(
-          hintText: 'Buscar por ID o email',
-          prefixIcon: Icon(Icons.search, color: KriptonTheme.silver),
+        decoration: InputDecoration(
+          hintText: l10n.searchByIdOrEmail,
+          prefixIcon: const Icon(Icons.search, color: KriptonTheme.silver),
         ),
       ),
     );
@@ -359,6 +361,7 @@ class _ErrorBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -366,14 +369,14 @@ class _ErrorBody extends StatelessWidget {
           const Icon(Icons.error_outline, color: KriptonTheme.alertRed, size: 48),
           const SizedBox(height: 16),
           Text(
-            'Error: $error',
+            l10n.errorWithMessage(error),
             style: const TextStyle(color: KriptonTheme.alertRed),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: onRetry,
-            child: const Text('Reintentar'),
+            child: Text(l10n.retry),
           ),
         ],
       ),
@@ -387,6 +390,7 @@ class _EmptyBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -398,12 +402,12 @@ class _EmptyBody extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Sin enlaces activos',
+            l10n.noActiveLinks,
             style: Theme.of(context).textTheme.displayMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Crea tu primer Data Room desde el dashboard',
+            l10n.createFirstFromDashboard,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: KriptonTheme.silver,
                 ),
@@ -411,7 +415,7 @@ class _EmptyBody extends StatelessWidget {
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () => context.push('/upload'),
-            child: const Text('Crear enlace'),
+            child: Text(l10n.createLink),
           ),
         ],
       ),
@@ -425,15 +429,16 @@ class _NoSearchResultsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    final l10n = AppLocalizations.of(context);
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, color: KriptonTheme.silver, size: 48),
-          SizedBox(height: 16),
+          const Icon(Icons.search_off, color: KriptonTheme.silver, size: 48),
+          const SizedBox(height: 16),
           Text(
-            'No se encontraron resultados',
-            style: TextStyle(color: KriptonTheme.silver),
+            l10n.noSearchResults,
+            style: const TextStyle(color: KriptonTheme.silver),
           ),
         ],
       ),
@@ -447,23 +452,22 @@ class _DeleteConfirmationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
       backgroundColor: KriptonTheme.ink,
-      title: const Text('Eliminar documento'),
-      content: const Text(
-        'Esta acción es irreversible. El documento será eliminado permanentemente.',
-      ),
+      title: Text(l10n.deleteDocumentTitle),
+      content: Text(l10n.deleteDocumentWarning),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancelar'),
+          child: Text(l10n.cancel),
         ),
         ElevatedButton(
           onPressed: () => Navigator.pop(context, true),
           style: ElevatedButton.styleFrom(
             backgroundColor: KriptonTheme.alertRed,
           ),
-          child: const Text('Eliminar'),
+          child: Text(l10n.delete),
         ),
       ],
     );

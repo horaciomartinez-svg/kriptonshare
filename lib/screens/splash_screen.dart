@@ -1,6 +1,7 @@
 // lib/screens/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -121,7 +122,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   ),
               const SizedBox(height: 16),
               Text(
-                'Data Room Efímero',
+                AppLocalizations.of(context).splashTagline,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: KriptonTheme.silver,
                     ),
