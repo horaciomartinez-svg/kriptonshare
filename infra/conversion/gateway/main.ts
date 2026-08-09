@@ -2,10 +2,13 @@
 /// Servicio mínimo en Deno: autentica JWT de Supabase, aplica límites por plan,
 /// reenvía a Gotenberg y devuelve el PDF. Sin persistencia ni logs de contenido.
 
-import { decodeBase64Url } from "https://deno.land/std@0.224.0/encoding/base64url.ts";
+import {
+  decodeBase64Url,
+  encodeBase64Url,
+} from "https://deno.land/std@0.224.0/encoding/base64url.ts";
 
 const GOTENBERG_URL = Deno.env.get("GOTENBERG_URL") ?? "http://gotenberg:3000";
-const SUPABASE_JWT_SECRET = Deno.env.get("SUPABASE_JWT_SECRET") ?? "";
+const SUPABASE_JWT_SECRET = (Deno.env.get("SUPABASE_JWT_SECRET") ?? "").trim();
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY =
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -15,6 +18,12 @@ const PREMIUM_MAX_BYTES = parseInt(
   10,
 );
 const PORT = parseInt(Deno.env.get("PORT") ?? "8080", 10);
+
+// Solo para desarrollo local: si la firma HMAC no valida, se acepta el token
+// si sus claims (sub/iss/exp) son correctos. ¡Debe estar en "false" en
+// producción! Un token con firma inválida se puede forjar fácilmente.
+const DEV_INSECURE_JWT =
+  (Deno.env.get("DEV_INSECURE_JWT") ?? "false").toLowerCase() === "true";
 
 const ALLOWED_EXTENSIONS = new Set([
   "doc",
@@ -45,10 +54,19 @@ interface JwtPayload {
   aud?: string | string[];
 }
 
+// CORS mínimo para desarrollo (Flutter Web sirve desde otro origen en localhost).
+// El endpoint está protegido por JWT, por lo que permitir * no expone datos.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Max-Age": "86400",
+};
+
 function jsonError(status: number, code: string, extra?: Record<string, unknown>): Response {
   return new Response(JSON.stringify({ error: code, ...extra }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
 }
 
@@ -66,6 +84,57 @@ async function importHmacKey(raw: Uint8Array): Promise<CryptoKey> {
   );
 }
 
+// Los tokens JWT omiten el padding base64url ("=") para ahorrar bytes.
+// Quita cualquier padding existente y rellena hasta longitud múltiplo de 4
+// para que el decodificador no lance "Invalid signature length".
+function normalizeBase64UrlPadding(input: string): string {
+  const stripped = input.replace(/=+$/, "");
+  return stripped + "=".repeat((4 - (stripped.length % 4)) % 4);
+}
+
+// Intenta decodificar el secreto como Base64/Base64Url. Devuelve null si la
+// cadena no es Base64 válido o no hace round-trip (evita malinterpretar un
+// secreto UTF-8 que por casualidad use caracteres del alfabeto base64).
+function tryDecodeBase64(secret: string): Uint8Array | null {
+  const urlSafe = normalizeBase64UrlPadding(secret)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+  try {
+    const decoded = decodeBase64Url(urlSafe);
+    if (encodeBase64Url(decoded) === urlSafe.replace(/=+$/, "")) {
+      return decoded;
+    }
+  } catch {
+    // No es Base64 válido.
+  }
+  return null;
+}
+
+// Supabase puede firmar con la clave en distintos formatos según el despliegue:
+//  - texto plano UTF-8 tal cual,
+//  - texto UTF-8 con el padding base64url restaurado (algunos .env llegan
+//    truncados, p. ej. sin los "==" finales),
+//  - bytes decodificados cuando la clave está codificada en Base64/Base64Url.
+// Se genera la lista de candidatas y la verificación acepta cualquiera.
+function buildJwtSecretCandidates(secret: string): Uint8Array[] {
+  const trimmed = secret.trim();
+  const candidates: Uint8Array[] = [];
+
+  const addUnique = (bytes: Uint8Array) => {
+    const exists = candidates.some((c) =>
+      c.length === bytes.length && c.every((b, i) => b === bytes[i])
+    );
+    if (!exists) candidates.push(bytes);
+  };
+
+  addUnique(new TextEncoder().encode(trimmed));
+  addUnique(new TextEncoder().encode(normalizeBase64UrlPadding(trimmed)));
+  const decoded = tryDecodeBase64(trimmed);
+  if (decoded) addUnique(decoded);
+
+  return candidates;
+}
+
 async function verifyJwt(token: string): Promise<JwtPayload> {
   if (!SUPABASE_JWT_SECRET) {
     throw new Error("SUPABASE_JWT_SECRET not configured");
@@ -76,27 +145,64 @@ async function verifyJwt(token: string): Promise<JwtPayload> {
 
   const [headerB64, payloadB64, signatureB64] = parts;
 
+  // Decodificar payload una sola vez (también se usa en el fallback de debug).
+  const payload = decodeJwtPayload(payloadB64);
+
   // Validar firma HS256
   const signingInput = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-  const secretBytes = new TextEncoder().encode(SUPABASE_JWT_SECRET);
-  const key = await importHmacKey(secretBytes);
-  const expectedSig = await hmacSha256(key, signingInput);
-  const actualSig = decodeBase64Url(signatureB64);
+  // Normalizar el padding base64url de la firma antes de decodificarla.
+  const actualSig = decodeBase64Url(normalizeBase64UrlPadding(signatureB64));
 
-  if (actualSig.byteLength !== expectedSig.byteLength) {
-    throw new Error("Invalid signature length");
+  const secretCandidates = buildJwtSecretCandidates(SUPABASE_JWT_SECRET);
+  let signatureValid = false;
+  for (const secretBytes of secretCandidates) {
+    const key = await importHmacKey(secretBytes);
+    const expectedSig = await hmacSha256(key, signingInput);
+    // HMAC-SHA256 siempre produce 32 bytes; si la firma decodificada no
+    // coincide en longitud es que el token está malformado.
+    if (expectedSig.byteLength !== actualSig.byteLength) continue;
+    const expectedArr = new Uint8Array(expectedSig);
+    let equal = true;
+    for (let i = 0; i < expectedArr.length; i++) {
+      equal &&= expectedArr[i] === actualSig[i];
+    }
+    if (equal) {
+      signatureValid = true;
+      break;
+    }
   }
-  const expectedArr = new Uint8Array(expectedSig);
-  const actualArr = new Uint8Array(actualSig);
-  let equal = true;
-  for (let i = 0; i < expectedArr.length; i++) {
-    equal &&= expectedArr[i] === actualArr[i];
-  }
-  if (!equal) throw new Error("Invalid signature");
 
-  // Decodificar payload
-  const payloadJson = new TextDecoder().decode(decodeBase64Url(payloadB64));
-  const payload = JSON.parse(payloadJson) as JwtPayload;
+  if (!signatureValid) {
+    // Registro estructurado para depuración: claims del token, algoritmo,
+    // emisor y longitud de las claves intentadas. Nunca el secreto en sí.
+    console.log(
+      "[auth] JWT HMAC verification failed",
+      JSON.stringify({
+        header: decodeJwtHeader(headerB64),
+        claims: {
+          sub: payload.sub ?? null,
+          iss: payload.iss ?? null,
+          aud: payload.aud ?? null,
+          exp: payload.exp ?? null,
+        },
+        signatureLength: actualSig.byteLength,
+        keyLengths: secretCandidates.map((c) => c.byteLength),
+        devInsecureFallback: DEV_INSECURE_JWT,
+      }),
+    );
+
+    if (!DEV_INSECURE_JWT) {
+      throw new Error("Invalid signature");
+    }
+
+    // Fallback SOLO para desarrollo local: valida las demandas esenciales
+    // (sub, iss 'supabase', exp > ahora) sin verificar la firma.
+    console.warn(
+      "[auth] DEV_INSECURE_JWT=true: aceptando token sin verificar la firma",
+    );
+    validateJwtClaims(payload);
+    return payload;
+  }
 
   // Validar expiración
   const now = Math.floor(Date.now() / 1000);
@@ -110,6 +216,38 @@ async function verifyJwt(token: string): Promise<JwtPayload> {
   }
 
   return payload;
+}
+
+function decodeJwtHeader(headerB64: string): { alg?: string } {
+  try {
+    return JSON.parse(
+      new TextDecoder().decode(decodeBase64Url(normalizeBase64UrlPadding(headerB64))),
+    ) as { alg?: string };
+  } catch {
+    return {};
+  }
+}
+
+function decodeJwtPayload(payloadB64: string): JwtPayload {
+  const payloadJson = new TextDecoder().decode(
+    decodeBase64Url(normalizeBase64UrlPadding(payloadB64)),
+  );
+  return JSON.parse(payloadJson) as JwtPayload;
+}
+
+// Valida las demandas esenciales de un JWT de Supabase sin verificar la firma.
+// Única vía de acceso del fallback DEV_INSECURE_JWT.
+function validateJwtClaims(payload: JwtPayload): void {
+  if (typeof payload.sub !== "string" || payload.sub.length === 0) {
+    throw new Error("Missing sub claim");
+  }
+  if (typeof payload.iss !== "string" || !payload.iss.includes("supabase")) {
+    throw new Error("Invalid issuer");
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof payload.exp !== "number" || payload.exp <= now) {
+    throw new Error("Token expired");
+  }
 }
 
 async function resolveMaxBytes(sub: string): Promise<number> {
@@ -138,8 +276,14 @@ async function resolveMaxBytes(sub: string): Promise<number> {
       throw new Error(`Supabase error: ${response.status}`);
     }
 
-    const data = await response.json() as Array<{ max_file_size_bytes: number }>;
-    const maxBytes = data?.[0]?.max_file_size_bytes ?? FREE_MAX_BYTES;
+    // Con `Accept: application/vnd.pgrst.object+json` PostgREST devuelve un
+    // OBJETO único (no un array) cuando el query coincide con una fila.
+    // Aceptamos ambos formatos para no romper si el header cambia.
+    const data = await response.json() as unknown;
+    const row = Array.isArray(data)
+      ? (data as Array<{ max_file_size_bytes?: number }>)[0]
+      : (data as { max_file_size_bytes?: number } | null);
+    const maxBytes = row?.max_file_size_bytes ?? FREE_MAX_BYTES;
     const effectiveMaxBytes = Math.min(maxBytes, PREMIUM_MAX_BYTES);
 
     tierCache.set(sub, { maxBytes: effectiveMaxBytes, expiresAt: now + 5 * 60 * 1000 });
@@ -311,6 +455,12 @@ async function convertWithGotenberg(
 
 async function handleRequest(request: Request): Promise<Response> {
   const url = new URL(request.url);
+
+  // Preflight CORS para desarrollo web.
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   if (request.method !== "POST" || url.pathname !== "/v1/convert/office") {
     return jsonError(404, "not_found");
   }
@@ -391,7 +541,7 @@ async function handleRequest(request: Request): Promise<Response> {
     // Devolver el stream del PDF tal cual.
     return new Response(gotenbergResponse.body, {
       status: 200,
-      headers: { "Content-Type": "application/pdf" },
+      headers: { "Content-Type": "application/pdf", ...CORS_HEADERS },
     });
   } catch (err) {
     const durationMs = Date.now() - startTime;

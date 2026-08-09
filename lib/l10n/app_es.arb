@@ -185,6 +185,7 @@
   "protectedFormat": "Formato protegido",
   "officeNotViewable": "Los documentos de Microsoft Office y otros formatos no se visualizan directamente dentro de la app por seguridad.",
   "convertToPdfAdvice": "Para compartir este contenido de forma segura, conviértelo a PDF antes de subirlo.",
+  "conversionPreviewFailed": "No se pudo generar la vista previa PDF (Error de conexión al servidor de conversión).",
   "confidentialBanner": "KRIPTONSHARE | CONFIDENCIAL",
   "secureMode": "MODO SEGURO",
   "backToHome": "Volver al inicio",

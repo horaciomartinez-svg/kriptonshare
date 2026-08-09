@@ -68,9 +68,16 @@ class AppConstants {
   static const int maxTelemetryBufferSize = 50;
 
   // === CONVERSIÓN OFFICE → PDF (FASE 1) ===
+  // En desarrollo el default apunta al conversion-gateway local (docker compose en infra/conversion).
+  // En producción se sobreescribe vía --dart-define=CONVERSION_SERVICE_URL=https://convert.kriptonshare.com.
+  //
+  // IMPORTANTE (dispositivo Android FÍSICO): 'localhost' apunta al propio
+  // teléfono, NO al PC que ejecuta el gateway. Usa la IP LAN del PC
+  // (ej. http://192.168.68.112:8080) donde corre docker compose.
+  // En el emulador Android usa --dart-define=CONVERSION_SERVICE_URL=http://10.0.2.2:8080.
   static const String conversionServiceUrl = String.fromEnvironment(
       'CONVERSION_SERVICE_URL',
-      defaultValue: 'https://convert.kriptonshare.com');
+      defaultValue: 'http://192.168.68.112:8080');
   static const Duration conversionTimeout = Duration(seconds: 120);
 
   // Límite de conversión por plan: REUTILIZA los topes ya definidos para upload.

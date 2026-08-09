@@ -30,6 +30,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   bool _isConverting = false;
   bool _isUploading = false;
   bool _conversionFailed = false;
+  String? _conversionErrorDetail;
   String? _shareLink;
   String? _errorMessage;
   double _progress = 0;
@@ -156,7 +157,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         userPassword: _passwordController.text,
         selectedDurationHours: _selectedDurationHours.toInt(),
         recipientEmail: _recipientController.text.isEmpty ? null : _recipientController.text,
-        onConversionStatus: (status) {
+        onConversionStatus: (status, [detail]) {
           if (status == 'ready') {
             setState(() {
               _isConverting = false;
@@ -164,12 +165,33 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               _progress = 0.75;
             });
           } else if (status == 'failed') {
+            final detailMsg = detail ?? 'Sin detalle';
+            debugPrint('[CONVERSION] Vista previa falló: $detailMsg');
             setState(() {
               _isConverting = false;
               _isUploading = true;
               _conversionFailed = true;
+              _conversionErrorDetail = detailMsg;
               _progress = 0.75;
             });
+            if (mounted) {
+              // Aviso VISIBLE con el error de red exacto del gateway (p. ej.
+              // SocketException / Connection refused / timeouts de ngrok).
+              // Sin SnackBarBehavior.floating: evita "Floating SnackBar
+              // presented off screen" cuando la vista tiene bottomNavigationBar
+              // o Scaffolds anidados (el dashboard queda registrado debajo).
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${l10n.conversionPreviewFailed}\n$detailMsg',
+                    ),
+                    backgroundColor: KriptonTheme.alertRed,
+                    duration: const Duration(seconds: 6),
+                  ),
+                );
+            }
           }
         },
       );
@@ -593,13 +615,30 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                           border: Border.all(color: KriptonTheme.amber.withOpacity(0.3)),
                         ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Icon(Icons.info_outline, color: KriptonTheme.amber, size: 18),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
-                                l10n.previewGenerationFailedNotice,
-                                style: const TextStyle(color: KriptonTheme.amber, fontSize: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l10n.previewGenerationFailedNotice,
+                                    style: const TextStyle(color: KriptonTheme.amber, fontSize: 12),
+                                  ),
+                                  if (_conversionErrorDetail != null) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _conversionErrorDetail!,
+                                      style: const TextStyle(
+                                        color: KriptonTheme.alertRed,
+                                        fontSize: 11,
+                                        fontFamily: 'SFMono',
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ],

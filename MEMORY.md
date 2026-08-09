@@ -1,5 +1,59 @@
 # KRIPTONSHARE — Memoria de sesión
 
+## 2026-08-06 (noche)
+
+### Tarea
+Diagnóstico p2p del flujo Office → PDF: los .docx se subían OK pero el receptor veía "Formato protegido / conviértelo a PDF" al abrir el link.
+
+### Causa raíz
+`conversionServiceUrl` default era `http://localhost:8080` → en dispositivo Android físico `localhost` = el teléfono, no el PC del gateway → connection refused → `conversion_status='failed'`. Además `usesCleartextTraffic="false"` bloqueaba HTTP plano (Android 9+). El flujo del visor (`useViewerObject: true`, `hasPdfPreview`) estaba bien; nunca se ejecutaba porque no existía el preview.
+
+### Cambios
+- `constants.dart`: default `conversionServiceUrl` → `http://192.168.68.112:8080` (IP LAN del gateway).
+- `AndroidManifest.xml`: `usesCleartextTraffic="true"` (solo dev, comentado).
+- Logs `[CONVERSION]` (URL POST, HTTP status, viewer_object_key UUID, código DioException/endpoint) en `conversion_service.dart`, `file_provider.dart`, `upload_repository_impl.dart`; log `[VIEWER]` de decisión usePreview en `viewer_screen.dart`.
+- `flutter analyze`: No issues. `flutter test`: 71/71.
+
+### Nota importante
+- El .docx de 32 MB SOLO convierte con cuenta Premium (el gateway valida `users.max_file_size_bytes`; Free=10MB → HTTP 413 too_large). El de 182 KB sí convierte en Free.
+
+## 2026-08-06
+
+### Tarea (tarde)
+Diagnóstico del flujo de autenticación: el Login no permitía acceder en el SM-A546E (Android físico) con usuario/contraseña válidos.
+
+### Causa raíz
+El router (`router_provider.dart`) decide autenticación con el `StreamProvider authProvider`, NO con el `authStateProvider` del formulario. El stream hacía `users.select().single()` sin try/catch; si fallaba (usuario sin fila en `public.users`, RLS, red), la excepción mataba el stream `async*` → Riverpod en `AsyncError` para siempre → el login "exitoso" rebotaba a `/auth` silenciosamente.
+
+### Cambios
+- `authProvider` blindado (nunca muere; loguea todo; auto-crea `public.users` en `PGRST116`). Helpers top-level `_fetchUserRow`/`_createPublicUserRecord` (idempotente 23505).
+- `signIn`: `debugPrint` con email, userId, PostgrestException y stack.
+- `auth_screen.dart`: `_loginErrorMessage()` mapea errores a mensajes localizados; logs en UI.
+- `flutter analyze`: No issues. `flutter test`: 71/71 verdes.
+
+### Notas
+- Supabase es público HTTPS. El login no depende del gateway de conversión. (Nota posterior 2026-08-06 noche: `usesCleartextTraffic` se cambió a `true` para el gateway HTTP local de dev.)
+
+## 2026-08-06
+
+### Tarea
+Completar la infraestructura de conversión Office → PDF (Gotenberg + conversion-gateway Deno) y enlazarla con el cliente Flutter.
+
+### Cambios realizados
+- `lib/utils/constants.dart`: `conversionServiceUrl` default → `http://localhost:8080` (dev). Producción: `--dart-define=CONVERSION_SERVICE_URL`. Emulador Android: `http://10.0.2.2:8080`.
+- `file_provider.dart` y `upload_repository_impl.dart`: catch ampliado a cualquier error en conversión/preview → `conversion_status='failed'`, el upload NUNCA se bloquea, original preservado, limpieza best-effort de preview huérfano en R2.
+- `infra/conversion/gateway/main.ts`: + CORS mínimo (preflight OPTIONS) para Flutter Web dev. El resto ya estaba bien (JWT HS256/exp/iss, límites por plan, multipart a Gotenberg, response `application/pdf`).
+- `infra/conversion/README.md`: sección desarrollo local + variables `.env` inline.
+- BD: columnas `viewer_object_key`/`viewer_file_size_bytes`/`conversion_status` y RPC `get_shared_file_metadata` confirmadas en migración `20260801000000_office_pdf_preview.sql` (sin cambios).
+
+### Resultado
+- `flutter analyze`: No issues found.
+- `flutter test`: 71/71 verdes.
+
+### Pendiente (usuario, requiere Docker/Deno)
+- `docker compose up -d` en `infra/conversion/` con `.env`.
+- Probar curl + flujo E2E Office → preview PDF cifrado.
+
 ## 2026-08-02
 
 ### Tarea

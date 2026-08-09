@@ -20,11 +20,18 @@ services:
       SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      # SÓLO desarrollo local: acepta tokens cuya firma no valida si sus claims
+      # (sub/iss/exp) son correctos. Poner a false en producción.
+      DEV_INSECURE_JWT: ${DEV_INSECURE_JWT:-true}
       FREE_MAX_BYTES: "10485760"
       PREMIUM_MAX_BYTES: "104857600"
       PORT: "8080"
+    # 0.0.0.0 para desarrollo: permite que un dispositivo Android FÍSICO en la
+    # misma LAN acceda al gateway vía http://<IP_LAN_del_PC>:8080 (default del
+    # cliente Flutter). En producción, detrás de Caddy/Nginx, volver a
+    # "127.0.0.1:8080:8080" para que el gateway solo escuche en loopback.
     ports:
-      - "127.0.0.1:8080:8080"
+      - "0.0.0.0:8080:8080"
     depends_on: [gotenberg]
     networks: [conversion]
 

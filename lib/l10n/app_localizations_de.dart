@@ -618,6 +618,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Um diesen Inhalt sicher zu teilen, konvertieren Sie ihn vor dem Hochladen in PDF.';
 
   @override
+  String get conversionPreviewFailed =>
+      'Die PDF-Vorschau konnte nicht erstellt werden (Verbindungsfehler zum Konvertierungsserver).';
+
+  @override
   String get confidentialBanner => 'KRIPTONSHARE | VERTRAULICH';
 
   @override

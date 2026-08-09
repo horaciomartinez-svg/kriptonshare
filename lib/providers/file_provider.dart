@@ -180,18 +180,22 @@ class FileService {
     required int selectedDurationHours,
     int? maxDownloads,
     String? recipientEmail,
-    void Function(String status)? onConversionStatus,
+    void Function(String status, [String? detail])? onConversionStatus,
   }) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) throw Exception('User not authenticated');
+
+    debugPrint('[UPLOAD_START] Iniciando subida de Office. '
+        'URL de conversión: ${AppConstants.conversionServiceUrl}');
 
     final allowed = await canUpload(fileBytes.length, user.id);
     if (!allowed) {
       throw Exception('Upload cannot be completed. Check your plan limits.');
     }
 
-    // Prueba temporal de conectividad R2
-    await testR2Connection();
+    // Prueba temporal de conectividad R2 eliminada: añadía un PUT diagnóstico
+    // en cada upload (latencia + punto de fallo por SocketException) sin valor
+    // en producción. testR2Connection() se conserva para diagnósticos manuales.
 
     // 1. Encriptación local Zero-Knowledge (AES-256-GCM) en Isolate
     //    para no bloquear el hilo de UI con archivos grandes.
@@ -246,6 +250,8 @@ class FileService {
           'password': userPassword,
         }));
         viewerStorageKey = _uuid.v4();
+        debugPrint('[CONVERSION] viewer_object_key=$viewerStorageKey '
+            '(pdf=${result.pdfBytes.length} bytes, cifrado=${(encPreview['ciphertext'] as Uint8List).length} bytes)');
         final previewPayload = Uint8List.fromList([
           ...(encPreview['salt'] as Uint8List),
           ...(encPreview['nonce'] as Uint8List),
@@ -255,12 +261,32 @@ class FileService {
         await _putEncryptedObject(viewerStorageKey, previewPayload);
         viewerSizeBytes = result.pdfBytes.length;
         conversionStatus = 'ready';
+        debugPrint('[CONVERSION] conversion_status=ready '
+            'viewer_file_size_bytes=$viewerSizeBytes '
+            'viewer_object_key=$viewerStorageKey');
         onConversionStatus?.call(conversionStatus);
-      } on ConversionException catch (e) {
-        debugPrint('[CONVERSION] Failed (${e.code}): ${e.message}. Continuing without preview.');
-        conversionStatus = 'failed';   // fallback: comportamiento actual
+      } catch (e) {
+        // Nunca bloquea la subida: si la conversión o la subida del preview fallan
+        // (servicio caído, red, límite, JWT inválido...), se conserva el archivo
+        // original y se registra conversion_status = 'failed'.
+        final code = e is ConversionException ? e.code : 'network';
+        // Mensaje amigable y conciso: para una DioException se usa solo el
+        // mensaje (sin stack trace ni toString() verboso). La vista previa es
+        // opcional y no debe saturar la consola ni el banner.
+        final message = e is ConversionException
+            ? e.message
+            : e is DioException
+                ? (e.message ?? 'Conversion failed')
+                : e.toString();
+        debugPrint('[CONVERSION] Failed ($code): $message. Continuing without preview.');
+        // Best-effort: si el preview cifrado llegó a subirse a R2 pero un paso
+        // posterior falló, limpiar el objeto huérfano.
+        if (viewerStorageKey != null) {
+          await _deleteR2Object(viewerStorageKey);
+        }
+        conversionStatus = 'failed';
         viewerStorageKey = null;
-        onConversionStatus?.call(conversionStatus);
+        onConversionStatus?.call(conversionStatus, '$code: $message');
       }
     }
 

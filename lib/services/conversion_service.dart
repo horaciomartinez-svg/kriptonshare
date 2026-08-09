@@ -1,5 +1,6 @@
-import 'dart:typed_data';
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/constants.dart';
 
 /// Resultado de una conversión Office → PDF.
@@ -30,7 +31,9 @@ class ConversionService {
               connectTimeout: const Duration(seconds: 30),
               sendTimeout: AppConstants.conversionTimeout,
               receiveTimeout: AppConstants.conversionTimeout,
-            ));
+            )) {
+    debugPrint('[CONVERSION] Gateway URL: ${AppConstants.conversionServiceUrl}');
+  }
 
   Future<ConversionResult> convertOfficeToPdf({
     required Uint8List fileBytes,
@@ -44,6 +47,9 @@ class ConversionService {
         'File exceeds the ${maxBytes ~/ (1024 * 1024)} MB limit of your plan.',
       );
     }
+    const endpoint = '${AppConstants.conversionServiceUrl}/v1/convert/office';
+    debugPrint('[CONVERSION] POST $endpoint '
+        '($fileName, ${fileBytes.length} bytes, max=$maxBytes)');
     try {
       final form = FormData.fromMap({
         'file': MultipartFile.fromBytes(fileBytes, filename: fileName),
@@ -53,18 +59,43 @@ class ConversionService {
         data: form,
         options: Options(
           responseType: ResponseType.bytes,
-          headers: {'Authorization': 'Bearer $accessToken'},
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            // ngrok free muestra una página interstitial de aviso en la primera
+            // petición de un navegador; este header la desactiva también para
+            // clientes HTTP sin necesidad de usar --host-header.
+            'ngrok-skip-browser-warning': 'true',
+          },
         ),
       );
+      debugPrint('[CONVERSION] HTTP ${response.statusCode}: '
+          '${response.data?.length ?? 0} bytes PDF');
       return ConversionResult(Uint8List.fromList(response.data!));
     } on DioException catch (e) {
       final status = e.response?.statusCode;
-      final data = e.response?.data;
+      final raw = e.response?.data;
       String? serverCode;
       int? limitBytes;
-      if (data is Map<String, dynamic>) {
-        serverCode = data['error'] as String?;
-        limitBytes = data['limit_bytes'] as int?;
+      // Con ResponseType.bytes el body de error del gateway llega como bytes,
+      // no como Map. Decodificamos los 3 formatos posibles (Map, bytes, String)
+      // para extraer `error` y `limit_bytes` del JSON del gateway.
+      Map<String, dynamic>? decoded;
+      if (raw is Map<String, dynamic>) {
+        decoded = raw;
+      } else if (raw is List<int>) {
+        try {
+          final json = jsonDecode(utf8.decode(raw));
+          if (json is Map<String, dynamic>) decoded = json;
+        } catch (_) {}
+      } else if (raw is String) {
+        try {
+          final json = jsonDecode(raw);
+          if (json is Map<String, dynamic>) decoded = json;
+        } catch (_) {}
+      }
+      if (decoded != null) {
+        serverCode = decoded['error'] as String?;
+        limitBytes = decoded['limit_bytes'] as int?;
       }
       final code = serverCode ?? switch (status) {
         401 => 'unauthorized',
@@ -79,10 +110,26 @@ class ConversionService {
             ? 'conversion_timeout'
             : 'network',
       };
-      final message = limitBytes != null
-          ? 'File exceeds the ${limitBytes ~/ (1024 * 1024)} MB limit of your plan.'
-          : 'Conversion error (HTTP ${status ?? '-'})';
+      // Causa raíz del fallo de red (SocketException, ConnectionError,
+      // TimeoutException...) que explica por qué la petición no llegó al gateway.
+      final rootCause = e.error;
+      // Log de UNA línea y sin stack trace: la vista previa es opcional y no
+      // debe saturar la consola. El detalle técnico queda en el mensaje de la UI.
+      debugPrint('[CONVERSION] Error Dio: code=$code status=$status '
+          'serverError=$serverCode tipo=${e.type} '
+          'rootCause=${rootCause?.runtimeType ?? rootCause}');
+      final message = switch (code) {
+        // 401: mensaje amigable sin ruido técnico (el preview es opcional).
+        'unauthorized' => 'Authentication failed. Please sign in again.',
+        _ => limitBytes != null
+            ? 'File exceeds the ${limitBytes ~/ (1024 * 1024)} MB limit of your plan.'
+            : 'Conversion error (HTTP ${status ?? '-'}) '
+                '[${e.type}] ${rootCause ?? e.message}',
+      };
       throw ConversionException(code, message);
+    } catch (e) {
+      debugPrint('[CONVERSION] Error inesperado: $e');
+      throw ConversionException('network', 'Unexpected conversion error: $e');
     }
   }
 }

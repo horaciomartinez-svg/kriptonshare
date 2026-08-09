@@ -117,6 +117,8 @@ class UploadRepositoryImpl implements IUploadRepository {
             'password': password,
           }));
           viewerStorageKey = _uuid.v4();
+          debugPrint('[CONVERSION clean] viewer_object_key=$viewerStorageKey '
+              '(pdf=${result.pdfBytes.length} bytes, cifrado=${(encPreview['ciphertext'] as Uint8List).length} bytes)');
           final previewPayload = Uint8List.fromList([
             ...(encPreview['salt'] as Uint8List),
             ...(encPreview['nonce'] as Uint8List),
@@ -130,8 +132,15 @@ class UploadRepositoryImpl implements IUploadRepository {
           );
           viewerSizeBytes = result.pdfBytes.length;
           conversionStatus = 'ready';
-        } on ConversionException catch (e) {
-          debugPrint('[CONVERSION clean] Failed (${e.code}): ${e.message}. Continuing without preview.');
+          debugPrint('[CONVERSION clean] conversion_status=ready '
+              'viewer_file_size_bytes=$viewerSizeBytes '
+              'viewer_object_key=$viewerStorageKey');
+        } catch (e) {
+          // Nunca bloquea la subida: si la conversión o el preview fallan, se
+          // conserva el archivo original y se registra conversion_status = 'failed'.
+          final code = e is ConversionException ? e.code : 'network';
+          final message = e is ConversionException ? e.message : e.toString();
+          debugPrint('[CONVERSION clean] Failed ($code): $message. Continuing without preview.');
           conversionStatus = 'failed';
           viewerStorageKey = null;
         }

@@ -603,6 +603,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'To share this content securely, convert it to PDF before uploading.';
 
   @override
+  String get conversionPreviewFailed =>
+      'Could not generate the PDF preview (connection error to the conversion server).';
+
+  @override
   String get confidentialBanner => 'KRIPTONSHARE | CONFIDENTIAL';
 
   @override

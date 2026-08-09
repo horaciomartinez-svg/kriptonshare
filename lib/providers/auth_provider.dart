@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,15 +15,47 @@ final supabaseClientProvider = Provider<SupabaseClient>((ref) => Supabase.instan
 final authProvider = StreamProvider<KriptonUser?>((ref) async* {
   final client = ref.watch(supabaseClientProvider);
 
+  // El router depende de este stream para decidir autenticación. Si una
+  // excepción se propaga aquí, el stream `async*` muere y Riverpod queda en
+  // AsyncError para siempre: el login "exitoso" rebota a /auth sin mensaje.
+  // Por eso TODO error se captura y loguea, y el stream nunca muere.
   await for (final authState in client.auth.onAuthStateChange) {
     if (authState.session != null) {
-      final userData = await client
-          .from('users')
-          .select()
-          .eq('id', authState.session!.user.id)
-          .single();
-
-      yield KriptonUser.fromJson(userData);
+      final userId = authState.session!.user.id;
+      try {
+        final userData = await _fetchUserRow(client, userId);
+        yield KriptonUser.fromJson(userData);
+      } on PostgrestException catch (e) {
+        if (e.code == 'PGRST116') {
+          // Sesión válida pero sin registro en public.users (usuario creado
+          // desde el dashboard de Auth, p. ej.). Crearlo aquí también para
+          // que el stream nunca quede huérfano y bloquee el acceso.
+          debugPrint('[authProvider] PGRST116: public.users ausente para '
+              '$userId. Intentando crearlo...');
+          final email = authState.session!.user.email;
+          try {
+            if (email == null || email.isEmpty) {
+              debugPrint('[authProvider] Sin email para crear el registro.');
+              yield null;
+            } else {
+              await _createPublicUserRecord(client, userId: userId, email: email);
+              final userData = await _fetchUserRow(client, userId);
+              yield KriptonUser.fromJson(userData);
+            }
+          } catch (e2) {
+            debugPrint('[authProvider] No se pudo crear public.users: $e2');
+            yield null;
+          }
+        } else {
+          debugPrint('[authProvider] Error leyendo public.users '
+              '(code=${e.code}): ${e.message}');
+          yield null;
+        }
+      } catch (e, st) {
+        debugPrint('[authProvider] Error inesperado leyendo public.users: '
+            '$e\n$st');
+        yield null;
+      }
     } else {
       yield null;
     }
@@ -32,6 +65,41 @@ final authProvider = StreamProvider<KriptonUser?>((ref) async* {
 final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<KriptonUser?>>((ref) {
   return AuthNotifier(ref);
 });
+
+/// Lee la fila de public.users del usuario autenticado.
+Future<Map<String, dynamic>> _fetchUserRow(SupabaseClient client, String userId) async {
+  return await client.from('users').select().eq('id', userId).single();
+}
+
+/// Crea el registro en public.users para un usuario autenticado que aún no
+/// tiene fila (por ejemplo, usuarios creados desde el dashboard de Auth).
+/// Idempotente: si la fila ya existe (23505 unique_violation), no hace nada.
+Future<void> _createPublicUserRecord(
+  SupabaseClient client, {
+  required String userId,
+  required String email,
+}) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final preferredLanguage =
+        prefs.getString(kLocaleStorageKey) ?? kFallbackLocale.languageCode;
+
+    await client.from('users').insert({
+      'id': userId,
+      'email': email,
+      'subscription_tier': 'free',
+      'monthly_links_generated': 0,
+      'monthly_links_reset_at': DateTime.now().toIso8601String(),
+      'total_storage_used_bytes': 0,
+      'max_storage_premium_bytes': AppConstants.premiumMaxStorageBytes,
+      'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
+      'preferred_language': preferredLanguage,
+    });
+  } on PostgrestException catch (e) {
+    // 23505 = unique_violation (race condition). Se ignora.
+    if (e.code != '23505') rethrow;
+  }
+}
 
 class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
   final Ref _ref;
@@ -64,10 +132,12 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
     state = const AsyncValue.loading();
     try {
       final client = _ref.read(supabaseClientProvider);
+      debugPrint('[AuthNotifier.signIn] Intentando iniciar sesión con $email');
       final response = await client.auth.signInWithPassword(
         email: email,
         password: password,
       );
+      debugPrint('[AuthNotifier.signIn] Sesión creada: userId=${response.user?.id}');
 
       final user = response.user;
       if (user == null) {
@@ -86,6 +156,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
         // Si el registro no existe, intentar crearlo automáticamente.
         // Esto suele ocurrir cuando el UUID en public.users no coincide
         // con auth.users (p. ej. usuario recreado en Auth).
+        debugPrint('[AuthNotifier.signIn] PostgrestException al leer users: '
+            'code=${e.code} message=${e.message}');
         if (e.code == 'PGRST116') {
           await _ensureUserRecord(client, user.id, email);
           final userData = await client
@@ -105,6 +177,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
         );
       }
     } catch (e, st) {
+      debugPrint('[AuthNotifier.signIn] Error: tipo=${e.runtimeType} '
+          'error=$e\n$st');
       state = AsyncValue.error(e, st);
     }
   }
@@ -175,26 +249,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
   /// Crea el registro de usuario en public.users si no existe.
   /// Útil cuando el UUID en auth.users no coincide con public.users.
   Future<void> _ensureUserRecord(SupabaseClient client, String userId, String email) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final preferredLanguage =
-          prefs.getString(kLocaleStorageKey) ?? kFallbackLocale.languageCode;
-
-      await client.from('users').insert({
-        'id': userId,
-        'email': email,
-        'subscription_tier': 'free',
-        'monthly_links_generated': 0,
-        'monthly_links_reset_at': DateTime.now().toIso8601String(),
-        'total_storage_used_bytes': 0,
-        'max_storage_premium_bytes': AppConstants.premiumMaxStorageBytes,
-        'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
-        'preferred_language': preferredLanguage,
-      });
-    } on PostgrestException catch (e) {
-      // Si ya existe (por race condition), ignorar.
-      if (e.code != '23505') rethrow;
-    }
+    await _createPublicUserRecord(client, userId: userId, email: email);
   }
 
   /// Modo prueba Premium: activa/desactiva tier premium directamente en Supabase

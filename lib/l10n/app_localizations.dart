@@ -1154,6 +1154,12 @@ abstract class AppLocalizations {
   /// **'To share this content securely, convert it to PDF before uploading.'**
   String get convertToPdfAdvice;
 
+  /// No description provided for @conversionPreviewFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not generate the PDF preview (connection error to the conversion server).'**
+  String get conversionPreviewFailed;
+
   /// No description provided for @confidentialBanner.
   ///
   /// In en, this message translates to:

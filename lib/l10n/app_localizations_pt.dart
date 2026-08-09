@@ -606,6 +606,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Para compartilhar este conteúdo com segurança, converta-o para PDF antes de enviá-lo.';
 
   @override
+  String get conversionPreviewFailed =>
+      'Não foi possível gerar a prévia em PDF (erro de conexão com o servidor de conversão).';
+
+  @override
   String get confidentialBanner => 'KRIPTONSHARE | CONFIDENCIAL';
 
   @override

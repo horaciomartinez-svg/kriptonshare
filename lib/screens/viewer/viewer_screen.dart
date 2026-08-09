@@ -141,6 +141,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       final usePreview = OfficeFormats.isConvertible(
               mimeType: _file!.mimeType, fileName: _file!.originalFilename) &&
           _file!.hasPdfPreview;
+      debugPrint('[VIEWER] conversionStatus=${_file!.conversionStatus} '
+          'viewerObjectKey=${_file!.viewerObjectKey} '
+          'hasPdfPreview=${_file!.hasPdfPreview} usePreview=$usePreview');
 
       final decrypted = await fileService.downloadAndDecryptFile(
         _file!,

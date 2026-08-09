@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/localization/language_selector_modal.dart';
@@ -57,19 +58,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
       _errorMessage = null;
     });
 
+    final l10n = AppLocalizations.of(context);
+    final email = _loginEmailController.text.trim();
+
     try {
       await ref.read(authStateProvider.notifier).signIn(
-        _loginEmailController.text.trim(),
+        email,
         _loginPasswordController.text,
       );
 
       final currentState = ref.read(authStateProvider);
       if (mounted && currentState.hasError) {
         final error = currentState.error;
+        debugPrint('[AuthScreen] Login falló. Error: $error');
         setState(() {
-          _errorMessage = error is Exception
-              ? error.toString().replaceFirst('Exception: ', '')
-              : AppLocalizations.of(context).loginInvalidCredentials;
+          _errorMessage = _loginErrorMessage(error, l10n);
         });
         return;
       }
@@ -77,7 +80,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
       if (!mounted) return;
 
       // Si el desbloqueo biométrico está habilitado, pedirlo como segundo paso.
-      final l10n = AppLocalizations.of(context);
       final biometricService = await BiometricService.create();
       final biometricEnabled = biometricService.isBiometricEnabled;
       final biometricAvailable = await biometricService.isBiometricAvailable();
@@ -107,9 +109,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
         context.go('/dashboard');
       }
     } catch (e) {
+      debugPrint('[AuthScreen] Excepción inesperada en login: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = AppLocalizations.of(context).loginInvalidCredentials;
+          _errorMessage = l10n.loginInvalidCredentials;
         });
       }
     } finally {
@@ -117,6 +120,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// Mapea el error devuelto por Supabase a un mensaje localizado y explícito.
+  /// Los detalles completos se loguean en consola para diagnóstico.
+  String _loginErrorMessage(Object? error, AppLocalizations l10n) {
+    if (error is AuthException) {
+      final message = error.message.toLowerCase();
+      debugPrint('[AuthScreen] AuthException: ${error.message}');
+      if (message.contains('invalid login credentials') ||
+          message.contains('invalid_credentials') ||
+          message.contains('invalid email or password')) {
+        return l10n.loginInvalidCredentials;
+      }
+      return l10n.errorSignInFailed;
+    }
+    if (error is PostgrestException) {
+      debugPrint('[AuthScreen] PostgrestException: '
+          'code=${error.code} message=${error.message}');
+      return l10n.errorSignInFailed;
+    }
+    debugPrint('[AuthScreen] Error sin mapeo: $error');
+    return l10n.errorSignInFailed;
   }
 
   Future<void> _register() async {
