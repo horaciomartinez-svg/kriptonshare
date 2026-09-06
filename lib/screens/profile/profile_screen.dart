@@ -114,7 +114,7 @@ class ProfileScreen extends ConsumerWidget {
                       _buildPlanRow(
                         context,
                         l10n.maxFileSize,
-                        '${AppConstants.maxFileSizeBytes ~/ (1024 * 1024)} MB',
+                        '${user.maxFileSizeBytes ~/ (1024 * 1024)} MB',
                         Icons.file_present,
                       ),
                       const SizedBox(height: 12),
@@ -130,14 +130,16 @@ class ProfileScreen extends ConsumerWidget {
                       _buildPlanRow(
                         context,
                         l10n.monthlyLinks,
-                        '${AppConstants.maxLinksPerMonth}',
+                        user.isPremium ? l10n.unlimited : '${AppConstants.maxLinksPerMonth}',
                         Icons.link,
                       ),
                       const SizedBox(height: 12),
                       _buildPlanRow(
                         context,
                         l10n.maxDuration,
-                        l10n.hoursValue(AppConstants.maxDurationHours),
+                        user.isPremium
+                            ? l10n.daysValue(user.maxDurationHours ~/ 24)
+                            : l10n.hoursValue(user.maxDurationHours),
                         Icons.timer,
                       ),
                       const SizedBox(height: 12),

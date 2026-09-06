@@ -89,6 +89,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
           localizedReason: l10n.biometricLoginReason,
         );
         if (!didAuthenticate) {
+          if (!mounted) return;
           // Si cancela la huella, cerramos la sesión recién iniciada para
           // evitar dejar la app desbloqueada.
           await ref.read(authStateProvider.notifier).signOut();

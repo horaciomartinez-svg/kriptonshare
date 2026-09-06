@@ -203,8 +203,10 @@
   "notAvailable": "No disponible",
   "monthlyLinks": "Enlaces mensuales",
   "maxDuration": "Duración máxima",
-  "hoursValue": "{count} horas",
-  "encryptionLabel": "Cifrado",
+   "hoursValue": "{count} horas",
+   "daysValue": "{count} días",
+   "unlimited": "Ilimitado",
+   "encryptionLabel": "Cifrado",
   "watermarkLabel": "Marca de agua",
   "institutionalPassiveWatermark": "Institucional pasiva",
   "biometricsLabel": "Biometría",
@@ -273,7 +275,8 @@
   "storageExpanded": "Almacenamiento ampliado",
 
   "remainingLinks": "{remaining} restantes",
-  "freePlanLabel": "Plan gratuito",
+   "freePlanLabel": "Plan gratuito",
+   "premiumPlanLabel": "Plan Premium",
 
   "errorUserNotAuthenticated": "Usuario no autenticado",
   "errorQuotaExceeded": "Límite de cuotas excedido",

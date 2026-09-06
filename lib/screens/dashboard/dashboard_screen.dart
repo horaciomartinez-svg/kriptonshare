@@ -11,6 +11,7 @@ import '../../providers/file_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
 import '../../widgets/link_gauge.dart';
+import '../../widgets/premium_storage_gauge.dart';
 import '../../widgets/data_room_card.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -91,11 +92,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Link Gauge
-                  LinkGauge(
-                    used: linksUsed,
-                    total: AppConstants.maxLinksPerMonth,
-                  )
+                  // Gauge: Freemium → Monthly Links | Premium → Storage Usage
+                  if (!user.isPremium)
+                    LinkGauge(
+                      used: linksUsed,
+                      total: AppConstants.maxLinksPerMonth,
+                    )
+                      .animate()
+                      .fade(delay: 100.ms, duration: 400.ms)
+                      .scale(delay: 100.ms, duration: 400.ms)
+                  else
+                    PremiumStorageGauge(
+                      usedBytes: user.totalStorageUsedBytes,
+                    )
                       .animate()
                       .fade(delay: 100.ms, duration: 400.ms)
                       .scale(delay: 100.ms, duration: 400.ms),
@@ -106,13 +115,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     children: [
                       _buildStatCard(
                         l10n.capacity,
-                        '${AppConstants.maxFileSizeBytes ~/ (1024 * 1024)} MB',
+                        '${user.maxFileSizeBytes ~/ (1024 * 1024)} MB',
                         Icons.storage,
                       ),
                       const SizedBox(width: 12),
                       _buildStatCard(
                         l10n.duration,
-                        '${AppConstants.maxDurationHours}h',
+                        user.isPremium
+                            ? '${user.maxDurationHours ~/ 24}d'
+                            : '${user.maxDurationHours}h',
                         Icons.timer,
                       ),
                       const SizedBox(width: 12),

@@ -668,6 +668,14 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String daysValue(int count) {
+    return '$count dias';
+  }
+
+  @override
+  String get unlimited => 'Ilimitado';
+
+  @override
   String get encryptionLabel => 'Criptografia';
 
   @override
@@ -882,6 +890,9 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get freePlanLabel => 'Plano gratuito';
+
+  @override
+  String get premiumPlanLabel => 'Plano Premium';
 
   @override
   String get errorUserNotAuthenticated => 'Usuário não autenticado';

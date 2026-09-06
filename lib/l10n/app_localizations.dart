@@ -1262,6 +1262,18 @@ abstract class AppLocalizations {
   /// **'{count} hours'**
   String hoursValue(int count);
 
+  /// No description provided for @daysValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} days'**
+  String daysValue(int count);
+
+  /// No description provided for @unlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited'**
+  String get unlimited;
+
   /// No description provided for @encryptionLabel.
   ///
   /// In en, this message translates to:
@@ -1657,6 +1669,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Free plan'**
   String get freePlanLabel;
+
+  /// No description provided for @premiumPlanLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium plan'**
+  String get premiumPlanLabel;
 
   /// No description provided for @errorUserNotAuthenticated.
   ///

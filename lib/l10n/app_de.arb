@@ -203,8 +203,10 @@
   "notAvailable": "Nicht verfügbar",
   "monthlyLinks": "Monatliche Links",
   "maxDuration": "Maximale Laufzeit",
-  "hoursValue": "{count} Stunden",
-  "encryptionLabel": "Verschlüsselung",
+   "hoursValue": "{count} Stunden",
+   "daysValue": "{count} Tage",
+   "unlimited": "Unbegrenzt",
+   "encryptionLabel": "Verschlüsselung",
   "watermarkLabel": "Wasserzeichen",
   "institutionalPassiveWatermark": "Institutionell passiv",
   "biometricsLabel": "Biometrie",
@@ -273,7 +275,8 @@
   "storageExpanded": "Speicher erweitert",
 
   "remainingLinks": "{remaining} verbleibend",
-  "freePlanLabel": "Kostenloser Plan",
+   "freePlanLabel": "Kostenloser Plan",
+   "premiumPlanLabel": "Premium-Plan",
 
   "errorUserNotAuthenticated": "Benutzer nicht authentifiziert",
   "errorQuotaExceeded": "Kontingentlimit überschritten",

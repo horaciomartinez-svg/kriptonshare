@@ -229,8 +229,11 @@
   "notAvailable": "Not available",
   "monthlyLinks": "Monthly links",
   "maxDuration": "Maximum duration",
-  "hoursValue": "{count} hours",
-  "@hoursValue": { "placeholders": { "count": { "type": "int" } } },
+   "hoursValue": "{count} hours",
+   "@hoursValue": { "placeholders": { "count": { "type": "int" } } },
+   "daysValue": "{count} days",
+   "@daysValue": { "placeholders": { "count": { "type": "int" } } },
+   "unlimited": "Unlimited",
   "encryptionLabel": "Encryption",
   "watermarkLabel": "Watermark",
   "institutionalPassiveWatermark": "Institutional passive",
@@ -307,7 +310,8 @@
 
   "remainingLinks": "{remaining} remaining",
   "@remainingLinks": { "placeholders": { "remaining": { "type": "int" } } },
-  "freePlanLabel": "Free plan",
+   "freePlanLabel": "Free plan",
+   "premiumPlanLabel": "Premium plan",
 
   "errorUserNotAuthenticated": "User not authenticated",
   "errorQuotaExceeded": "Quota limit exceeded",

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform, SocketException;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../utils/constants.dart';
@@ -10,12 +11,76 @@ class ConversionResult {
 }
 
 class ConversionException implements Exception {
-  final String code;   // 'too_large' | 'unsupported_format' | 'conversion_failed'
-                       // | 'conversion_timeout' | 'unauthorized' | 'network'
+  final String code;
   final String message;
   const ConversionException(this.code, this.message);
   @override
   String toString() => 'ConversionException($code): $message';
+}
+
+/// Resuelve la URL efectiva del gateway para conectar con Gotenberg.
+///
+/// 📱 DISPOSITIVO FÍSICO vs. EMULADOR:
+///
+/// Un emulador de Android se ejecuta dentro de una máquina virtual en tu PC.
+/// Desde dentro del emulador, "localhost" (127.0.0.1) se refiere al propio
+/// emulador, NO a tu PC anfitrión. Por eso el emulador proporciona un alias
+/// especial: 10.0.2.2, que redirige el tráfico al loopback del host (127.0.0.1).
+///
+/// Un dispositivo físico real NO tiene ese alias. Para alcanzar el servidor
+/// en tu PC, debe usar la IP LAN real de tu máquina (ej: 192.168.0.21).
+/// Además, tanto el teléfono como el PC deben estar conectados a la misma
+/// red Wi-Fi, de lo contrario no habrá conectividad entre ellos.
+///
+/// Estrategia:
+///   1) En modo debug + Android → usar la IP LAN real del host (dispositivo físico).
+///   2) En release o no-Android → usar la URL configurada via --dart-define.
+String _resolveGatewayUrl() {
+  const baseUrl = String.fromEnvironment(
+    'API_HOST',
+    defaultValue: 'http://192.168.0.21:8080',
+  );
+  if (kDebugMode && Platform.isAndroid) {
+    debugPrint('[CONVERSION] Debug + Android → host LAN IP: $baseUrl');
+    return baseUrl;
+  }
+
+  const raw = AppConstants.conversionServiceUrl;
+  debugPrint('[CONVERSION] Using configured URL: $raw');
+  return raw;
+}
+
+/// Patrón Fail-Fast: Verificación rápida del servidor antes de iniciar la conversión.
+///
+/// El objetivo es detectar problemas de conectividad en ~3s, antes de lanzar
+/// una petición POST de 60s. Esto mejora la UX al evitar pantallas congeladas
+/// durante un minuto completo cuando el dispositivo y el PC no están en la misma red.
+///
+/// Si el servidor responde con 404 o 405 (esperado al hacer GET a la raíz),
+/// se ignora el error porque significa que el servidor SÍ está vivo.
+Future<void> checkServerHealth(Dio dio, String gatewayUrl) async {
+  try {
+    await dio.get(
+      gatewayUrl,
+      options: Options(
+        connectTimeout: const Duration(seconds: 3),
+        sendTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 3),
+      ),
+    );
+  } on DioException catch (e) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.connectionError ||
+        e.error is SocketException) {
+      throw ConversionException(
+        'network',
+        'No se puede alcanzar el servidor de conversión. Verifique que la IP del PC siga siendo 192.168.0.21',
+      );
+    }
+    if (e.response?.statusCode == 404 || e.response?.statusCode == 405) {
+      return;
+    }
+  }
 }
 
 /// Cliente del conversion-gateway (Fase 1).
@@ -23,31 +88,42 @@ class ConversionException implements Exception {
 /// de Supabase del usuario y devuelve el PDF. El servidor no persiste nada.
 class ConversionService {
   final Dio _dio;
+  final String gatewayUrl;
 
-  ConversionService({Dio? dio})
-      : _dio = dio ??
-            Dio(BaseOptions(
-              baseUrl: AppConstants.conversionServiceUrl,
-              connectTimeout: const Duration(seconds: 30),
-              sendTimeout: AppConstants.conversionTimeout,
-              receiveTimeout: AppConstants.conversionTimeout,
-            )) {
-    debugPrint('[CONVERSION] Gateway URL: ${AppConstants.conversionServiceUrl}');
+  factory ConversionService({Dio? dio}) {
+    final baseUrl = _resolveGatewayUrl();
+    debugPrint('[CONVERSION] Gateway URL: $baseUrl');
+    return ConversionService._(
+      dio ?? Dio(BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+      )),
+      baseUrl,
+    );
   }
+
+  ConversionService._(this._dio, this.gatewayUrl);
 
   Future<ConversionResult> convertOfficeToPdf({
     required Uint8List fileBytes,
     required String fileName,
     required String accessToken,
-    required int maxBytes, // AppConstants.conversionMaxBytesFor(isPremium: ...)
+    required int maxBytes,
   }) async {
+    // Patrón Fail-Fast: Verificar conectividad antes de iniciar la conversión.
+    // Esto permite detectar problemas de red en ~3s, evitando que la UI
+    // se congele durante 60s si el servidor no es alcanzable.
+    await checkServerHealth(_dio, gatewayUrl);
+
     if (fileBytes.length > maxBytes) {
       throw ConversionException(
         'too_large',
         'File exceeds the ${maxBytes ~/ (1024 * 1024)} MB limit of your plan.',
       );
     }
-    const endpoint = '${AppConstants.conversionServiceUrl}/v1/convert/office';
+    final endpoint = '$gatewayUrl/v1/convert/office';
     debugPrint('[CONVERSION] POST $endpoint '
         '($fileName, ${fileBytes.length} bytes, max=$maxBytes)');
     try {
@@ -61,9 +137,6 @@ class ConversionService {
           responseType: ResponseType.bytes,
           headers: {
             'Authorization': 'Bearer $accessToken',
-            // ngrok free muestra una página interstitial de aviso en la primera
-            // petición de un navegador; este header la desactiva también para
-            // clientes HTTP sin necesidad de usar --host-header.
             'ngrok-skip-browser-warning': 'true',
           },
         ),
@@ -76,9 +149,6 @@ class ConversionService {
       final raw = e.response?.data;
       String? serverCode;
       int? limitBytes;
-      // Con ResponseType.bytes el body de error del gateway llega como bytes,
-      // no como Map. Decodificamos los 3 formatos posibles (Map, bytes, String)
-      // para extraer `error` y `limit_bytes` del JSON del gateway.
       Map<String, dynamic>? decoded;
       if (raw is Map<String, dynamic>) {
         decoded = raw;
@@ -110,16 +180,11 @@ class ConversionService {
             ? 'conversion_timeout'
             : 'network',
       };
-      // Causa raíz del fallo de red (SocketException, ConnectionError,
-      // TimeoutException...) que explica por qué la petición no llegó al gateway.
       final rootCause = e.error;
-      // Log de UNA línea y sin stack trace: la vista previa es opcional y no
-      // debe saturar la consola. El detalle técnico queda en el mensaje de la UI.
       debugPrint('[CONVERSION] Error Dio: code=$code status=$status '
           'serverError=$serverCode tipo=${e.type} '
           'rootCause=${rootCause?.runtimeType ?? rootCause}');
       final message = switch (code) {
-        // 401: mensaje amigable sin ruido técnico (el preview es opcional).
         'unauthorized' => 'Authentication failed. Please sign in again.',
         _ => limitBytes != null
             ? 'File exceeds the ${limitBytes ~/ (1024 * 1024)} MB limit of your plan.'

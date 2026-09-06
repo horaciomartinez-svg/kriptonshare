@@ -203,8 +203,10 @@
   "notAvailable": "Non disponible",
   "monthlyLinks": "Liens mensuels",
   "maxDuration": "Durée maximale",
-  "hoursValue": "{count} heures",
-  "encryptionLabel": "Chiffrement",
+   "hoursValue": "{count} heures",
+   "daysValue": "{count} jours",
+   "unlimited": "Illimité",
+   "encryptionLabel": "Chiffrement",
   "watermarkLabel": "Filigrane",
   "institutionalPassiveWatermark": "Institutionnel passif",
   "biometricsLabel": "Biométrie",
@@ -273,7 +275,8 @@
   "storageExpanded": "Stockage agrandi",
 
   "remainingLinks": "{remaining} restants",
-  "freePlanLabel": "Plan gratuit",
+   "freePlanLabel": "Plan gratuit",
+   "premiumPlanLabel": "Plan Premium",
 
   "errorUserNotAuthenticated": "Utilisateur non authentifié",
   "errorQuotaExceeded": "Limite de quota dépassée",

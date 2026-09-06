@@ -6,11 +6,13 @@ import '../../utils/theme.dart';
 class LinkGauge extends StatelessWidget {
   final int used;
   final int total;
+  final bool isPremium;
 
   const LinkGauge({
     super.key,
     required this.used,
     required this.total,
+    this.isPremium = false,
   });
 
   @override
@@ -73,7 +75,7 @@ class LinkGauge extends StatelessWidget {
                 ),
           ),
           Text(
-            l10n.freePlanLabel,
+            isPremium ? l10n.premiumPlanLabel : l10n.freePlanLabel,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: KriptonTheme.graphite,
                 ),
