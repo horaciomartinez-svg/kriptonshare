@@ -15,6 +15,7 @@ import '../../../../providers/file_provider.dart';
 import '../../../../utils/office_formats.dart';
 import '../../../../utils/theme.dart';
 import '../../../../utils/constants.dart';
+import '../widgets/ms_office_warning_dialog.dart';
 
 class UploadScreen extends ConsumerStatefulWidget {
   const UploadScreen({super.key});
@@ -127,6 +128,15 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           'application/octet-stream',
       fileName: _selectedFile!.name,
     );
+
+    if (isConvertible && mounted) {
+      final shouldProceed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const MsOfficeWarningDialog(),
+      );
+      if (shouldProceed != true) return;
+    }
 
     setState(() {
       _isEncrypting = true;

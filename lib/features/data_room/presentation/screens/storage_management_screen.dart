@@ -3,16 +3,15 @@ import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../../../core/localization/formatters.dart';
-import '../../../../core/services/revenue_cat_service.dart';
+import '../../../../core/services/purchase_service.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../utils/theme.dart';
 import '../notifiers/storage_upsell_notifier.dart';
 
 final storageUpsellNotifierProvider =
     StateNotifierProvider<StorageUpsellNotifier, StorageUpsellState>((ref) {
-  return StorageUpsellNotifier(RevenueCatServiceImpl());
+  return StorageUpsellNotifier(ref, createPurchaseService(ref));
 });
 
 class StorageManagementScreen extends ConsumerStatefulWidget {
@@ -78,6 +77,40 @@ class _StorageManagementScreenState
                   ),
                 ),
               ),
+              if (upsell.isMockMode) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: KriptonTheme.amber.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: KriptonTheme.amber.withOpacity(0.4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.science,
+                        size: 18,
+                        color: KriptonTheme.amber,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${l10n.testModeLabel}: ${l10n.testModeDescription}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: KriptonTheme.amber,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               Text(
                 l10n.dataRoomCapacity,
@@ -223,9 +256,9 @@ class _StorageManagementScreenState
     }
   }
 
-  Future<void> _buySubscription(Offerings? offerings) async {
+  Future<void> _buySubscription(PurchaseOfferings offerings) async {
     final l10n = AppLocalizations.of(context);
-    final package = offerings?.current?.availablePackages.firstOrNull;
+    final package = offerings.currentPackages.firstOrNull;
     if (package == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.noOfferingsAvailable)),
@@ -244,13 +277,9 @@ class _StorageManagementScreenState
     }
   }
 
-  Future<void> _buyAddon(Offerings? offerings) async {
+  Future<void> _buyAddon(PurchaseOfferings offerings) async {
     final l10n = AppLocalizations.of(context);
-    // Buscar un offering de add-ons si existe; de lo contrario usar el primero.
-    final packages = offerings?.all.entries
-        .expand((e) => e.value.availablePackages)
-        .toList();
-    final package = packages?.firstOrNull;
+    final package = offerings.addonPackages.firstOrNull;
     if (package == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.noAddonsAvailable)),

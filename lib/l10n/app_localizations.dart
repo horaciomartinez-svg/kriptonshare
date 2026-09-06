@@ -116,6 +116,24 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get cancel;
 
+  /// No description provided for @accept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get accept;
+
+  /// No description provided for @msOfficeWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversion Warning'**
+  String get msOfficeWarningTitle;
+
+  /// No description provided for @msOfficeWarningBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You are about to convert an MS Office document to PDF. This process may take several minutes. It is recommended to use this option for files smaller than 5 MB. For larger files, it is preferable to convert them to PDF using MS Office. Do you wish to continue?'**
+  String get msOfficeWarningBody;
+
   /// No description provided for @retry.
   ///
   /// In en, this message translates to:

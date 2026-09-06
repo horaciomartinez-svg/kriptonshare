@@ -15,6 +15,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get cancel => 'Cancelar';
 
   @override
+  String get accept => 'Aceptar';
+
+  @override
+  String get msOfficeWarningTitle => 'Aviso de Conversión';
+
+  @override
+  String get msOfficeWarningBody =>
+      'Está por convertir un documento MS Office a PDF, este proceso puede tomar varios minutos, se recomienda usar esta opción en archivos de tamaño menor a 5 MB. En archivos más grandes es preferible convertirlos a PDF por medio de MS Office. ¿Desea continuar?';
+
+  @override
   String get retry => 'Reintentar';
 
   @override
