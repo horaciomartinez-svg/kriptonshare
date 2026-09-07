@@ -19,7 +19,7 @@ final authProvider = StreamProvider<KriptonUser?>((ref) async* {
   // El router depende de este stream para decidir autenticación. Si una
   // excepción se propaga aquí, el stream `async*` muere y Riverpod queda en
   // AsyncError para siempre: el login "exitoso" rebota a /auth sin mensaje.
-  // Por eso TODO error se captura y loguea, y el stream nunca muere.
+  // Por eso cada error se captura y loguea, y el stream nunca muere.
   await for (final authState in client.auth.onAuthStateChange) {
     if (authState.session != null) {
       final userId = authState.session!.user.id;
