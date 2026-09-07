@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/localization/formatters.dart';
 import '../../core/localization/language_selector_modal.dart';
 import '../../core/localization/locale_provider.dart';
 import '../../core/localization/supported_locales.dart';
@@ -81,7 +80,11 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
                   child: Text(
-                    user.isPremium ? l10n.premium.toUpperCase() : l10n.free.toUpperCase(),
+                    switch (user.effectiveTier) {
+                      'business' => l10n.businessBadge,
+                      'premium' => l10n.premium.toUpperCase(),
+                      _ => l10n.free.toUpperCase(),
+                    },
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: user.isPremium
                               ? KriptonTheme.electricLime
@@ -116,15 +119,6 @@ class ProfileScreen extends ConsumerWidget {
                         l10n.maxFileSize,
                         '${user.maxFileSizeBytes ~/ (1024 * 1024)} MB',
                         Icons.file_present,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildPlanRow(
-                        context,
-                        l10n.dataRoomStorage,
-                        user.isPremium
-                            ? formatBytes(context, user.maxStorageBytes)
-                            : l10n.notAvailable,
-                        Icons.storage,
                       ),
                       const SizedBox(height: 12),
                       _buildPlanRow(
@@ -264,8 +258,9 @@ class ProfileScreen extends ConsumerWidget {
                     .slideY(begin: 0.2, end: 0),
                 const SizedBox(height: 24),
 
-                // Upgrade CTA
-                Container(
+                // Upgrade CTA (solo usuarios free; quienes pagan gestionan en /plans)
+                if (!user.isPremium) ...[
+                  Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: KriptonTheme.brandGradient,
@@ -289,7 +284,7 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: () => context.push('/storage-management'),
+                        onPressed: () => context.push('/plans'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: KriptonTheme.platinum,
                           foregroundColor: KriptonTheme.charcoalBlack,
@@ -298,9 +293,10 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                )
-                    .animate()
-                    .fade(delay: 400.ms, duration: 400.ms),
+                  )
+                      .animate()
+                      .fade(delay: 400.ms, duration: 400.ms),
+                ],
                 const SizedBox(height: 32),
 
                 // Logout

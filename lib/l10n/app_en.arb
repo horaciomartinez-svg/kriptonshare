@@ -3,11 +3,6 @@
   "appName": "KRIPTONSHARE",
   "cancel": "Cancel",
   "accept": "Accept",
-  "msOfficeWarningTitle": "Conversion Warning",
-  "msOfficeWarningBody": "You are about to convert an MS Office document to PDF. This process may take several minutes. It is recommended to use this option for files smaller than 5 MB. For larger files, it is preferable to convert them to PDF using MS Office. Do you wish to continue?",
-  "accept": "Accept",
-  "msOfficeWarningTitle": "Conversion Warning",
-  "msOfficeWarningBody": "You are about to convert an MS Office document to PDF. This process may take several minutes. It is recommended to use this option for files smaller than 5 MB. For larger files, it is preferable to convert them to PDF using MS Office. Do you wish to continue?",
   "retry": "Retry",
   "delete": "Delete",
   "share": "Share",
@@ -21,10 +16,14 @@
   "language": "Language",
   "selectLanguage": "Select language",
   "errorWithMessage": "Error: {message}",
-  "@errorWithMessage": { "placeholders": { "message": { "type": "String" } } },
-
+  "@errorWithMessage": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "splashTagline": "Ephemeral Data Room",
-
   "onboardingTitle1": "Zero-Knowledge Encryption",
   "onboardingBody1": "Your files are encrypted locally with AES-256 before uploading to the cloud. No one but you holds the keys.",
   "onboardingTitle2": "Ephemeral Links",
@@ -34,7 +33,6 @@
   "onboardingSkip": "SKIP",
   "onboardingStart": "START",
   "onboardingNext": "NEXT",
-
   "authTagline": "Your device is the sole custodian",
   "loginTab": "Sign In",
   "registerTab": "Create Account",
@@ -45,7 +43,13 @@
   "passwordLabel": "Password",
   "passwordRequired": "Password required",
   "passwordMinLength": "Minimum {min} characters",
-  "@passwordMinLength": { "placeholders": { "min": { "type": "int" } } },
+  "@passwordMinLength": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
   "confirmPasswordLabel": "Confirm password",
   "confirmPasswordRequired": "Confirmation required",
   "passwordsDoNotMatch": "Passwords do not match",
@@ -56,9 +60,20 @@
   "biometricLoginReason": "Verify your identity to complete sign-in",
   "biometricAuthCancelled": "Biometric authentication cancelled.",
   "freePlanInfo": "Free plan: {maxMB} MB max · {maxLinks} links/month · {maxHours}h duration",
-  "@freePlanInfo": { "placeholders": { "maxMB": { "type": "int" }, "maxLinks": { "type": "int" }, "maxHours": { "type": "int" } } },
+  "@freePlanInfo": {
+    "placeholders": {
+      "maxMB": {
+        "type": "int"
+      },
+      "maxLinks": {
+        "type": "int"
+      },
+      "maxHours": {
+        "type": "int"
+      }
+    }
+  },
   "termsNotice": "By signing up, you accept the data sovereignty terms. KRIPTONSHARE never stores your files in plain text.",
-
   "lockTitle": "KRIPTONSHARE locked",
   "lockSubtitle": "Use your fingerprint or face to unlock the app.",
   "lockVerifying": "Verifying...",
@@ -67,7 +82,6 @@
   "authCancelled": "Authentication cancelled.",
   "noSavedCredentials": "No saved credentials. Please sign in manually.",
   "invalidSavedCredentials": "Saved credentials are no longer valid. Please sign in manually.",
-
   "biometricSettingsTitle": "Biometrics Settings",
   "biometricIntro": "Protect access to your Data Rooms with your biometric identity.",
   "biometricNotAvailableTitle": "Biometrics not available",
@@ -94,8 +108,13 @@
   "biometricUnlockEnabledMsg": "Biometric unlock enabled. It will be requested after sign-in.",
   "biometricUnlockDisabledMsg": "Biometric unlock disabled.",
   "biometricQueryError": "Error checking biometrics: {message}",
-  "@biometricQueryError": { "placeholders": { "message": { "type": "String" } } },
-
+  "@biometricQueryError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "dashboardTab": "Dashboard",
   "linksTab": "Links",
   "profileTab": "Profile",
@@ -112,13 +131,30 @@
   "createFirstDataRoom": "Create your first secure Data Room",
   "expiresLabel": "Expires",
   "expiresInMinutes": "in {minutes}m",
-  "@expiresInMinutes": { "placeholders": { "minutes": { "type": "int" } } },
+  "@expiresInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "expiresInHours": "in {hours}h",
-  "@expiresInHours": { "placeholders": { "hours": { "type": "int" } } },
+  "@expiresInHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "expiresInDays": "in {days}d",
-  "@expiresInDays": { "placeholders": { "days": { "type": "int" } } },
+  "@expiresInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "analyticsTooltip": "Analytics",
-
   "newDataRoom": "New Data Room",
   "attachFile": "Attach File",
   "cameraToVault": "Camera to Vault",
@@ -127,17 +163,26 @@
   "passwordNotStoredHint": "Not stored in the cloud",
   "recipientEmailOptional": "Recipient email (optional)",
   "encryptAndGenerateLink": "Encrypt and generate link",
-  "pdfPreviewGeneratedNotice": "A secure PDF preview will be generated for the recipient",
   "dataRoomReadyBanner": "Data Room ready on Cloudflare",
-  "previewGenerationFailedNotice": "The file was shared, but the preview could not be generated. The recipient will be able to download it if you allow it.",
   "protectingFiles": "Protecting your files...",
   "encryptingAesStep": "> Encrypting with AES-256...",
-  "generatingPreviewStep": "> Generating secure preview...",
   "syncingR2Step": "> Syncing to R2...",
   "fileExceedsPlanLimit": "The file exceeds the {maxSize} limit of your plan",
-  "@fileExceedsPlanLimit": { "placeholders": { "maxSize": { "type": "String" } } },
+  "@fileExceedsPlanLimit": {
+    "placeholders": {
+      "maxSize": {
+        "type": "String"
+      }
+    }
+  },
   "captureExceedsPlanLimit": "The capture exceeds the {maxSize} limit of your plan",
-  "@captureExceedsPlanLimit": { "placeholders": { "maxSize": { "type": "String" } } },
+  "@captureExceedsPlanLimit": {
+    "placeholders": {
+      "maxSize": {
+        "type": "String"
+      }
+    }
+  },
   "cameraAccessCancelled": "Camera access cancelled or denied",
   "enterEncryptionPassword": "Enter an encryption password",
   "sessionExpired": "Session expired",
@@ -149,17 +194,29 @@
   "max48Hours": "48 hours (Max)",
   "max30Days": "Max 30 days",
   "daysUnit": "{count} Days",
-  "@daysUnit": { "placeholders": { "count": { "type": "int" } } },
+  "@daysUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "hoursUnit": "{count} Hours",
-  "@hoursUnit": { "placeholders": { "count": { "type": "int" } } },
-  "upsellTitle": "Sending without pauses?",
-  "upsellCta": "> Go Premium",
+  "@hoursUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "linkExpiresNotice": "This link expires in {hours}h.",
-  "@linkExpiresNotice": { "placeholders": { "hours": { "type": "int" } } },
-  "adSampleTitle": "IBM Cloud Security",
-  "adSampleBody": "Protect your company's infrastructure.",
-  "adSampleCta": "LEARN MORE",
-
+  "@linkExpiresNotice": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "searchByIdOrEmail": "Search by ID or email",
   "createLink": "Create link",
   "noSearchResults": "No results found",
@@ -169,30 +226,85 @@
   "linkRevoked": "Link revoked",
   "documentDeleted": "Document deleted",
   "shareMessageTemplate": "Secure document via KRIPTONSHARE\n\n{url}\n\nIf the link does not open the app, use:\n{appUrl}\n\nThis link expires in {hours}h.",
-  "@shareMessageTemplate": { "placeholders": { "url": { "type": "String" }, "appUrl": { "type": "String" }, "hours": { "type": "int" } } },
+  "@shareMessageTemplate": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      },
+      "appUrl": {
+        "type": "String"
+      },
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "hoursRemaining": "{hours}h remaining",
-  "@hoursRemaining": { "placeholders": { "hours": { "type": "int" } } },
+  "@hoursRemaining": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "daysRemaining": "{days}d remaining",
-  "@daysRemaining": { "placeholders": { "days": { "type": "int" } } },
+  "@daysRemaining": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "viewsCount": "{count} views",
-  "@viewsCount": { "placeholders": { "count": { "type": "int" } } },
+  "@viewsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "activeTag": "ACTIVE",
   "expiredTag": "EXPIRED",
   "expiresOn": "Expires: {date}",
-  "@expiresOn": { "placeholders": { "date": { "type": "String" } } },
-
+  "@expiresOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "expiredLinksTitle": "Expired links",
   "noExpiredLinks": "No expired links",
   "allDataRoomsActive": "All your Data Rooms are active",
   "sizeExpiredOn": "{size} · Expired on {date}",
-  "@sizeExpiredOn": { "placeholders": { "size": { "type": "String" }, "date": { "type": "String" } } },
-
+  "@sizeExpiredOn": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "linkIdMissing": "Link ID not provided",
   "linkInvalidExpiredRevoked": "Invalid, expired or revoked link",
   "recipientOnlyNotice": "This file was sent to {recipient}. Sign in with that account to access it.",
-  "@recipientOnlyNotice": { "placeholders": { "recipient": { "type": "String" } } },
+  "@recipientOnlyNotice": {
+    "placeholders": {
+      "recipient": {
+        "type": "String"
+      }
+    }
+  },
   "documentLoadError": "Error loading document: {error}",
-  "@documentLoadError": { "placeholders": { "error": { "type": "String" } } },
+  "@documentLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "invalidDecryptedFile": "The decrypted file is not valid. Check the password.",
   "incompleteFileData": "Incomplete or corrupt file data.",
   "wrongPasswordOrCorrupt": "Wrong password or corrupt file",
@@ -205,23 +317,42 @@
   "decryptingDocument": "Decrypting document...",
   "unexpectedError": "Unexpected error",
   "pdfOpenError": "Could not open the PDF:\n{error}",
-  "@pdfOpenError": { "placeholders": { "error": { "type": "String" } } },
+  "@pdfOpenError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "pdfViewerFallback": "The native viewer could not display this PDF. For security reasons it cannot be opened outside the app.",
   "decryptedVideo": "Decrypted video",
   "playVideo": "Play video",
   "protectedFormat": "Protected format",
   "officeNotViewable": "Microsoft Office documents and other formats cannot be viewed directly inside the app for security reasons.",
   "convertToPdfAdvice": "To share this content securely, convert it to PDF before uploading.",
-  "conversionPreviewFailed": "Could not generate the PDF preview (connection error to the conversion server).",
   "confidentialBanner": "KRIPTONSHARE | CONFIDENTIAL",
   "secureMode": "SECURE MODE",
   "backToHome": "Back to home",
   "unknownError": "Unknown error",
   "videoPlaybackError": "Could not play the video: {error}",
-  "@videoPlaybackError": { "placeholders": { "error": { "type": "String" } } },
+  "@videoPlaybackError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "fileSizeAndType": "{size} · {mimeType}",
-  "@fileSizeAndType": { "placeholders": { "size": { "type": "String" }, "mimeType": { "type": "String" } } },
-
+  "@fileSizeAndType": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      },
+      "mimeType": {
+        "type": "String"
+      }
+    }
+  },
   "profileTitle": "Profile",
   "yourCurrentPlan": "Your current plan",
   "maxFileSize": "Maximum file size",
@@ -229,20 +360,31 @@
   "notAvailable": "Not available",
   "monthlyLinks": "Monthly links",
   "maxDuration": "Maximum duration",
-   "hoursValue": "{count} hours",
-   "@hoursValue": { "placeholders": { "count": { "type": "int" } } },
-   "daysValue": "{count} days",
-   "@daysValue": { "placeholders": { "count": { "type": "int" } } },
-   "unlimited": "Unlimited",
+  "hoursValue": "{count} hours",
+  "@hoursValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "daysValue": "{count} days",
+  "@daysValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "unlimited": "Unlimited",
   "encryptionLabel": "Encryption",
   "watermarkLabel": "Watermark",
   "institutionalPassiveWatermark": "Institutional passive",
   "biometricsLabel": "Biometrics",
   "configureBiometrics": "Set up fingerprint or Face ID",
   "unlockFullCapacity": "Unlock full capacity",
-  "premiumBenefits": "100 MB per file, unlimited links, custom expiration, dynamic forensic watermark.",
+  "premiumBenefits": "100 MB per file · unlimited links · up to 30 days · 1 GB ephemeral storage · dynamic watermark",
   "managePremiumVault": "Manage Premium Vault",
-
   "analyticsTitle": "Analytics",
   "noDataAvailable": "No data available",
   "dataRoomsMetrics": "Your Data Rooms metrics",
@@ -261,34 +403,58 @@
   "topLinksEmptyHint": "Your most viewed links will appear here",
   "unnamedDocument": "Unnamed document",
   "viewsDownloadsSummary": "{views} views · {downloads} downloads",
-  "@viewsDownloadsSummary": { "placeholders": { "views": { "type": "int" }, "downloads": { "type": "int" } } },
+  "@viewsDownloadsSummary": {
+    "placeholders": {
+      "views": {
+        "type": "int"
+      },
+      "downloads": {
+        "type": "int"
+      }
+    }
+  },
   "noEventsForLink": "No events recorded for this link",
   "pageN": "Page {number}",
-  "@pageN": { "placeholders": { "number": { "type": "int" } } },
+  "@pageN": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
   "eventPageView": "Page view",
   "eventDownloadComplete": "Download completed",
   "eventDownloadStart": "Download started",
   "eventScreenshotBlocked": "Screenshot blocked",
-
-  "enterDataRoomPassword": "Enter the Data Room password",
-  "dataRoomNotFound": "Data Room not found",
-  "dataRoomPasswordLabel": "Data Room password",
-  "selectFileToDecrypt": "Select a file to decrypt it in RAM",
-  "encryptedFilesCount": "{count} Encrypted Files · {size}",
-  "@encryptedFilesCount": { "placeholders": { "count": { "type": "int" }, "size": { "type": "String" } } },
   "aes256Encrypted": "{size} · AES-256 encrypted",
-  "@aes256Encrypted": { "placeholders": { "size": { "type": "String" } } },
-  "officeDocsNotViewable": "Office documents cannot be viewed directly for security reasons.",
+  "@aes256Encrypted": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
   "confidentialUserWatermark": "{email} • CONFIDENTIAL",
-  "@confidentialUserWatermark": { "placeholders": { "email": { "type": "String" } } },
-
-  "storageManagementTitle": "Vault & Data Room Storage",
+  "@confidentialUserWatermark": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "premiumActive": "PREMIUM ACTIVE",
   "freePlanBadge": "FREE PLAN",
-  "dataRoomCapacity": "Data Room capacity",
   "storageUsedOf": "{used} / {max} Used",
-  "@storageUsedOf": { "placeholders": { "used": { "type": "String" }, "max": { "type": "String" } } },
-  "expandDataRoomAddon": "Expand Data Room (+1 GB for $5/month)",
+  "@storageUsedOf": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
   "subscriptionOptions": "Subscription Options",
   "monthlyPlan": "Monthly",
   "monthlyPrice": "$19.00 / month",
@@ -305,14 +471,16 @@
   "testPremiumDeactivated": "Test Premium deactivated",
   "noOfferingsAvailable": "No offerings available",
   "subscriptionActivated": "Subscription activated",
-  "noAddonsAvailable": "No add-ons available",
-  "storageExpanded": "Storage expanded",
-
   "remainingLinks": "{remaining} remaining",
-  "@remainingLinks": { "placeholders": { "remaining": { "type": "int" } } },
-   "freePlanLabel": "Free plan",
-   "premiumPlanLabel": "Premium plan",
-
+  "@remainingLinks": {
+    "placeholders": {
+      "remaining": {
+        "type": "int"
+      }
+    }
+  },
+  "freePlanLabel": "Free plan",
+  "premiumPlanLabel": "Premium plan",
   "errorUserNotAuthenticated": "User not authenticated",
   "errorQuotaExceeded": "Quota limit exceeded",
   "errorUploadNotAllowed": "Upload cannot be completed. Check your plan limits.",
@@ -323,61 +491,33 @@
   "errorInvalidKey": "Invalid key",
   "errorDecryptionFailed": "Decryption error",
   "errorDecryptionWithDetail": "Decryption error: {error}",
-  "@errorDecryptionWithDetail": { "placeholders": { "error": { "type": "String" } } },
-
-  "dataRoomExplorerTitle": "My Data Room Vault",
-  "premiumCapacityLabel": "PREMIUM DATA ROOM CAPACITY",
-  "storageUsedSummary": "{used} of {max} used ({percent}%)",
-  "@storageUsedSummary": { "placeholders": { "used": { "type": "String" }, "max": { "type": "String" }, "percent": { "type": "int" } } },
-  "expandVaultAddon": "Expand Vault (+1 GB for $5/month)",
+  "@errorDecryptionWithDetail": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "uploadFileMax": "Upload file (≤ 100 MB)",
-  "newVirtualFolder": "New virtual folder",
-  "batchUploadAction": "Batch upload to folder",
-  "batchUploadHint": "Multiple selection",
-  "virtualFoldersSection": "Virtual folders",
-  "unfiledFilesSection": "Individual files in vault",
-  "folderCardSummary": "{count} files · {size}",
-  "@folderCardSummary": { "placeholders": { "count": { "type": "int" }, "size": { "type": "String" } } },
-  "linkStatusActiveExpires": "Link: Active (expires in {days} days)",
-  "@linkStatusActiveExpires": { "placeholders": { "days": { "type": "int" } } },
   "sendAction": "Send",
   "sortByName": "Name",
   "sortByLastModified": "Last modified",
   "sortBySize": "Size",
   "gridView": "Grid view",
   "listView": "List view",
-  "emptyDataRoomTitle": "Your Data Room is empty",
-  "emptyDataRoomHint": "Upload encrypted files or create your first virtual folder",
-  "folderNameLabel": "Folder name",
-  "folderDescriptionLabel": "Description (optional)",
-  "createFolder": "Create folder",
-  "folderCreated": "Folder created",
-  "batchUploadTitle": "Batch upload",
-  "batchProgressSummary": "{completed} of {total} files uploaded",
-  "@batchProgressSummary": { "placeholders": { "completed": { "type": "int" }, "total": { "type": "int" } } },
-  "batchCompletedMessage": "{count} files encrypted in Data Room",
-  "@batchCompletedMessage": { "placeholders": { "count": { "type": "int" } } },
-  "batchFileSkippedTooLarge": "{filename} exceeds 100 MB and was skipped",
-  "@batchFileSkippedTooLarge": { "placeholders": { "filename": { "type": "String" } } },
-  "selectDestinationFolder": "Select destination folder",
-  "filesSelected": "{count} files selected",
-  "@filesSelected": { "placeholders": { "count": { "type": "int" } } },
-
-  "dataRoomLobbyTitle": "DATA ROOM: {name}",
-  "@dataRoomLobbyTitle": { "placeholders": { "name": { "type": "String" } } },
   "linkExpiresInLabel": "Link expires in: {days} days",
-  "@linkExpiresInLabel": { "placeholders": { "days": { "type": "int" } } },
+  "@linkExpiresInLabel": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "recipientEmailRequiredTitle": "Enter your email to access the documents",
   "dataRoomAccessAuditNotice": "Enter your email to continue. Access will be audited.",
   "accessAction": "Access",
-  "availableDocumentsSection": "Documents available in the folder",
   "encryptedAtOrigin": "Encrypted at source",
-  "openAndDecryptInRam": "Open and decrypt in RAM",
-  "ramDecryptionNotice": "Documents are decrypted exclusively in volatile RAM and are covered by active read auditing.",
-
-  "shareSheetTitle": "Share securely",
   "shareSingleFile": "Single file",
-  "shareFullFolder": "Full folder",
   "requireRecipientEmailLabel": "Require recipient email",
   "requireRecipientEmailSubtitle": "The recipient must enter their email before accessing",
   "enableWatermarkLabel": "Dynamic watermark",
@@ -385,14 +525,130 @@
   "expirationPremiumNotice": "Premium: links can last up to 30 days",
   "copyLink": "Copy link",
   "shareQrCode": "Share QR code",
-
   "errorExpirationMustBeFuture": "The expiration date must be in the future.",
   "errorExpirationPremiumMax": "Premium: the maximum link expiration is 30 days.",
   "errorExpirationFreemiumMax": "Free plan: the maximum link expiration is 48 hours.",
   "expirationPremiumValid": "Valid Premium expiration (≤ 30 days).",
   "expirationFreemiumValid": "Valid Free expiration (≤ 48 h).",
-
-  "eventLobbyEnter": "Lobby entered",
-  "eventFileOpen": "File opened",
-  "eventLobbyExit": "Lobby exited"
+  "unlockPremiumTitle": "Unlock Premium",
+  "paywallBody": "Upload larger files, create unlimited links, and keep your files longer.",
+  "close": "Close",
+  "popular": "POPULAR",
+  "premiumPlanName": "Premium",
+  "businessPlanName": "Business",
+  "monthlyLabel": "Monthly",
+  "yearlyLabel": "Yearly",
+  "yearlySaveLabel": "Save {percent}%",
+  "@yearlySaveLabel": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "subscribeToBusiness": "Subscribe to Business",
+  "trialBannerTitle": "Start your free trial",
+  "trialBannerBody": "Try Premium free for 7 days. Cancel anytime.",
+  "featureFileSize": "Up to {size} MB per file",
+  "@featureFileSize": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "featureStorage": "{storage} storage",
+  "@featureStorage": {
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "featureLinkDuration": "Links up to {days} days",
+  "@featureLinkDuration": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "featureActiveLinks": "Up to {count} active links",
+  "@featureActiveLinks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "featureActiveLinksUnlimited": "Unlimited active links",
+  "featureNoAds": "No ads",
+  "unsupportedFormatTitle": "Unsupported format",
+  "unsupportedFormatBody": "For security, KRIPTONSHARE only accepts files in these formats: {formats}. Convert your document to PDF before sharing it.",
+  "@unsupportedFormatBody": {
+    "placeholders": {
+      "formats": {
+        "type": "String"
+      }
+    }
+  },
+  "unsupportedViewerBody": "This format cannot be viewed safely inside the app. Accepted formats: {formats}.",
+  "@unsupportedViewerBody": {
+    "placeholders": {
+      "formats": {
+        "type": "String"
+      }
+    }
+  },
+  "plansTitle": "Plans & storage",
+  "trialBanner": "Try Premium: {days} days left",
+  "@trialBanner": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "trialPromo": "14 days of Premium free. No card required.",
+  "trialExpiredTitle": "Your Premium trial has ended",
+  "trialExpiredBody": "You are back on the free plan: 20 MB per file, 20 links a month and 7-day expiry. Keep 100 MB, unlimited links and 30 days with Premium.",
+  "businessBenefits": "200 MB per file · 5 GB total · links up to 60 days · everything in Premium · priority support · custom branding in the viewer (coming soon)",
+  "premiumPriceMonthly": "$12.99/month",
+  "premiumPriceAnnual": "$103.99/year",
+  "premiumAnnualSavings": "4 months free (33% savings)",
+  "businessPriceMonthly": "$29.99/month",
+  "businessPriceAnnual": "$239.99/year",
+  "businessAnnualSavings": "Save 33%",
+  "paywallFileSizeTitle": "File too large",
+  "paywallFileSizeBody": "Your plan allows {maxSize} per file. With Premium you can share up to 100 MB.",
+  "@paywallFileSizeBody": {
+    "placeholders": {
+      "maxSize": {
+        "type": "String"
+      }
+    }
+  },
+  "paywallActiveLinksTitle": "Active links limit",
+  "paywallActiveLinksBody": "The free plan allows 3 active links at a time. With Premium they are unlimited.",
+  "paywallMonthlyQuotaTitle": "Monthly limit reached",
+  "paywallMonthlyQuotaBody": "You have created 20 links this month. With Premium they are unlimited.",
+  "paywallDurationTitle": "Free plan maximum duration",
+  "paywallDurationBody": "Free links last up to 7 days. With Premium, up to 30 days.",
+  "paywallStorageTitle": "Storage full",
+  "paywallStorageBody": "You have used your {quota} of storage. Delete active links to free up space or upgrade your plan.",
+  "@paywallStorageBody": {
+    "placeholders": {
+      "quota": {
+        "type": "String"
+      }
+    }
+  },
+  "paywallStorageBodyBusiness": "You have used all 5 GB. Delete or expire active links to free up space.",
+  "paywallViewPlans": "View plans",
+  "paywallNotNow": "Not now",
+  "max7Days": "7 days (Max)",
+  "max60Days": "60 days (Max)",
+  "ephemeralStorageLabel": "Total ephemeral storage",
+  "businessBadge": "BUSINESS",
+  "businessPlanLabel": "Business Plan"
 }

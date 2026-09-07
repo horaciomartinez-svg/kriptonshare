@@ -18,13 +18,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get accept => 'Akzeptieren';
 
   @override
-  String get msOfficeWarningTitle => 'Konvertierungswarnung';
-
-  @override
-  String get msOfficeWarningBody =>
-      'Sie sind dabei, ein MS Office-Dokument in ein PDF zu konvertieren. Dieser Vorgang kann einige Minuten dauern. Es wird empfohlen, diese Option für Dateien unter 5 MB zu verwenden. Größere Dateien sollten vorzugsweise mit MS Office konvertiert werden. Möchten Sie fortfahren?';
-
-  @override
   String get retry => 'Erneut versuchen';
 
   @override
@@ -379,24 +372,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get encryptAndGenerateLink => 'Verschlüsseln und Link generieren';
 
   @override
-  String get pdfPreviewGeneratedNotice =>
-      'Eine sichere PDF-Vorschau wird für den Empfänger erstellt';
-
-  @override
   String get dataRoomReadyBanner => 'Data Room bereit auf Cloudflare';
-
-  @override
-  String get previewGenerationFailedNotice =>
-      'Die Datei wurde geteilt, aber die Vorschau konnte nicht erstellt werden. Der Empfänger kann sie herunterladen, wenn Sie es erlauben.';
 
   @override
   String get protectingFiles => 'Ihre Dateien werden geschützt...';
 
   @override
   String get encryptingAesStep => '> Verschlüsselung mit AES-256...';
-
-  @override
-  String get generatingPreviewStep => '> Sichere Vorschau wird erstellt...';
 
   @override
   String get syncingR2Step => '> Synchronisierung mit R2...';
@@ -454,25 +436,9 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get upsellTitle => 'Senden ohne Pausen?';
-
-  @override
-  String get upsellCta => '> Zu Premium wechseln';
-
-  @override
   String linkExpiresNotice(int hours) {
     return 'Dieser Link läuft in $hours Std. ab.';
   }
-
-  @override
-  String get adSampleTitle => 'IBM Cloud Security';
-
-  @override
-  String get adSampleBody =>
-      'Schützen Sie die Infrastruktur Ihres Unternehmens.';
-
-  @override
-  String get adSampleCta => 'MEHR ERFAHREN';
 
   @override
   String get searchByIdOrEmail => 'Nach ID oder E-Mail suchen';
@@ -628,10 +594,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Um diesen Inhalt sicher zu teilen, konvertieren Sie ihn vor dem Hochladen in PDF.';
 
   @override
-  String get conversionPreviewFailed =>
-      'Die PDF-Vorschau konnte nicht erstellt werden (Verbindungsfehler zum Konvertierungsserver).';
-
-  @override
   String get confidentialBanner => 'KRIPTONSHARE | VERTRAULICH';
 
   @override
@@ -707,7 +669,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get premiumBenefits =>
-      '100 MB pro Datei, unbegrenzte Links, individueller Ablauf, dynamisches forensisches Wasserzeichen.';
+      '100 MB pro Datei • unbegrenzte Links • bis zu 30 Tage • 1 GB temporärer Speicher • dynamisches Wasserzeichen';
 
   @override
   String get managePremiumVault => 'Premium-Tresor verwalten';
@@ -790,40 +752,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get eventScreenshotBlocked => 'Screenshot blockiert';
 
   @override
-  String get enterDataRoomPassword =>
-      'Geben Sie das Passwort des Data Rooms ein';
-
-  @override
-  String get dataRoomNotFound => 'Data Room nicht gefunden';
-
-  @override
-  String get dataRoomPasswordLabel => 'Data-Room-Passwort';
-
-  @override
-  String get selectFileToDecrypt =>
-      'Wählen Sie eine Datei, um sie im RAM zu entschlüsseln';
-
-  @override
-  String encryptedFilesCount(int count, String size) {
-    return '$count verschlüsselte Dateien · $size';
-  }
-
-  @override
   String aes256Encrypted(String size) {
     return '$size · AES-256-verschlüsselt';
   }
 
   @override
-  String get officeDocsNotViewable =>
-      'Office-Dokumente können aus Sicherheitsgründen nicht direkt angezeigt werden.';
-
-  @override
   String confidentialUserWatermark(String email) {
     return '$email • VERTRAULICH';
   }
-
-  @override
-  String get storageManagementTitle => 'Tresor & Data-Room-Speicher';
 
   @override
   String get premiumActive => 'PREMIUM AKTIV';
@@ -832,16 +768,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get freePlanBadge => 'KOSTENLOSER PLAN';
 
   @override
-  String get dataRoomCapacity => 'Kapazität des Data Rooms';
-
-  @override
   String storageUsedOf(String used, String max) {
     return '$used / $max belegt';
   }
-
-  @override
-  String get expandDataRoomAddon =>
-      'Data Room erweitern (+1 GB für 5 \$/Monat)';
 
   @override
   String get subscriptionOptions => 'Abonnement-Optionen';
@@ -893,12 +822,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get subscriptionActivated => 'Abonnement aktiviert';
 
   @override
-  String get noAddonsAvailable => 'Keine Add-ons verfügbar';
-
-  @override
-  String get storageExpanded => 'Speicher erweitert';
-
-  @override
   String remainingLinks(int remaining) {
     return '$remaining verbleibend';
   }
@@ -944,46 +867,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get dataRoomExplorerTitle => 'Mein Data-Room-Tresor';
-
-  @override
-  String get premiumCapacityLabel => 'PREMIUM-DATA-ROOM-KAPAZITÄT';
-
-  @override
-  String storageUsedSummary(String used, String max, int percent) {
-    return '$used von $max belegt ($percent %)';
-  }
-
-  @override
-  String get expandVaultAddon => 'Tresor erweitern (+1 GB für 5 \$/Monat)';
-
-  @override
   String get uploadFileMax => 'Datei hochladen (≤ 100 MB)';
-
-  @override
-  String get newVirtualFolder => 'Neuer virtueller Ordner';
-
-  @override
-  String get batchUploadAction => 'Stapel-Upload in Ordner';
-
-  @override
-  String get batchUploadHint => 'Mehrfachauswahl';
-
-  @override
-  String get virtualFoldersSection => 'Virtuelle Ordner';
-
-  @override
-  String get unfiledFilesSection => 'Einzelne Dateien im Tresor';
-
-  @override
-  String folderCardSummary(int count, String size) {
-    return '$count Dateien · $size';
-  }
-
-  @override
-  String linkStatusActiveExpires(int days) {
-    return 'Link: Aktiv (läuft in $days Tagen ab)';
-  }
 
   @override
   String get sendAction => 'Senden';
@@ -1004,56 +888,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get listView => 'Listenansicht';
 
   @override
-  String get emptyDataRoomTitle => 'Ihr Data Room ist leer';
-
-  @override
-  String get emptyDataRoomHint =>
-      'Laden Sie verschlüsselte Dateien hoch oder erstellen Sie Ihren ersten virtuellen Ordner';
-
-  @override
-  String get folderNameLabel => 'Ordnername';
-
-  @override
-  String get folderDescriptionLabel => 'Beschreibung (optional)';
-
-  @override
-  String get createFolder => 'Ordner erstellen';
-
-  @override
-  String get folderCreated => 'Ordner erstellt';
-
-  @override
-  String get batchUploadTitle => 'Stapel-Upload';
-
-  @override
-  String batchProgressSummary(int completed, int total) {
-    return '$completed von $total Dateien hochgeladen';
-  }
-
-  @override
-  String batchCompletedMessage(int count) {
-    return '$count Dateien im Data Room verschlüsselt';
-  }
-
-  @override
-  String batchFileSkippedTooLarge(String filename) {
-    return '$filename überschreitet 100 MB und wurde übersprungen';
-  }
-
-  @override
-  String get selectDestinationFolder => 'Zielordner auswählen';
-
-  @override
-  String filesSelected(int count) {
-    return '$count Dateien ausgewählt';
-  }
-
-  @override
-  String dataRoomLobbyTitle(String name) {
-    return 'DATA ROOM: $name';
-  }
-
-  @override
   String linkExpiresInLabel(int days) {
     return 'Link läuft ab in: $days Tagen';
   }
@@ -1070,26 +904,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get accessAction => 'Zugreifen';
 
   @override
-  String get availableDocumentsSection => 'Im Ordner verfügbare Dokumente';
-
-  @override
   String get encryptedAtOrigin => 'An der Quelle verschlüsselt';
 
   @override
-  String get openAndDecryptInRam => 'Im RAM öffnen und entschlüsseln';
-
-  @override
-  String get ramDecryptionNotice =>
-      'Dokumente werden ausschließlich im flüchtigen RAM entschlüsselt und unterliegen einer aktiven Leseprotokollierung.';
-
-  @override
-  String get shareSheetTitle => 'Sicher teilen';
-
-  @override
   String get shareSingleFile => 'Einzelne Datei';
-
-  @override
-  String get shareFullFolder => 'Gesamter Ordner';
 
   @override
   String get requireRecipientEmailLabel => 'Empfänger-E-Mail erforderlich';
@@ -1135,11 +953,184 @@ class AppLocalizationsDe extends AppLocalizations {
       'Gültiger kostenloser Ablauf (≤ 48 Std.).';
 
   @override
-  String get eventLobbyEnter => 'Lobby betreten';
+  String get unlockPremiumTitle => 'Premium freischalten';
 
   @override
-  String get eventFileOpen => 'Datei geöffnet';
+  String get paywallBody =>
+      'Laden Sie größere Dateien hoch, erstellen Sie unbegrenzte Links und behalten Sie Ihre Dateien länger.';
 
   @override
-  String get eventLobbyExit => 'Lobby verlassen';
+  String get close => 'Schließen';
+
+  @override
+  String get popular => 'BELIEBT';
+
+  @override
+  String get premiumPlanName => 'Premium';
+
+  @override
+  String get businessPlanName => 'Business';
+
+  @override
+  String get monthlyLabel => 'Monatlich';
+
+  @override
+  String get yearlyLabel => 'Jährlich';
+
+  @override
+  String yearlySaveLabel(int percent) {
+    return '$percent % sparen';
+  }
+
+  @override
+  String get subscribeToBusiness => 'Business abonnieren';
+
+  @override
+  String get trialBannerTitle => 'Kostenlose Testphase starten';
+
+  @override
+  String get trialBannerBody =>
+      '14 Tage Premium kostenlos testen. Jederzeit kündbar.';
+
+  @override
+  String featureFileSize(int size) {
+    return 'Bis zu $size MB pro Datei';
+  }
+
+  @override
+  String featureStorage(String storage) {
+    return '$storage Speicher';
+  }
+
+  @override
+  String featureLinkDuration(int days) {
+    return 'Links bis zu $days Tagen';
+  }
+
+  @override
+  String featureActiveLinks(int count) {
+    return 'Bis zu $count aktive Links';
+  }
+
+  @override
+  String get featureActiveLinksUnlimited => 'Unbegrenzte aktive Links';
+
+  @override
+  String get featureNoAds => 'Keine Werbung';
+
+  @override
+  String get unsupportedFormatTitle => 'Nicht unterstütztes Format';
+
+  @override
+  String unsupportedFormatBody(String formats) {
+    return 'Aus Sicherheitsgründen akzeptiert KRIPTONSHARE nur Dateien in diesen Formaten: $formats. Konvertieren Sie Ihr Dokument in PDF, bevor Sie es teilen.';
+  }
+
+  @override
+  String unsupportedViewerBody(String formats) {
+    return 'Dieses Format kann nicht sicher in der App angezeigt werden. Akzeptierte Formate: $formats.';
+  }
+
+  @override
+  String get plansTitle => 'Tarife und Speicher';
+
+  @override
+  String trialBanner(int days) {
+    return 'Premium testen: $days Tage übrig';
+  }
+
+  @override
+  String get trialPromo =>
+      '14 Tage Premium kostenlos. Keine Karte erforderlich.';
+
+  @override
+  String get trialExpiredTitle => 'Ihre Premium-Testphase ist beendet';
+
+  @override
+  String get trialExpiredBody =>
+      'Sie sind zurück im kostenlosen Tarif: 20 MB pro Datei, 20 Links pro Monat und Ablauf nach 7 Tagen. Behalten Sie 100 MB, unbegrenzte Links und 30 Tage mit Premium.';
+
+  @override
+  String get businessBenefits =>
+      '200 MB pro Datei • 5 GB gesamt • Links bis zu 60 Tage • alles aus Premium • Prioritäts-Support • eigenes Branding im Viewer (in Kürze)';
+
+  @override
+  String get premiumPriceMonthly => '12,99 \$/Monat';
+
+  @override
+  String get premiumPriceAnnual => '103,99 \$/Jahr';
+
+  @override
+  String get premiumAnnualSavings => '4 Monate gratis (33 % Ersparnis)';
+
+  @override
+  String get businessPriceMonthly => '29,99 \$/Monat';
+
+  @override
+  String get businessPriceAnnual => '239,99 \$/Jahr';
+
+  @override
+  String get businessAnnualSavings => '33 % sparen';
+
+  @override
+  String get paywallFileSizeTitle => 'Datei zu groß';
+
+  @override
+  String paywallFileSizeBody(String maxSize) {
+    return 'Ihr Tarif erlaubt $maxSize pro Datei. Mit Premium können Sie bis zu 100 MB teilen.';
+  }
+
+  @override
+  String get paywallActiveLinksTitle => 'Grenze für aktive Links';
+
+  @override
+  String get paywallActiveLinksBody =>
+      'Der kostenlose Tarif erlaubt 3 gleichzeitig aktive Links. Mit Premium sind sie unbegrenzt.';
+
+  @override
+  String get paywallMonthlyQuotaTitle => 'Monatslimit erreicht';
+
+  @override
+  String get paywallMonthlyQuotaBody =>
+      'Sie haben diesen Monat 20 Links erstellt. Mit Premium sind sie unbegrenzt.';
+
+  @override
+  String get paywallDurationTitle => 'Maximale Dauer im kostenlosen Tarif';
+
+  @override
+  String get paywallDurationBody =>
+      'Kostenlose Links gelten bis zu 7 Tage. Mit Premium bis zu 30.';
+
+  @override
+  String get paywallStorageTitle => 'Speicher voll';
+
+  @override
+  String paywallStorageBody(String quota) {
+    return 'Sie haben $quota Speicher verbraucht. Löschen Sie aktive Links, um Platz zu schaffen, oder upgraden Sie Ihren Tarif.';
+  }
+
+  @override
+  String get paywallStorageBodyBusiness =>
+      'Sie haben alle 5 GB verbraucht. Löschen Sie aktive Links oder lassen Sie sie ablaufen, um Platz zu schaffen.';
+
+  @override
+  String get paywallViewPlans => 'Tarife ansehen';
+
+  @override
+  String get paywallNotNow => 'Später';
+
+  @override
+  String get max7Days => '7 Tage (max.)';
+
+  @override
+  String get max60Days => '60 Tage (max.)';
+
+  @override
+  String get ephemeralStorageLabel => 'Gesamter temporärer Speicher';
+
+  @override
+  String get businessBadge => 'BUSINESS';
+
+  @override
+  String get businessPlanLabel => 'Business-Tarif';
 }

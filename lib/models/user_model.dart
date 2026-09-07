@@ -8,6 +8,7 @@ class KriptonUser {
   final String subscriptionTier;
   final int monthlyLinksGenerated;
   final DateTime? subscriptionExpiresAt;
+  final DateTime? trialEndsAt;
   final DateTime createdAt;
   final DateTime? lastLoginAt;
   final int totalStorageUsedBytes;
@@ -22,6 +23,7 @@ class KriptonUser {
     this.subscriptionTier = 'free',
     this.monthlyLinksGenerated = 0,
     this.subscriptionExpiresAt,
+    this.trialEndsAt,
     required this.createdAt,
     this.lastLoginAt,
     this.totalStorageUsedBytes = 0,
@@ -44,6 +46,9 @@ class KriptonUser {
       subscriptionExpiresAt: json['subscription_expires_at'] != null
           ? DateTime.parse(json['subscription_expires_at'] as String)
           : null,
+      trialEndsAt: json['trial_ends_at'] != null
+          ? DateTime.parse(json['trial_ends_at'] as String)
+          : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       lastLoginAt: json['last_login_at'] != null
           ? DateTime.parse(json['last_login_at'] as String)
@@ -63,6 +68,7 @@ class KriptonUser {
       'subscription_tier': subscriptionTier,
       'monthly_links_generated': monthlyLinksGenerated,
       'subscription_expires_at': subscriptionExpiresAt?.toIso8601String(),
+      'trial_ends_at': trialEndsAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'last_login_at': lastLoginAt?.toIso8601String(),
       'total_storage_used_bytes': totalStorageUsedBytes,
@@ -71,19 +77,71 @@ class KriptonUser {
     };
   }
 
-  bool get isFree => subscriptionTier == 'free';
-  bool get isPremium => subscriptionTier == 'premium' || subscriptionTier == 'enterprise';
+  KriptonUser copyWith({
+    String? id,
+    String? email,
+    String? displayName,
+    String? avatarUrl,
+    String? subscriptionTier,
+    int? monthlyLinksGenerated,
+    DateTime? subscriptionExpiresAt,
+    DateTime? trialEndsAt,
+    DateTime? createdAt,
+    DateTime? lastLoginAt,
+    int? totalStorageUsedBytes,
+    int? maxStoragePremiumBytes,
+    int? maxStorageBytes,
+  }) {
+    return KriptonUser(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      displayName: displayName ?? this.displayName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      subscriptionTier: subscriptionTier ?? this.subscriptionTier,
+      monthlyLinksGenerated: monthlyLinksGenerated ?? this.monthlyLinksGenerated,
+      subscriptionExpiresAt: subscriptionExpiresAt ?? this.subscriptionExpiresAt,
+      trialEndsAt: trialEndsAt ?? this.trialEndsAt,
+      createdAt: createdAt ?? this.createdAt,
+      lastLoginAt: lastLoginAt ?? this.lastLoginAt,
+      totalStorageUsedBytes: totalStorageUsedBytes ?? this.totalStorageUsedBytes,
+      maxStoragePremiumBytes: maxStoragePremiumBytes ?? this.maxStoragePremiumBytes,
+      maxStorageBytes: maxStorageBytes ?? this.maxStorageBytes,
+    );
+  }
+
+  bool get _isTrialActive => trialEndsAt != null && trialEndsAt!.isAfter(DateTime.now());
+
+  String get effectiveTier {
+    if (subscriptionTier == 'business' || subscriptionTier == 'enterprise') {
+      return 'business';
+    }
+    if (subscriptionTier == 'premium' || _isTrialActive) {
+      return 'premium';
+    }
+    return 'free';
+  }
+
+  bool get isFree => effectiveTier == 'free';
+  bool get isPremium => effectiveTier == 'premium' || effectiveTier == 'business';
 
   int get linksRemaining => (AppConstants.maxLinksPerMonth - monthlyLinksGenerated).clamp(0, AppConstants.maxLinksPerMonth);
   bool get canCreateLink => isPremium || monthlyLinksGenerated < AppConstants.maxLinksPerMonth;
 
-  int get maxFileSizeBytes => isPremium
-      ? AppConstants.premiumMaxFileSizeBytes
-      : AppConstants.freeMaxFileSizeBytes;
+  int get maxFileSizeBytes {
+    return switch (effectiveTier) {
+      'business' => AppConstants.businessMaxFileSizeBytes,
+      'premium' => AppConstants.premiumMaxFileSizeBytes,
+      _ => AppConstants.freeMaxFileSizeBytes,
+    };
+  }
 
-  int get maxDurationHours => isPremium
-      ? AppConstants.premiumMaxDurationHours
-      : AppConstants.freeMaxDurationHours;
+  int get maxDurationHours {
+    return switch (effectiveTier) {
+      'business' => AppConstants.businessMaxDurationHours,
+      'premium' => AppConstants.premiumMaxDurationHours,
+      _ => AppConstants.freeMaxDurationHours,
+    };
+  }
 
   int get remainingPremiumStorageBytes => isPremium
       ? (maxStorageBytes - totalStorageUsedBytes).clamp(0, maxStorageBytes)

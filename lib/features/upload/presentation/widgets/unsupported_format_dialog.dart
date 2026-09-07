@@ -1,0 +1,79 @@
+import 'package:flutter/material.dart';
+import '../../../../l10n/app_localizations.dart';
+import 'package:kriptonshare/utils/supported_formats.dart';
+import 'package:kriptonshare/utils/theme.dart';
+
+class UnsupportedFormatDialog extends StatelessWidget {
+  const UnsupportedFormatDialog({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Dialog(
+      backgroundColor: KriptonTheme.ink,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: KriptonTheme.cardBorder, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.block,
+              size: 48,
+              color: KriptonTheme.alertRed,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.unsupportedFormatTitle,
+              style: const TextStyle(
+                color: KriptonTheme.platinum,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Inter',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              l10n.unsupportedFormatBody(SupportedFormats.viewableListForHumans),
+              style: const TextStyle(
+                color: KriptonTheme.silver,
+                fontSize: 14,
+                height: 1.5,
+                fontFamily: 'Inter',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: KriptonTheme.electricLime,
+                  foregroundColor: KriptonTheme.charcoalBlack,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  l10n.accept,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

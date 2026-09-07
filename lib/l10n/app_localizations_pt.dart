@@ -18,13 +18,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get accept => 'Aceitar';
 
   @override
-  String get msOfficeWarningTitle => 'Aviso de Conversão';
-
-  @override
-  String get msOfficeWarningBody =>
-      'Você está prestes a converter um documento do MS Office para PDF. Este processo pode levar vários minutos. Recomenda-se usar esta opção para arquivos menores que 5 MB. Para arquivos maiores, é preferível convertê-los para PDF usando o MS Office. Deseja continuar?';
-
-  @override
   String get retry => 'Tentar novamente';
 
   @override
@@ -373,24 +366,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get encryptAndGenerateLink => 'Criptografar e gerar link';
 
   @override
-  String get pdfPreviewGeneratedNotice =>
-      'Uma visualização segura em PDF será gerada para o destinatário';
-
-  @override
   String get dataRoomReadyBanner => 'Data Room pronto na Cloudflare';
-
-  @override
-  String get previewGenerationFailedNotice =>
-      'O arquivo foi compartilhado, mas a visualização não pôde ser gerada. O destinatário poderá baixá-lo se você permitir.';
 
   @override
   String get protectingFiles => 'Protegendo seus arquivos...';
 
   @override
   String get encryptingAesStep => '> Criptografando com AES-256...';
-
-  @override
-  String get generatingPreviewStep => '> Gerando visualização segura...';
 
   @override
   String get syncingR2Step => '> Sincronizando com o R2...';
@@ -446,24 +428,9 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get upsellTitle => 'Envios sem pausas?';
-
-  @override
-  String get upsellCta => '> Vá para o Premium';
-
-  @override
   String linkExpiresNotice(int hours) {
     return 'Este link expira em ${hours}h.';
   }
-
-  @override
-  String get adSampleTitle => 'IBM Cloud Security';
-
-  @override
-  String get adSampleBody => 'Proteja a infraestrutura da sua empresa.';
-
-  @override
-  String get adSampleCta => 'SAIBA MAIS';
 
   @override
   String get searchByIdOrEmail => 'Buscar por ID ou e-mail';
@@ -616,10 +583,6 @@ class AppLocalizationsPt extends AppLocalizations {
       'Para compartilhar este conteúdo com segurança, converta-o para PDF antes de enviá-lo.';
 
   @override
-  String get conversionPreviewFailed =>
-      'Não foi possível gerar a prévia em PDF (erro de conexão com o servidor de conversão).';
-
-  @override
   String get confidentialBanner => 'KRIPTONSHARE | CONFIDENCIAL';
 
   @override
@@ -695,7 +658,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get premiumBenefits =>
-      '100 MB por arquivo, links ilimitados, expiração personalizável, marca d\'água forense dinâmica.';
+      '100 MB por arquivo • links ilimitados • até 30 dias • 1 GB de armazenamento efêmero • marca d’água dinâmica';
 
   @override
   String get managePremiumVault => 'Gerenciar Vault Premium';
@@ -777,39 +740,14 @@ class AppLocalizationsPt extends AppLocalizations {
   String get eventScreenshotBlocked => 'Captura de tela bloqueada';
 
   @override
-  String get enterDataRoomPassword => 'Digite a senha do Data Room';
-
-  @override
-  String get dataRoomNotFound => 'Data Room não encontrado';
-
-  @override
-  String get dataRoomPasswordLabel => 'Senha do Data Room';
-
-  @override
-  String get selectFileToDecrypt =>
-      'Selecione um arquivo para descriptografá-lo na memória RAM';
-
-  @override
-  String encryptedFilesCount(int count, String size) {
-    return '$count Arquivos Criptografados · $size';
-  }
-
-  @override
   String aes256Encrypted(String size) {
     return '$size · Criptografado AES-256';
   }
 
   @override
-  String get officeDocsNotViewable =>
-      'Documentos do Office não podem ser visualizados diretamente por segurança.';
-
-  @override
   String confidentialUserWatermark(String email) {
     return '$email • CONFIDENCIAL';
   }
-
-  @override
-  String get storageManagementTitle => 'Vault e Armazenamento do Data Room';
 
   @override
   String get premiumActive => 'PREMIUM ATIVO';
@@ -818,15 +756,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get freePlanBadge => 'PLANO GRATUITO';
 
   @override
-  String get dataRoomCapacity => 'Capacidade do Data Room';
-
-  @override
   String storageUsedOf(String used, String max) {
     return '$used / $max Usados';
   }
-
-  @override
-  String get expandDataRoomAddon => 'Expandir Data Room (+1 GB por US\$ 5/mês)';
 
   @override
   String get subscriptionOptions => 'Opções de Assinatura';
@@ -878,12 +810,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get subscriptionActivated => 'Assinatura ativada';
 
   @override
-  String get noAddonsAvailable => 'Não há complementos disponíveis';
-
-  @override
-  String get storageExpanded => 'Armazenamento ampliado';
-
-  @override
   String remainingLinks(int remaining) {
     return '$remaining restantes';
   }
@@ -929,46 +855,7 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get dataRoomExplorerTitle => 'Meu Vault Data Room';
-
-  @override
-  String get premiumCapacityLabel => 'CAPACIDADE DO DATA ROOM PREMIUM';
-
-  @override
-  String storageUsedSummary(String used, String max, int percent) {
-    return '$used de $max usados ($percent%)';
-  }
-
-  @override
-  String get expandVaultAddon => 'Expandir Vault (+1 GB por US\$ 5/mês)';
-
-  @override
   String get uploadFileMax => 'Enviar arquivo (≤ 100 MB)';
-
-  @override
-  String get newVirtualFolder => 'Nova pasta virtual';
-
-  @override
-  String get batchUploadAction => 'Envio em lote para a pasta';
-
-  @override
-  String get batchUploadHint => 'Seleção em lote';
-
-  @override
-  String get virtualFoldersSection => 'Pastas virtuais';
-
-  @override
-  String get unfiledFilesSection => 'Arquivos individuais no Vault';
-
-  @override
-  String folderCardSummary(int count, String size) {
-    return '$count arquivos · $size';
-  }
-
-  @override
-  String linkStatusActiveExpires(int days) {
-    return 'Link: Ativo (expira em $days dias)';
-  }
 
   @override
   String get sendAction => 'Enviar';
@@ -989,56 +876,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get listView => 'Visualização em lista';
 
   @override
-  String get emptyDataRoomTitle => 'Seu Data Room está vazio';
-
-  @override
-  String get emptyDataRoomHint =>
-      'Envie arquivos criptografados ou crie sua primeira pasta virtual';
-
-  @override
-  String get folderNameLabel => 'Nome da pasta';
-
-  @override
-  String get folderDescriptionLabel => 'Descrição (opcional)';
-
-  @override
-  String get createFolder => 'Criar pasta';
-
-  @override
-  String get folderCreated => 'Pasta criada';
-
-  @override
-  String get batchUploadTitle => 'Envio em lote';
-
-  @override
-  String batchProgressSummary(int completed, int total) {
-    return '$completed de $total arquivos enviados';
-  }
-
-  @override
-  String batchCompletedMessage(int count) {
-    return '$count arquivos criptografados no Data Room';
-  }
-
-  @override
-  String batchFileSkippedTooLarge(String filename) {
-    return '$filename excede 100 MB e foi ignorado';
-  }
-
-  @override
-  String get selectDestinationFolder => 'Selecione a pasta de destino';
-
-  @override
-  String filesSelected(int count) {
-    return '$count arquivos selecionados';
-  }
-
-  @override
-  String dataRoomLobbyTitle(String name) {
-    return 'DATA ROOM: $name';
-  }
-
-  @override
   String linkExpiresInLabel(int days) {
     return 'Link expira em: $days dias';
   }
@@ -1055,26 +892,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get accessAction => 'Acessar';
 
   @override
-  String get availableDocumentsSection => 'Documentos disponíveis na pasta';
-
-  @override
   String get encryptedAtOrigin => 'Criptografado na origem';
 
   @override
-  String get openAndDecryptInRam => 'Abrir e descriptografar na memória RAM';
-
-  @override
-  String get ramDecryptionNotice =>
-      'Os documentos são descriptografados exclusivamente em RAM volátil e contam com auditoria de leitura ativa.';
-
-  @override
-  String get shareSheetTitle => 'Compartilhar com segurança';
-
-  @override
   String get shareSingleFile => 'Arquivo individual';
-
-  @override
-  String get shareFullFolder => 'Pasta completa';
 
   @override
   String get requireRecipientEmailLabel => 'E-mail do destinatário obrigatório';
@@ -1119,11 +940,184 @@ class AppLocalizationsPt extends AppLocalizations {
   String get expirationFreemiumValid => 'Expiração gratuita válida (≤ 48 h).';
 
   @override
-  String get eventLobbyEnter => 'Entrada no lobby';
+  String get unlockPremiumTitle => 'Desbloqueie o Premium';
 
   @override
-  String get eventFileOpen => 'Arquivo aberto';
+  String get paywallBody =>
+      'Envie arquivos maiores, crie links ilimitados e mantenha seus arquivos por mais tempo.';
 
   @override
-  String get eventLobbyExit => 'Saída do lobby';
+  String get close => 'Fechar';
+
+  @override
+  String get popular => 'POPULAR';
+
+  @override
+  String get premiumPlanName => 'Premium';
+
+  @override
+  String get businessPlanName => 'Business';
+
+  @override
+  String get monthlyLabel => 'Mensal';
+
+  @override
+  String get yearlyLabel => 'Anual';
+
+  @override
+  String yearlySaveLabel(int percent) {
+    return 'Economize $percent%';
+  }
+
+  @override
+  String get subscribeToBusiness => 'Assinar o Business';
+
+  @override
+  String get trialBannerTitle => 'Comece seu teste grátis';
+
+  @override
+  String get trialBannerBody =>
+      'Experimente o Premium grátis por 14 dias. Cancele quando quiser.';
+
+  @override
+  String featureFileSize(int size) {
+    return 'Até $size MB por arquivo';
+  }
+
+  @override
+  String featureStorage(String storage) {
+    return '$storage de armazenamento';
+  }
+
+  @override
+  String featureLinkDuration(int days) {
+    return 'Links de até $days dias';
+  }
+
+  @override
+  String featureActiveLinks(int count) {
+    return 'Até $count links ativos';
+  }
+
+  @override
+  String get featureActiveLinksUnlimited => 'Links ativos ilimitados';
+
+  @override
+  String get featureNoAds => 'Sem anúncios';
+
+  @override
+  String get unsupportedFormatTitle => 'Formato não suportado';
+
+  @override
+  String unsupportedFormatBody(String formats) {
+    return 'Por segurança, o KRIPTONSHARE só aceita arquivos nestes formatos: $formats. Converta seu documento para PDF antes de compartilhá-lo.';
+  }
+
+  @override
+  String unsupportedViewerBody(String formats) {
+    return 'Este formato não pode ser visualizado com segurança dentro do app. Formatos aceitos: $formats.';
+  }
+
+  @override
+  String get plansTitle => 'Planos e armazenamento';
+
+  @override
+  String trialBanner(int days) {
+    return 'Experimente o Premium: $days dias restantes';
+  }
+
+  @override
+  String get trialPromo =>
+      '14 dias de Premium grátis. Sem necessidade de cartão.';
+
+  @override
+  String get trialExpiredTitle => 'Sua avaliação do Premium terminou';
+
+  @override
+  String get trialExpiredBody =>
+      'Você voltou ao plano grátis: 20 MB por arquivo, 20 links por mês e expiração em 7 dias. Mantenha 100 MB, links ilimitados e 30 dias com o Premium.';
+
+  @override
+  String get businessBenefits =>
+      '200 MB por arquivo • 5 GB no total • links de até 60 dias • tudo do Premium • suporte prioritário • marca própria no visualizador (em breve)';
+
+  @override
+  String get premiumPriceMonthly => '\$12.99/mês';
+
+  @override
+  String get premiumPriceAnnual => '\$103.99/ano';
+
+  @override
+  String get premiumAnnualSavings => '4 meses grátis (economia de 33%)';
+
+  @override
+  String get businessPriceMonthly => '\$29.99/mês';
+
+  @override
+  String get businessPriceAnnual => '\$239.99/ano';
+
+  @override
+  String get businessAnnualSavings => 'Economize 33%';
+
+  @override
+  String get paywallFileSizeTitle => 'Arquivo grande demais';
+
+  @override
+  String paywallFileSizeBody(String maxSize) {
+    return 'Seu plano permite $maxSize por arquivo. Com o Premium você pode compartilhar até 100 MB.';
+  }
+
+  @override
+  String get paywallActiveLinksTitle => 'Limite de links ativos';
+
+  @override
+  String get paywallActiveLinksBody =>
+      'O plano grátis permite 3 links ativos por vez. Com o Premium eles são ilimitados.';
+
+  @override
+  String get paywallMonthlyQuotaTitle => 'Limite mensal atingido';
+
+  @override
+  String get paywallMonthlyQuotaBody =>
+      'Você criou 20 links neste mês. Com o Premium eles são ilimitados.';
+
+  @override
+  String get paywallDurationTitle => 'Duração máxima do plano grátis';
+
+  @override
+  String get paywallDurationBody =>
+      'Links grátis duram até 7 dias. Com o Premium, até 30.';
+
+  @override
+  String get paywallStorageTitle => 'Armazenamento cheio';
+
+  @override
+  String paywallStorageBody(String quota) {
+    return 'Você usou $quota de armazenamento. Exclua links ativos para liberar espaço ou faça upgrade do seu plano.';
+  }
+
+  @override
+  String get paywallStorageBodyBusiness =>
+      'Você usou os 5 GB completos. Exclua ou expire links ativos para liberar espaço.';
+
+  @override
+  String get paywallViewPlans => 'Ver planos';
+
+  @override
+  String get paywallNotNow => 'Agora não';
+
+  @override
+  String get max7Days => '7 dias (máx.)';
+
+  @override
+  String get max60Days => '60 dias (máx.)';
+
+  @override
+  String get ephemeralStorageLabel => 'Armazenamento efêmero total';
+
+  @override
+  String get businessBadge => 'BUSINESS';
+
+  @override
+  String get businessPlanLabel => 'Plano Business';
 }

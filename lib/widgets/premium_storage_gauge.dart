@@ -1,24 +1,19 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
+import '../core/localization/formatters.dart';
 import '../utils/theme.dart';
 
-/// Gráfica circular que muestra el uso del Data Room Premium (1 GB base).
-///
-/// Cómo funciona:
-///   1) Recibe `usedBytes` (totalStorageUsedBytes del usuario).
-///   2) Calcula el ratio: usedBytes / 1 GB (1073741824).
-///   3) Un Stack superpone:
-///      - Un círculo de fondo (KriptonTheme.ink).
-///      - Un CircularProgressIndicator animado con el ratio.
-///      - Un texto centrado que muestra "X MB / 1 GB" o "X GB / 1 GB".
+/// Gráfica circular del almacenamiento efímero total del usuario
+/// (suma de archivos con links activos: `total_storage_used_bytes` /
+/// `max_storage_bytes`). Vive en la pantalla de planes (§6.4).
 class PremiumStorageGauge extends StatelessWidget {
   final int usedBytes;
-  final int maxBytes; // 1 GB base por defecto
+  final int maxBytes;
 
   const PremiumStorageGauge({
     super.key,
     required this.usedBytes,
-    this.maxBytes = 1073741824, // 1 GB
+    required this.maxBytes,
   });
 
   @override
@@ -27,16 +22,6 @@ class PremiumStorageGauge extends StatelessWidget {
 
     // Ratio clamp(0, 1): evita que CircularProgressIndicator reciba > 1.0
     final ratio = (usedBytes / maxBytes).clamp(0.0, 1.0);
-
-    // Formateo legible: si < 1 GB muestra MB, si >= 1 GB muestra GB con 1 decimal.
-    String usedLabel;
-    if (usedBytes < 1024 * 1024 * 1024) {
-      final mb = usedBytes ~/ (1024 * 1024);
-      usedLabel = '$mb MB';
-    } else {
-      final gb = usedBytes / (1024 * 1024 * 1024);
-      usedLabel = '${gb.toStringAsFixed(1)} GB';
-    }
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -53,12 +38,14 @@ class PremiumStorageGauge extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                l10n.dataRoomStorage,
-                style: Theme.of(context).textTheme.titleLarge,
+              Expanded(
+                child: Text(
+                  l10n.ephemeralStorageLabel,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
               Text(
-                '$usedLabel / 1 GB',
+                '${formatBytes(context, usedBytes)} / ${formatBytes(context, maxBytes)}',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: KriptonTheme.electricLime,
                       fontSize: 14,
@@ -67,25 +54,22 @@ class PremiumStorageGauge extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          // Stack: círculo de fondo + progress + texto centrado
           SizedBox(
             width: 120,
             height: 120,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Círculo de fondo (pista del progreso)
-                SizedBox(
+                const SizedBox(
                   width: 120,
                   height: 120,
                   child: CircularProgressIndicator(
                     value: 1.0,
                     strokeWidth: 8,
                     backgroundColor: KriptonTheme.inkDeep,
-                    valueColor: const AlwaysStoppedAnimation<Color>(KriptonTheme.ink),
+                    valueColor: AlwaysStoppedAnimation<Color>(KriptonTheme.ink),
                   ),
                 ),
-                // Progreso circular animado
                 SizedBox(
                   width: 120,
                   height: 120,
@@ -93,14 +77,14 @@ class PremiumStorageGauge extends StatelessWidget {
                     value: ratio,
                     strokeWidth: 8,
                     backgroundColor: Colors.transparent,
-                    valueColor: const AlwaysStoppedAnimation<Color>(KriptonTheme.electricLime),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                        KriptonTheme.electricLime),
                     strokeCap: StrokeCap.round,
                   ),
                 ),
-                // Texto centrado: porcentaje
                 Text(
                   '${(ratio * 100).toInt()}%',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: KriptonTheme.electricLime,
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
@@ -109,13 +93,6 @@ class PremiumStorageGauge extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.premiumPlanLabel,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: KriptonTheme.graphite,
-                ),
           ),
         ],
       ),

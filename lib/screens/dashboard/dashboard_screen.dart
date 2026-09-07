@@ -6,13 +6,14 @@ import 'package:go_router/go_router.dart';
 import '../../core/localization/formatters.dart';
 import '../../core/localization/language_selector_modal.dart';
 import '../../models/kripton_file.dart';
+import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/file_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
 import '../../widgets/link_gauge.dart';
-import '../../widgets/premium_storage_gauge.dart';
-import '../../widgets/data_room_card.dart';
+import '../../features/analytics/services/funnel_metrics_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -22,10 +23,142 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  bool _trialExpiredDialogShown = false;
+
   Future<void> _loadData() async {
     await ref.read(authStateProvider.notifier).refreshUser();
     ref.invalidate(userLinksProvider);
     ref.invalidate(receivedFilesProvider);
+  }
+
+  String _linkStatusLabel(AppLocalizations l10n, ShareLink link) {
+    final now = DateTime.now();
+    final isExpired = !link.isActive || link.expiresAt.isBefore(now);
+    if (isExpired) return l10n.expiredTag;
+    final remaining = link.expiresAt.difference(now);
+    final remainingHours = remaining.inHours;
+    if (remainingHours < 24) {
+      return l10n.hoursRemaining(remainingHours.clamp(1, 23));
+    }
+    return l10n.daysRemaining(remainingHours ~/ 24);
+  }
+
+  /// Banner de cuenta regresiva del trial (visible mientras el trial esté
+  /// activo). Al tocarlo lleva a /plans para renovar antes de que expire.
+  Widget? _buildTrialBanner(AppLocalizations l10n, KriptonUser user) {
+    final trialEndsAt = user.trialEndsAt;
+    if (user.subscriptionTier != 'free' || trialEndsAt == null) return null;
+    if (!trialEndsAt.isAfter(DateTime.now())) return null;
+
+    final daysLeft = (trialEndsAt.difference(DateTime.now()).inHours / 24).ceil();
+    return GestureDetector(
+      onTap: () => context.push('/plans'),
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              KriptonTheme.electricLime.withOpacity(0.14),
+              KriptonTheme.kryptonGreen.withOpacity(0.08),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: KriptonTheme.electricLime.withOpacity(0.35),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.workspace_premium_outlined,
+              color: KriptonTheme.electricLime,
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                l10n.trialBanner(daysLeft),
+                style: const TextStyle(
+                  color: KriptonTheme.platinum,
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: KriptonTheme.silver,
+              size: 20,
+            ),
+          ],
+        ),
+      ).animate().fade(delay: 200.ms, duration: 300.ms),
+    );
+  }
+
+  /// Diálogo "tu trial terminó": se muestra una única vez (persistente) el
+  /// primer día tras la expiración del trial (§13.4). Registra `trial_expired`.
+  void _maybeShowTrialExpiredDialog(KriptonUser user) {
+    if (_trialExpiredDialogShown) return;
+    if (user.subscriptionTier != 'free' || user.trialEndsAt == null) return;
+    if (user.trialEndsAt!.isAfter(DateTime.now())) return;
+
+    _trialExpiredDialogShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('trial_expired_dialog_shown') ?? false) return;
+      await prefs.setBool('trial_expired_dialog_shown', true);
+      if (!mounted) return;
+
+      final l10n = AppLocalizations.of(context);
+      FunnelMetricsService().logEvent('trial_expired');
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            backgroundColor: KriptonTheme.inkDeep,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: KriptonTheme.cardBorder, width: 1),
+            ),
+            title: Text(
+              l10n.trialExpiredTitle,
+              style: const TextStyle(color: KriptonTheme.platinum),
+            ),
+            content: Text(
+              l10n.trialExpiredBody,
+              style: const TextStyle(color: KriptonTheme.platinumGrey, height: 1.5),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(
+                  l10n.paywallNotNow,
+                  style: const TextStyle(color: KriptonTheme.silver),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  context.push('/plans');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: KriptonTheme.electricLime,
+                  foregroundColor: KriptonTheme.charcoalBlack,
+                ),
+                child: Text(l10n.paywallViewPlans),
+              ),
+            ],
+          );
+        },
+      );
+    });
   }
 
   @override
@@ -66,6 +199,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               return const Center(child: CircularProgressIndicator());
             }
 
+            _maybeShowTrialExpiredDialog(user);
             final linksUsed = user.monthlyLinksGenerated;
 
             return SingleChildScrollView(
@@ -73,6 +207,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildTrialBanner(l10n, user) ?? const SizedBox.shrink(),
                   // Welcome
                   Text(
                     l10n.welcome,
@@ -92,18 +227,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Gauge: Freemium → Monthly Links | Premium → Storage Usage
+                  // Gauge: solo free (cuota mensual de links). El storage se
+                  // gestiona desde /plans (§6.4).
                   if (!user.isPremium)
                     LinkGauge(
                       used: linksUsed,
                       total: AppConstants.maxLinksPerMonth,
-                    )
-                      .animate()
-                      .fade(delay: 100.ms, duration: 400.ms)
-                      .scale(delay: 100.ms, duration: 400.ms)
-                  else
-                    PremiumStorageGauge(
-                      usedBytes: user.totalStorageUsedBytes,
                     )
                       .animate()
                       .fade(delay: 100.ms, duration: 400.ms)
@@ -129,7 +258,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       const SizedBox(width: 12),
                       _buildStatCard(
                         l10n.plan,
-                        user.isPremium ? l10n.premium : l10n.free,
+                        switch (user.effectiveTier) {
+                          'business' => l10n.businessBadge,
+                          'premium' => l10n.premium,
+                          _ => l10n.free,
+                        },
                         Icons.verified,
                       ),
                     ],
@@ -278,13 +411,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 l10n.noActiveLinks,
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                l10n.createFirstDataRoom,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: KriptonTheme.silver,
-                                    ),
-                              ),
                             ],
                           ),
                         );
@@ -296,7 +422,62 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         itemCount: activeLinks.take(5).length,
                         itemBuilder: (context, index) {
                           final link = activeLinks[index];
-                          return DataRoomCard(link: link)
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: KriptonTheme.ink,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: KriptonTheme.cardBorder,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: KriptonTheme.electricLime.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.link,
+                                    color: KriptonTheme.electricLime,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        link.id.substring(0, 8).toUpperCase(),
+                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                              color: KriptonTheme.platinum,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _linkStatusLabel(l10n, link),
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: KriptonTheme.silver,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  color: KriptonTheme.silver,
+                                ),
+                              ],
+                            ),
+                          )
                               .animate()
                               .fade(delay: Duration(milliseconds: 300 + index * 100))
                               .slideY(

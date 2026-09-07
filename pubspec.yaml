@@ -82,9 +82,6 @@ dependencies:
   # Logger
   logger: ^2.3.0
   
-  # Google Mobile Ads (AdMob)
-  google_mobile_ads: ^7.0.0
-
   # RevenueCat SDK — suscripciones y add-ons IAP
   purchases_flutter: ^8.0.0
 
@@ -109,10 +106,8 @@ flutter:
   uses-material-design: true
   generate: true
 
-  # assets:
-  #   - assets/logo/
-  #   - assets/images/
-  #   - assets/icons/
+  assets:
+    - assets/branding/
 
   # Splash screen colors
   # Color: #0A0A0F (Charcoal Black)

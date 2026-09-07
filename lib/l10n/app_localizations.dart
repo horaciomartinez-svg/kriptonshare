@@ -122,18 +122,6 @@ abstract class AppLocalizations {
   /// **'Accept'**
   String get accept;
 
-  /// No description provided for @msOfficeWarningTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Conversion Warning'**
-  String get msOfficeWarningTitle;
-
-  /// No description provided for @msOfficeWarningBody.
-  ///
-  /// In en, this message translates to:
-  /// **'You are about to convert an MS Office document to PDF. This process may take several minutes. It is recommended to use this option for files smaller than 5 MB. For larger files, it is preferable to convert them to PDF using MS Office. Do you wish to continue?'**
-  String get msOfficeWarningBody;
-
   /// No description provided for @retry.
   ///
   /// In en, this message translates to:
@@ -764,23 +752,11 @@ abstract class AppLocalizations {
   /// **'Encrypt and generate link'**
   String get encryptAndGenerateLink;
 
-  /// No description provided for @pdfPreviewGeneratedNotice.
-  ///
-  /// In en, this message translates to:
-  /// **'A secure PDF preview will be generated for the recipient'**
-  String get pdfPreviewGeneratedNotice;
-
   /// No description provided for @dataRoomReadyBanner.
   ///
   /// In en, this message translates to:
   /// **'Data Room ready on Cloudflare'**
   String get dataRoomReadyBanner;
-
-  /// No description provided for @previewGenerationFailedNotice.
-  ///
-  /// In en, this message translates to:
-  /// **'The file was shared, but the preview could not be generated. The recipient will be able to download it if you allow it.'**
-  String get previewGenerationFailedNotice;
 
   /// No description provided for @protectingFiles.
   ///
@@ -793,12 +769,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'> Encrypting with AES-256...'**
   String get encryptingAesStep;
-
-  /// No description provided for @generatingPreviewStep.
-  ///
-  /// In en, this message translates to:
-  /// **'> Generating secure preview...'**
-  String get generatingPreviewStep;
 
   /// No description provided for @syncingR2Step.
   ///
@@ -890,41 +860,11 @@ abstract class AppLocalizations {
   /// **'{count} Hours'**
   String hoursUnit(int count);
 
-  /// No description provided for @upsellTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Sending without pauses?'**
-  String get upsellTitle;
-
-  /// No description provided for @upsellCta.
-  ///
-  /// In en, this message translates to:
-  /// **'> Go Premium'**
-  String get upsellCta;
-
   /// No description provided for @linkExpiresNotice.
   ///
   /// In en, this message translates to:
   /// **'This link expires in {hours}h.'**
   String linkExpiresNotice(int hours);
-
-  /// No description provided for @adSampleTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'IBM Cloud Security'**
-  String get adSampleTitle;
-
-  /// No description provided for @adSampleBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Protect your company\'s infrastructure.'**
-  String get adSampleBody;
-
-  /// No description provided for @adSampleCta.
-  ///
-  /// In en, this message translates to:
-  /// **'LEARN MORE'**
-  String get adSampleCta;
 
   /// No description provided for @searchByIdOrEmail.
   ///
@@ -1172,12 +1112,6 @@ abstract class AppLocalizations {
   /// **'To share this content securely, convert it to PDF before uploading.'**
   String get convertToPdfAdvice;
 
-  /// No description provided for @conversionPreviewFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not generate the PDF preview (connection error to the conversion server).'**
-  String get conversionPreviewFailed;
-
   /// No description provided for @confidentialBanner.
   ///
   /// In en, this message translates to:
@@ -1313,7 +1247,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumBenefits.
   ///
   /// In en, this message translates to:
-  /// **'100 MB per file, unlimited links, custom expiration, dynamic forensic watermark.'**
+  /// **'100 MB per file · unlimited links · up to 30 days · 1 GB ephemeral storage · dynamic watermark'**
   String get premiumBenefits;
 
   /// No description provided for @managePremiumVault.
@@ -1466,59 +1400,17 @@ abstract class AppLocalizations {
   /// **'Screenshot blocked'**
   String get eventScreenshotBlocked;
 
-  /// No description provided for @enterDataRoomPassword.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter the Data Room password'**
-  String get enterDataRoomPassword;
-
-  /// No description provided for @dataRoomNotFound.
-  ///
-  /// In en, this message translates to:
-  /// **'Data Room not found'**
-  String get dataRoomNotFound;
-
-  /// No description provided for @dataRoomPasswordLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Data Room password'**
-  String get dataRoomPasswordLabel;
-
-  /// No description provided for @selectFileToDecrypt.
-  ///
-  /// In en, this message translates to:
-  /// **'Select a file to decrypt it in RAM'**
-  String get selectFileToDecrypt;
-
-  /// No description provided for @encryptedFilesCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} Encrypted Files · {size}'**
-  String encryptedFilesCount(int count, String size);
-
   /// No description provided for @aes256Encrypted.
   ///
   /// In en, this message translates to:
   /// **'{size} · AES-256 encrypted'**
   String aes256Encrypted(String size);
 
-  /// No description provided for @officeDocsNotViewable.
-  ///
-  /// In en, this message translates to:
-  /// **'Office documents cannot be viewed directly for security reasons.'**
-  String get officeDocsNotViewable;
-
   /// No description provided for @confidentialUserWatermark.
   ///
   /// In en, this message translates to:
   /// **'{email} • CONFIDENTIAL'**
   String confidentialUserWatermark(String email);
-
-  /// No description provided for @storageManagementTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Vault & Data Room Storage'**
-  String get storageManagementTitle;
 
   /// No description provided for @premiumActive.
   ///
@@ -1532,23 +1424,11 @@ abstract class AppLocalizations {
   /// **'FREE PLAN'**
   String get freePlanBadge;
 
-  /// No description provided for @dataRoomCapacity.
-  ///
-  /// In en, this message translates to:
-  /// **'Data Room capacity'**
-  String get dataRoomCapacity;
-
   /// No description provided for @storageUsedOf.
   ///
   /// In en, this message translates to:
   /// **'{used} / {max} Used'**
   String storageUsedOf(String used, String max);
-
-  /// No description provided for @expandDataRoomAddon.
-  ///
-  /// In en, this message translates to:
-  /// **'Expand Data Room (+1 GB for \$5/month)'**
-  String get expandDataRoomAddon;
 
   /// No description provided for @subscriptionOptions.
   ///
@@ -1646,18 +1526,6 @@ abstract class AppLocalizations {
   /// **'Subscription activated'**
   String get subscriptionActivated;
 
-  /// No description provided for @noAddonsAvailable.
-  ///
-  /// In en, this message translates to:
-  /// **'No add-ons available'**
-  String get noAddonsAvailable;
-
-  /// No description provided for @storageExpanded.
-  ///
-  /// In en, this message translates to:
-  /// **'Storage expanded'**
-  String get storageExpanded;
-
   /// No description provided for @remainingLinks.
   ///
   /// In en, this message translates to:
@@ -1736,77 +1604,11 @@ abstract class AppLocalizations {
   /// **'Decryption error: {error}'**
   String errorDecryptionWithDetail(String error);
 
-  /// No description provided for @dataRoomExplorerTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'My Data Room Vault'**
-  String get dataRoomExplorerTitle;
-
-  /// No description provided for @premiumCapacityLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'PREMIUM DATA ROOM CAPACITY'**
-  String get premiumCapacityLabel;
-
-  /// No description provided for @storageUsedSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'{used} of {max} used ({percent}%)'**
-  String storageUsedSummary(String used, String max, int percent);
-
-  /// No description provided for @expandVaultAddon.
-  ///
-  /// In en, this message translates to:
-  /// **'Expand Vault (+1 GB for \$5/month)'**
-  String get expandVaultAddon;
-
   /// No description provided for @uploadFileMax.
   ///
   /// In en, this message translates to:
   /// **'Upload file (≤ 100 MB)'**
   String get uploadFileMax;
-
-  /// No description provided for @newVirtualFolder.
-  ///
-  /// In en, this message translates to:
-  /// **'New virtual folder'**
-  String get newVirtualFolder;
-
-  /// No description provided for @batchUploadAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Batch upload to folder'**
-  String get batchUploadAction;
-
-  /// No description provided for @batchUploadHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Multiple selection'**
-  String get batchUploadHint;
-
-  /// No description provided for @virtualFoldersSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Virtual folders'**
-  String get virtualFoldersSection;
-
-  /// No description provided for @unfiledFilesSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Individual files in vault'**
-  String get unfiledFilesSection;
-
-  /// No description provided for @folderCardSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} files · {size}'**
-  String folderCardSummary(int count, String size);
-
-  /// No description provided for @linkStatusActiveExpires.
-  ///
-  /// In en, this message translates to:
-  /// **'Link: Active (expires in {days} days)'**
-  String linkStatusActiveExpires(int days);
 
   /// No description provided for @sendAction.
   ///
@@ -1844,84 +1646,6 @@ abstract class AppLocalizations {
   /// **'List view'**
   String get listView;
 
-  /// No description provided for @emptyDataRoomTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Your Data Room is empty'**
-  String get emptyDataRoomTitle;
-
-  /// No description provided for @emptyDataRoomHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Upload encrypted files or create your first virtual folder'**
-  String get emptyDataRoomHint;
-
-  /// No description provided for @folderNameLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Folder name'**
-  String get folderNameLabel;
-
-  /// No description provided for @folderDescriptionLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Description (optional)'**
-  String get folderDescriptionLabel;
-
-  /// No description provided for @createFolder.
-  ///
-  /// In en, this message translates to:
-  /// **'Create folder'**
-  String get createFolder;
-
-  /// No description provided for @folderCreated.
-  ///
-  /// In en, this message translates to:
-  /// **'Folder created'**
-  String get folderCreated;
-
-  /// No description provided for @batchUploadTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Batch upload'**
-  String get batchUploadTitle;
-
-  /// No description provided for @batchProgressSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'{completed} of {total} files uploaded'**
-  String batchProgressSummary(int completed, int total);
-
-  /// No description provided for @batchCompletedMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} files encrypted in Data Room'**
-  String batchCompletedMessage(int count);
-
-  /// No description provided for @batchFileSkippedTooLarge.
-  ///
-  /// In en, this message translates to:
-  /// **'{filename} exceeds 100 MB and was skipped'**
-  String batchFileSkippedTooLarge(String filename);
-
-  /// No description provided for @selectDestinationFolder.
-  ///
-  /// In en, this message translates to:
-  /// **'Select destination folder'**
-  String get selectDestinationFolder;
-
-  /// No description provided for @filesSelected.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} files selected'**
-  String filesSelected(int count);
-
-  /// No description provided for @dataRoomLobbyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'DATA ROOM: {name}'**
-  String dataRoomLobbyTitle(String name);
-
   /// No description provided for @linkExpiresInLabel.
   ///
   /// In en, this message translates to:
@@ -1946,47 +1670,17 @@ abstract class AppLocalizations {
   /// **'Access'**
   String get accessAction;
 
-  /// No description provided for @availableDocumentsSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Documents available in the folder'**
-  String get availableDocumentsSection;
-
   /// No description provided for @encryptedAtOrigin.
   ///
   /// In en, this message translates to:
   /// **'Encrypted at source'**
   String get encryptedAtOrigin;
 
-  /// No description provided for @openAndDecryptInRam.
-  ///
-  /// In en, this message translates to:
-  /// **'Open and decrypt in RAM'**
-  String get openAndDecryptInRam;
-
-  /// No description provided for @ramDecryptionNotice.
-  ///
-  /// In en, this message translates to:
-  /// **'Documents are decrypted exclusively in volatile RAM and are covered by active read auditing.'**
-  String get ramDecryptionNotice;
-
-  /// No description provided for @shareSheetTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Share securely'**
-  String get shareSheetTitle;
-
   /// No description provided for @shareSingleFile.
   ///
   /// In en, this message translates to:
   /// **'Single file'**
   String get shareSingleFile;
-
-  /// No description provided for @shareFullFolder.
-  ///
-  /// In en, this message translates to:
-  /// **'Full folder'**
-  String get shareFullFolder;
 
   /// No description provided for @requireRecipientEmailLabel.
   ///
@@ -2060,23 +1754,311 @@ abstract class AppLocalizations {
   /// **'Valid Free expiration (≤ 48 h).'**
   String get expirationFreemiumValid;
 
-  /// No description provided for @eventLobbyEnter.
+  /// No description provided for @unlockPremiumTitle.
   ///
   /// In en, this message translates to:
-  /// **'Lobby entered'**
-  String get eventLobbyEnter;
+  /// **'Unlock Premium'**
+  String get unlockPremiumTitle;
 
-  /// No description provided for @eventFileOpen.
+  /// No description provided for @paywallBody.
   ///
   /// In en, this message translates to:
-  /// **'File opened'**
-  String get eventFileOpen;
+  /// **'Upload larger files, create unlimited links, and keep your files longer.'**
+  String get paywallBody;
 
-  /// No description provided for @eventLobbyExit.
+  /// No description provided for @close.
   ///
   /// In en, this message translates to:
-  /// **'Lobby exited'**
-  String get eventLobbyExit;
+  /// **'Close'**
+  String get close;
+
+  /// No description provided for @popular.
+  ///
+  /// In en, this message translates to:
+  /// **'POPULAR'**
+  String get popular;
+
+  /// No description provided for @premiumPlanName.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium'**
+  String get premiumPlanName;
+
+  /// No description provided for @businessPlanName.
+  ///
+  /// In en, this message translates to:
+  /// **'Business'**
+  String get businessPlanName;
+
+  /// No description provided for @monthlyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get monthlyLabel;
+
+  /// No description provided for @yearlyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Yearly'**
+  String get yearlyLabel;
+
+  /// No description provided for @yearlySaveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Save {percent}%'**
+  String yearlySaveLabel(int percent);
+
+  /// No description provided for @subscribeToBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe to Business'**
+  String get subscribeToBusiness;
+
+  /// No description provided for @trialBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start your free trial'**
+  String get trialBannerTitle;
+
+  /// No description provided for @trialBannerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Try Premium free for 7 days. Cancel anytime.'**
+  String get trialBannerBody;
+
+  /// No description provided for @featureFileSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {size} MB per file'**
+  String featureFileSize(int size);
+
+  /// No description provided for @featureStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'{storage} storage'**
+  String featureStorage(String storage);
+
+  /// No description provided for @featureLinkDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Links up to {days} days'**
+  String featureLinkDuration(int days);
+
+  /// No description provided for @featureActiveLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {count} active links'**
+  String featureActiveLinks(int count);
+
+  /// No description provided for @featureActiveLinksUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited active links'**
+  String get featureActiveLinksUnlimited;
+
+  /// No description provided for @featureNoAds.
+  ///
+  /// In en, this message translates to:
+  /// **'No ads'**
+  String get featureNoAds;
+
+  /// No description provided for @unsupportedFormatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported format'**
+  String get unsupportedFormatTitle;
+
+  /// No description provided for @unsupportedFormatBody.
+  ///
+  /// In en, this message translates to:
+  /// **'For security, KRIPTONSHARE only accepts files in these formats: {formats}. Convert your document to PDF before sharing it.'**
+  String unsupportedFormatBody(String formats);
+
+  /// No description provided for @unsupportedViewerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This format cannot be viewed safely inside the app. Accepted formats: {formats}.'**
+  String unsupportedViewerBody(String formats);
+
+  /// No description provided for @plansTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Plans & storage'**
+  String get plansTitle;
+
+  /// No description provided for @trialBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Try Premium: {days} days left'**
+  String trialBanner(int days);
+
+  /// No description provided for @trialPromo.
+  ///
+  /// In en, this message translates to:
+  /// **'14 days of Premium free. No card required.'**
+  String get trialPromo;
+
+  /// No description provided for @trialExpiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Premium trial has ended'**
+  String get trialExpiredTitle;
+
+  /// No description provided for @trialExpiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You are back on the free plan: 20 MB per file, 20 links a month and 7-day expiry. Keep 100 MB, unlimited links and 30 days with Premium.'**
+  String get trialExpiredBody;
+
+  /// No description provided for @businessBenefits.
+  ///
+  /// In en, this message translates to:
+  /// **'200 MB per file · 5 GB total · links up to 60 days · everything in Premium · priority support · custom branding in the viewer (coming soon)'**
+  String get businessBenefits;
+
+  /// No description provided for @premiumPriceMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'\$12.99/month'**
+  String get premiumPriceMonthly;
+
+  /// No description provided for @premiumPriceAnnual.
+  ///
+  /// In en, this message translates to:
+  /// **'\$103.99/year'**
+  String get premiumPriceAnnual;
+
+  /// No description provided for @premiumAnnualSavings.
+  ///
+  /// In en, this message translates to:
+  /// **'4 months free (33% savings)'**
+  String get premiumAnnualSavings;
+
+  /// No description provided for @businessPriceMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'\$29.99/month'**
+  String get businessPriceMonthly;
+
+  /// No description provided for @businessPriceAnnual.
+  ///
+  /// In en, this message translates to:
+  /// **'\$239.99/year'**
+  String get businessPriceAnnual;
+
+  /// No description provided for @businessAnnualSavings.
+  ///
+  /// In en, this message translates to:
+  /// **'Save 33%'**
+  String get businessAnnualSavings;
+
+  /// No description provided for @paywallFileSizeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'File too large'**
+  String get paywallFileSizeTitle;
+
+  /// No description provided for @paywallFileSizeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your plan allows {maxSize} per file. With Premium you can share up to 100 MB.'**
+  String paywallFileSizeBody(String maxSize);
+
+  /// No description provided for @paywallActiveLinksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Active links limit'**
+  String get paywallActiveLinksTitle;
+
+  /// No description provided for @paywallActiveLinksBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The free plan allows 3 active links at a time. With Premium they are unlimited.'**
+  String get paywallActiveLinksBody;
+
+  /// No description provided for @paywallMonthlyQuotaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly limit reached'**
+  String get paywallMonthlyQuotaTitle;
+
+  /// No description provided for @paywallMonthlyQuotaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You have created 20 links this month. With Premium they are unlimited.'**
+  String get paywallMonthlyQuotaBody;
+
+  /// No description provided for @paywallDurationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Free plan maximum duration'**
+  String get paywallDurationTitle;
+
+  /// No description provided for @paywallDurationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Free links last up to 7 days. With Premium, up to 30 days.'**
+  String get paywallDurationBody;
+
+  /// No description provided for @paywallStorageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage full'**
+  String get paywallStorageTitle;
+
+  /// No description provided for @paywallStorageBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You have used your {quota} of storage. Delete active links to free up space or upgrade your plan.'**
+  String paywallStorageBody(String quota);
+
+  /// No description provided for @paywallStorageBodyBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'You have used all 5 GB. Delete or expire active links to free up space.'**
+  String get paywallStorageBodyBusiness;
+
+  /// No description provided for @paywallViewPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'View plans'**
+  String get paywallViewPlans;
+
+  /// No description provided for @paywallNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get paywallNotNow;
+
+  /// No description provided for @max7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days (Max)'**
+  String get max7Days;
+
+  /// No description provided for @max60Days.
+  ///
+  /// In en, this message translates to:
+  /// **'60 days (Max)'**
+  String get max60Days;
+
+  /// No description provided for @ephemeralStorageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total ephemeral storage'**
+  String get ephemeralStorageLabel;
+
+  /// No description provided for @businessBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'BUSINESS'**
+  String get businessBadge;
+
+  /// No description provided for @businessPlanLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Plan'**
+  String get businessPlanLabel;
 }
 
 class _AppLocalizationsDelegate

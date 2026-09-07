@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/analytics/services/funnel_metrics_service.dart';
 import '../core/localization/locale_provider.dart';
 import '../core/localization/supported_locales.dart';
 import '../models/user_model.dart';
@@ -91,7 +92,6 @@ Future<void> _createPublicUserRecord(
       'monthly_links_generated': 0,
       'monthly_links_reset_at': DateTime.now().toIso8601String(),
       'total_storage_used_bytes': 0,
-      'max_storage_premium_bytes': AppConstants.premiumMaxStorageBytes,
       'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
       'preferred_language': preferredLanguage,
     });
@@ -206,7 +206,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
           'monthly_links_generated': 0,
           'monthly_links_reset_at': DateTime.now().toIso8601String(),
           'total_storage_used_bytes': 0,
-          'max_storage_premium_bytes': AppConstants.premiumMaxStorageBytes,
           'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
           'preferred_language': preferredLanguage,
         });
@@ -217,6 +216,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
             .eq('id', response.user!.id)
             .single();
         state = AsyncValue.data(KriptonUser.fromJson(userData));
+
+        await FunnelMetricsService().logEvent('signup_completed');
+        await FunnelMetricsService().logEvent('trial_started');
       }
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -252,22 +254,57 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
     await _createPublicUserRecord(client, userId: userId, email: email);
   }
 
-  /// Modo prueba Premium: activa/desactiva tier premium directamente en Supabase
-  /// sin pasar por RevenueCat. Solo disponible en debug builds.
-  Future<void> setPremiumSimulation(bool enabled) async {
+  /// Modo prueba: activa/desactiva una suscripción simulada directamente en
+  /// Supabase sin pasar por RevenueCat. Solo disponible en debug builds.
+  Future<void> setPremiumSimulation(bool enabled, {String tier = 'premium'}) async {
     try {
       final client = _ref.read(supabaseClientProvider);
       final currentUser = client.auth.currentUser;
       if (currentUser == null) return;
 
+      final storageBytes = switch (tier) {
+        'business' => PremiumLimits.businessBaseStorageBytes,
+        'premium' => PremiumLimits.premiumBaseStorageBytes,
+        _ => 0,
+      };
+
       await client.from('users').update({
-        'subscription_tier': enabled ? 'premium' : 'free',
-        'max_storage_bytes': enabled ? PremiumLimits.premiumBaseStorageBytes : 0,
+        'subscription_tier': enabled ? tier : 'free',
+        'max_storage_bytes': enabled ? storageBytes : 0,
       }).eq('id', currentUser.id);
 
       await refreshUser();
     } catch (e) {
       // Silently fail
     }
+  }
+
+  /// Modo prueba Trial: establece trial_ends_at 14 días en el futuro.
+  Future<void> setTrialSimulation(bool enabled) async {
+    try {
+      final client = _ref.read(supabaseClientProvider);
+      final currentUser = client.auth.currentUser;
+      if (currentUser == null) return;
+
+      await client.from('users').update({
+        'trial_ends_at': enabled ? DateTime.now().add(const Duration(days: 14)).toIso8601String() : null,
+      }).eq('id', currentUser.id);
+
+      await refreshUser();
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+  /// Returns the current effective tier, factoring in trials.
+  String getEffectiveTier() {
+    final user = state.value;
+    return user?.effectiveTier ?? 'free';
+  }
+
+  /// Returns true if the current user has premium benefits (including trial).
+  bool getIsPremium() {
+    final user = state.value;
+    return user?.isPremium ?? false;
   }
 }

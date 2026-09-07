@@ -3,8 +3,6 @@
   "appName": "KRIPTONSHARE",
   "cancel": "Abbrechen",
   "accept": "Akzeptieren",
-  "msOfficeWarningTitle": "Konvertierungswarnung",
-  "msOfficeWarningBody": "Sie sind dabei, ein MS Office-Dokument in ein PDF zu konvertieren. Dieser Vorgang kann einige Minuten dauern. Es wird empfohlen, diese Option für Dateien unter 5 MB zu verwenden. Größere Dateien sollten vorzugsweise mit MS Office konvertiert werden. Möchten Sie fortfahren?",
   "retry": "Erneut versuchen",
   "delete": "Löschen",
   "share": "Teilen",
@@ -18,9 +16,7 @@
   "language": "Sprache",
   "selectLanguage": "Sprache auswählen",
   "errorWithMessage": "Fehler: {message}",
-
   "splashTagline": "Ephemerer Data Room",
-
   "onboardingTitle1": "Zero-Knowledge-Verschlüsselung",
   "onboardingBody1": "Ihre Dateien werden lokal mit AES-256 verschlüsselt, bevor sie in die Cloud hochgeladen werden. Niemand außer Ihnen besitzt die Schlüssel.",
   "onboardingTitle2": "Ephemere Links",
@@ -30,7 +26,6 @@
   "onboardingSkip": "ÜBERSPRINGEN",
   "onboardingStart": "STARTEN",
   "onboardingNext": "WEITER",
-
   "authTagline": "Ihr Gerät ist der einzige Verwahrer",
   "loginTab": "Anmelden",
   "registerTab": "Konto erstellen",
@@ -52,7 +47,6 @@
   "biometricAuthCancelled": "Biometrische Authentifizierung abgebrochen.",
   "freePlanInfo": "Kostenloser Plan: max. {maxMB} MB · {maxLinks} Links/Monat · {maxHours} Std. Laufzeit",
   "termsNotice": "Mit der Registrierung akzeptieren Sie die Bedingungen zur Datensouveränität. KRIPTONSHARE speichert Ihre Dateien niemals im Klartext.",
-
   "lockTitle": "KRIPTONSHARE gesperrt",
   "lockSubtitle": "Nutzen Sie Ihren Fingerabdruck oder Ihr Gesicht, um die App zu entsperren.",
   "lockVerifying": "Überprüfung...",
@@ -61,7 +55,6 @@
   "authCancelled": "Authentifizierung abgebrochen.",
   "noSavedCredentials": "Keine gespeicherten Anmeldedaten. Bitte melden Sie sich manuell an.",
   "invalidSavedCredentials": "Die gespeicherten Anmeldedaten sind nicht mehr gültig. Bitte melden Sie sich manuell an.",
-
   "biometricSettingsTitle": "Biometrie-Einstellungen",
   "biometricIntro": "Schützen Sie den Zugriff auf Ihre Data Rooms mit Ihrer biometrischen Identität.",
   "biometricNotAvailableTitle": "Biometrie nicht verfügbar",
@@ -88,7 +81,6 @@
   "biometricUnlockEnabledMsg": "Biometrische Entsperrung aktiviert. Sie wird nach der Anmeldung abgefragt.",
   "biometricUnlockDisabledMsg": "Biometrische Entsperrung deaktiviert.",
   "biometricQueryError": "Fehler beim Prüfen der Biometrie: {message}",
-
   "dashboardTab": "Dashboard",
   "linksTab": "Links",
   "profileTab": "Profil",
@@ -108,7 +100,6 @@
   "expiresInHours": "in {hours} Std.",
   "expiresInDays": "in {days} T.",
   "analyticsTooltip": "Analytik",
-
   "newDataRoom": "Neuer Data Room",
   "attachFile": "Datei anhängen",
   "cameraToVault": "Kamera zum Tresor",
@@ -117,12 +108,9 @@
   "passwordNotStoredHint": "Wird nicht in der Cloud gespeichert",
   "recipientEmailOptional": "E-Mail des Empfängers (optional)",
   "encryptAndGenerateLink": "Verschlüsseln und Link generieren",
-  "pdfPreviewGeneratedNotice": "Eine sichere PDF-Vorschau wird für den Empfänger erstellt",
   "dataRoomReadyBanner": "Data Room bereit auf Cloudflare",
-  "previewGenerationFailedNotice": "Die Datei wurde geteilt, aber die Vorschau konnte nicht erstellt werden. Der Empfänger kann sie herunterladen, wenn Sie es erlauben.",
   "protectingFiles": "Ihre Dateien werden geschützt...",
   "encryptingAesStep": "> Verschlüsselung mit AES-256...",
-  "generatingPreviewStep": "> Sichere Vorschau wird erstellt...",
   "syncingR2Step": "> Synchronisierung mit R2...",
   "fileExceedsPlanLimit": "Die Datei überschreitet das Limit von {maxSize} Ihres Plans",
   "captureExceedsPlanLimit": "Die Aufnahme überschreitet das Limit von {maxSize} Ihres Plans",
@@ -138,13 +126,7 @@
   "max30Days": "Max. 30 Tage",
   "daysUnit": "{count} Tage",
   "hoursUnit": "{count} Stunden",
-  "upsellTitle": "Senden ohne Pausen?",
-  "upsellCta": "> Zu Premium wechseln",
   "linkExpiresNotice": "Dieser Link läuft in {hours} Std. ab.",
-  "adSampleTitle": "IBM Cloud Security",
-  "adSampleBody": "Schützen Sie die Infrastruktur Ihres Unternehmens.",
-  "adSampleCta": "MEHR ERFAHREN",
-
   "searchByIdOrEmail": "Nach ID oder E-Mail suchen",
   "createLink": "Link erstellen",
   "noSearchResults": "Keine Ergebnisse gefunden",
@@ -160,12 +142,10 @@
   "activeTag": "AKTIV",
   "expiredTag": "ABGELAUFEN",
   "expiresOn": "Läuft ab: {date}",
-
   "expiredLinksTitle": "Abgelaufene Links",
   "noExpiredLinks": "Keine abgelaufenen Links",
   "allDataRoomsActive": "Alle Ihre Data Rooms sind aktiv",
   "sizeExpiredOn": "{size} · Abgelaufen am {date}",
-
   "linkIdMissing": "Link-ID nicht angegeben",
   "linkInvalidExpiredRevoked": "Ungültiger, abgelaufener oder widerrufener Link",
   "recipientOnlyNotice": "Diese Datei wurde an {recipient} gesendet. Melden Sie sich mit diesem Konto an, um darauf zuzugreifen.",
@@ -188,14 +168,12 @@
   "protectedFormat": "Geschütztes Format",
   "officeNotViewable": "Microsoft-Office-Dokumente und andere Formate können aus Sicherheitsgründen nicht direkt in der App angezeigt werden.",
   "convertToPdfAdvice": "Um diesen Inhalt sicher zu teilen, konvertieren Sie ihn vor dem Hochladen in PDF.",
-  "conversionPreviewFailed": "Die PDF-Vorschau konnte nicht erstellt werden (Verbindungsfehler zum Konvertierungsserver).",
   "confidentialBanner": "KRIPTONSHARE | VERTRAULICH",
   "secureMode": "SICHERER MODUS",
   "backToHome": "Zurück zur Startseite",
   "unknownError": "Unbekannter Fehler",
   "videoPlaybackError": "Video konnte nicht abgespielt werden: {error}",
   "fileSizeAndType": "{size} · {mimeType}",
-
   "profileTitle": "Profil",
   "yourCurrentPlan": "Ihr aktueller Plan",
   "maxFileSize": "Maximale Dateigröße",
@@ -203,18 +181,17 @@
   "notAvailable": "Nicht verfügbar",
   "monthlyLinks": "Monatliche Links",
   "maxDuration": "Maximale Laufzeit",
-   "hoursValue": "{count} Stunden",
-   "daysValue": "{count} Tage",
-   "unlimited": "Unbegrenzt",
-   "encryptionLabel": "Verschlüsselung",
+  "hoursValue": "{count} Stunden",
+  "daysValue": "{count} Tage",
+  "unlimited": "Unbegrenzt",
+  "encryptionLabel": "Verschlüsselung",
   "watermarkLabel": "Wasserzeichen",
   "institutionalPassiveWatermark": "Institutionell passiv",
   "biometricsLabel": "Biometrie",
   "configureBiometrics": "Fingerabdruck oder Face ID einrichten",
   "unlockFullCapacity": "Volle Kapazität freischalten",
-  "premiumBenefits": "100 MB pro Datei, unbegrenzte Links, individueller Ablauf, dynamisches forensisches Wasserzeichen.",
+  "premiumBenefits": "100 MB pro Datei • unbegrenzte Links • bis zu 30 Tage • 1 GB temporärer Speicher • dynamisches Wasserzeichen",
   "managePremiumVault": "Premium-Tresor verwalten",
-
   "analyticsTitle": "Analytik",
   "noDataAvailable": "Keine Daten verfügbar",
   "dataRoomsMetrics": "Metriken Ihrer Data Rooms",
@@ -239,22 +216,11 @@
   "eventDownloadComplete": "Download abgeschlossen",
   "eventDownloadStart": "Download gestartet",
   "eventScreenshotBlocked": "Screenshot blockiert",
-
-  "enterDataRoomPassword": "Geben Sie das Passwort des Data Rooms ein",
-  "dataRoomNotFound": "Data Room nicht gefunden",
-  "dataRoomPasswordLabel": "Data-Room-Passwort",
-  "selectFileToDecrypt": "Wählen Sie eine Datei, um sie im RAM zu entschlüsseln",
-  "encryptedFilesCount": "{count} verschlüsselte Dateien · {size}",
   "aes256Encrypted": "{size} · AES-256-verschlüsselt",
-  "officeDocsNotViewable": "Office-Dokumente können aus Sicherheitsgründen nicht direkt angezeigt werden.",
   "confidentialUserWatermark": "{email} • VERTRAULICH",
-
-  "storageManagementTitle": "Tresor & Data-Room-Speicher",
   "premiumActive": "PREMIUM AKTIV",
   "freePlanBadge": "KOSTENLOSER PLAN",
-  "dataRoomCapacity": "Kapazität des Data Rooms",
   "storageUsedOf": "{used} / {max} belegt",
-  "expandDataRoomAddon": "Data Room erweitern (+1 GB für 5 $/Monat)",
   "subscriptionOptions": "Abonnement-Optionen",
   "monthlyPlan": "Monatlich",
   "monthlyPrice": "19,00 $ / Monat",
@@ -271,13 +237,9 @@
   "testPremiumDeactivated": "Test-Premium deaktiviert",
   "noOfferingsAvailable": "Keine Angebote verfügbar",
   "subscriptionActivated": "Abonnement aktiviert",
-  "noAddonsAvailable": "Keine Add-ons verfügbar",
-  "storageExpanded": "Speicher erweitert",
-
   "remainingLinks": "{remaining} verbleibend",
-   "freePlanLabel": "Kostenloser Plan",
-   "premiumPlanLabel": "Premium-Plan",
-
+  "freePlanLabel": "Kostenloser Plan",
+  "premiumPlanLabel": "Premium-Plan",
   "errorUserNotAuthenticated": "Benutzer nicht authentifiziert",
   "errorQuotaExceeded": "Kontingentlimit überschritten",
   "errorUploadNotAllowed": "Der Upload kann nicht abgeschlossen werden. Prüfen Sie die Limits Ihres Plans.",
@@ -288,51 +250,19 @@
   "errorInvalidKey": "Ungültiger Schlüssel",
   "errorDecryptionFailed": "Fehler bei der Entschlüsselung",
   "errorDecryptionWithDetail": "Fehler beim Entschlüsseln: {error}",
-
-  "dataRoomExplorerTitle": "Mein Data-Room-Tresor",
-  "premiumCapacityLabel": "PREMIUM-DATA-ROOM-KAPAZITÄT",
-  "storageUsedSummary": "{used} von {max} belegt ({percent} %)",
-  "expandVaultAddon": "Tresor erweitern (+1 GB für 5 $/Monat)",
   "uploadFileMax": "Datei hochladen (≤ 100 MB)",
-  "newVirtualFolder": "Neuer virtueller Ordner",
-  "batchUploadAction": "Stapel-Upload in Ordner",
-  "batchUploadHint": "Mehrfachauswahl",
-  "virtualFoldersSection": "Virtuelle Ordner",
-  "unfiledFilesSection": "Einzelne Dateien im Tresor",
-  "folderCardSummary": "{count} Dateien · {size}",
-  "linkStatusActiveExpires": "Link: Aktiv (läuft in {days} Tagen ab)",
   "sendAction": "Senden",
   "sortByName": "Name",
   "sortByLastModified": "Zuletzt geändert",
   "sortBySize": "Größe",
   "gridView": "Rasteransicht",
   "listView": "Listenansicht",
-  "emptyDataRoomTitle": "Ihr Data Room ist leer",
-  "emptyDataRoomHint": "Laden Sie verschlüsselte Dateien hoch oder erstellen Sie Ihren ersten virtuellen Ordner",
-  "folderNameLabel": "Ordnername",
-  "folderDescriptionLabel": "Beschreibung (optional)",
-  "createFolder": "Ordner erstellen",
-  "folderCreated": "Ordner erstellt",
-  "batchUploadTitle": "Stapel-Upload",
-  "batchProgressSummary": "{completed} von {total} Dateien hochgeladen",
-  "batchCompletedMessage": "{count} Dateien im Data Room verschlüsselt",
-  "batchFileSkippedTooLarge": "{filename} überschreitet 100 MB und wurde übersprungen",
-  "selectDestinationFolder": "Zielordner auswählen",
-  "filesSelected": "{count} Dateien ausgewählt",
-
-  "dataRoomLobbyTitle": "DATA ROOM: {name}",
   "linkExpiresInLabel": "Link läuft ab in: {days} Tagen",
   "recipientEmailRequiredTitle": "Geben Sie Ihre E-Mail ein, um auf die Dokumente zuzugreifen",
   "dataRoomAccessAuditNotice": "Geben Sie Ihre E-Mail ein, um fortzufahren. Der Zugriff wird geprüft.",
   "accessAction": "Zugreifen",
-  "availableDocumentsSection": "Im Ordner verfügbare Dokumente",
   "encryptedAtOrigin": "An der Quelle verschlüsselt",
-  "openAndDecryptInRam": "Im RAM öffnen und entschlüsseln",
-  "ramDecryptionNotice": "Dokumente werden ausschließlich im flüchtigen RAM entschlüsselt und unterliegen einer aktiven Leseprotokollierung.",
-
-  "shareSheetTitle": "Sicher teilen",
   "shareSingleFile": "Einzelne Datei",
-  "shareFullFolder": "Gesamter Ordner",
   "requireRecipientEmailLabel": "Empfänger-E-Mail erforderlich",
   "requireRecipientEmailSubtitle": "Der Empfänger muss vor dem Zugriff seine E-Mail eingeben",
   "enableWatermarkLabel": "Dynamisches Wasserzeichen",
@@ -340,14 +270,130 @@
   "expirationPremiumNotice": "Premium: Links können bis zu 30 Tage gültig sein",
   "copyLink": "Link kopieren",
   "shareQrCode": "QR-Code teilen",
-
   "errorExpirationMustBeFuture": "Das Ablaufdatum muss in der Zukunft liegen.",
   "errorExpirationPremiumMax": "Premium: Die maximale Link-Laufzeit beträgt 30 Tage.",
   "errorExpirationFreemiumMax": "Kostenloser Plan: Die maximale Link-Laufzeit beträgt 48 Stunden.",
   "expirationPremiumValid": "Gültiger Premium-Ablauf (≤ 30 Tage).",
   "expirationFreemiumValid": "Gültiger kostenloser Ablauf (≤ 48 Std.).",
-
-  "eventLobbyEnter": "Lobby betreten",
-  "eventFileOpen": "Datei geöffnet",
-  "eventLobbyExit": "Lobby verlassen"
+  "unlockPremiumTitle": "Premium freischalten",
+  "paywallBody": "Laden Sie größere Dateien hoch, erstellen Sie unbegrenzte Links und behalten Sie Ihre Dateien länger.",
+  "close": "Schließen",
+  "popular": "BELIEBT",
+  "premiumPlanName": "Premium",
+  "businessPlanName": "Business",
+  "monthlyLabel": "Monatlich",
+  "yearlyLabel": "Jährlich",
+  "yearlySaveLabel": "{percent} % sparen",
+  "@yearlySaveLabel": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "subscribeToBusiness": "Business abonnieren",
+  "trialBannerTitle": "Kostenlose Testphase starten",
+  "trialBannerBody": "14 Tage Premium kostenlos testen. Jederzeit kündbar.",
+  "featureFileSize": "Bis zu {size} MB pro Datei",
+  "@featureFileSize": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "featureStorage": "{storage} Speicher",
+  "@featureStorage": {
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "featureLinkDuration": "Links bis zu {days} Tagen",
+  "@featureLinkDuration": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "featureActiveLinks": "Bis zu {count} aktive Links",
+  "@featureActiveLinks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "featureActiveLinksUnlimited": "Unbegrenzte aktive Links",
+  "featureNoAds": "Keine Werbung",
+  "businessAnnualSavings": "33 % sparen",
+  "businessBadge": "BUSINESS",
+  "businessBenefits": "200 MB pro Datei • 5 GB gesamt • Links bis zu 60 Tage • alles aus Premium • Prioritäts-Support • eigenes Branding im Viewer (in Kürze)",
+  "businessPlanLabel": "Business-Tarif",
+  "businessPriceAnnual": "239,99 $/Jahr",
+  "businessPriceMonthly": "29,99 $/Monat",
+  "ephemeralStorageLabel": "Gesamter temporärer Speicher",
+  "max60Days": "60 Tage (max.)",
+  "max7Days": "7 Tage (max.)",
+  "paywallActiveLinksBody": "Der kostenlose Tarif erlaubt 3 gleichzeitig aktive Links. Mit Premium sind sie unbegrenzt.",
+  "paywallActiveLinksTitle": "Grenze für aktive Links",
+  "paywallDurationBody": "Kostenlose Links gelten bis zu 7 Tage. Mit Premium bis zu 30.",
+  "paywallDurationTitle": "Maximale Dauer im kostenlosen Tarif",
+  "paywallFileSizeBody": "Ihr Tarif erlaubt {maxSize} pro Datei. Mit Premium können Sie bis zu 100 MB teilen.",
+  "paywallFileSizeTitle": "Datei zu groß",
+  "paywallMonthlyQuotaBody": "Sie haben diesen Monat 20 Links erstellt. Mit Premium sind sie unbegrenzt.",
+  "paywallMonthlyQuotaTitle": "Monatslimit erreicht",
+  "paywallNotNow": "Später",
+  "paywallStorageBody": "Sie haben {quota} Speicher verbraucht. Löschen Sie aktive Links, um Platz zu schaffen, oder upgraden Sie Ihren Tarif.",
+  "paywallStorageBodyBusiness": "Sie haben alle 5 GB verbraucht. Löschen Sie aktive Links oder lassen Sie sie ablaufen, um Platz zu schaffen.",
+  "paywallStorageTitle": "Speicher voll",
+  "paywallViewPlans": "Tarife ansehen",
+  "plansTitle": "Tarife und Speicher",
+  "premiumAnnualSavings": "4 Monate gratis (33 % Ersparnis)",
+  "premiumPriceAnnual": "103,99 $/Jahr",
+  "premiumPriceMonthly": "12,99 $/Monat",
+  "trialBanner": "Premium testen: {days} Tage übrig",
+  "trialExpiredBody": "Sie sind zurück im kostenlosen Tarif: 20 MB pro Datei, 20 Links pro Monat und Ablauf nach 7 Tagen. Behalten Sie 100 MB, unbegrenzte Links und 30 Tage mit Premium.",
+  "trialExpiredTitle": "Ihre Premium-Testphase ist beendet",
+  "trialPromo": "14 Tage Premium kostenlos. Keine Karte erforderlich.",
+  "unsupportedFormatBody": "Aus Sicherheitsgründen akzeptiert KRIPTONSHARE nur Dateien in diesen Formaten: {formats}. Konvertieren Sie Ihr Dokument in PDF, bevor Sie es teilen.",
+  "unsupportedFormatTitle": "Nicht unterstütztes Format",
+  "unsupportedViewerBody": "Dieses Format kann nicht sicher in der App angezeigt werden. Akzeptierte Formate: {formats}.",
+  "@unsupportedFormatBody": {
+    "placeholders": {
+      "formats": {
+        "type": "String"
+      }
+    }
+  },
+  "@unsupportedViewerBody": {
+    "placeholders": {
+      "formats": {
+        "type": "String"
+      }
+    }
+  },
+  "@trialBanner": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@paywallFileSizeBody": {
+    "placeholders": {
+      "maxSize": {
+        "type": "String"
+      }
+    }
+  },
+  "@paywallStorageBody": {
+    "placeholders": {
+      "quota": {
+        "type": "String"
+      }
+    }
+  }
 }

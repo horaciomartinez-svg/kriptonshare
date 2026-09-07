@@ -49,9 +49,14 @@ flutter run --dart-define=ENABLE_REVENUECAT=true \
    `billing_unavailable`. Este es el error que ocurría antes.
 6. **Monetizar app → Productos** → crea los product IDs (deben coincidir
    EXACTAMENTE con los de RevenueCat), por ejemplo:
-   - `premium_monthly` (suscripción)
-   - `premium_annual` (suscripción)
-   - `storage_1gb` (suscripción recurrente, add-on)
+   - `premium_monthly_v2` ($12.99/mes, suscripción)
+   - `premium_yearly_v2` ($103.99/año, suscripción)
+   - `business_monthly_v2` ($29.99/mes, suscripción)
+   - `business_yearly_v2` ($239.99/año, suscripción)
+
+> ⚠️ No se usan add-ons (no existe `storage_1gb`): el almacenamiento efímero
+> está incluido por plan (Premium 1 GB / Business 5 GB) y los límites se
+> gestionan por tier, no por compras adicionales.
 
 ### 3. RevenueCat Dashboard
 
@@ -60,9 +65,10 @@ flutter run --dart-define=ENABLE_REVENUECAT=true \
 2. **Store settings** → pega la **Service Account JSON** del paso 1.4.
 3. Toma la **Public SDK Key** que empieza por `goog_` (para Android).
 4. **Offerings** → crea un offering `premium` con los productos
-   `premium_monthly` y `premium_annual` como **switches**.
-5. **Offerings** → crea un offering `storage_addons` con `storage_1gb`.
-6. Activa el offering `premium` como **current**.
+   `premium_monthly_v2` y `premium_yearly_v2` como **switches**.
+5. **Offerings** → crea un offering `business` con los productos
+   `business_monthly_v2` y `business_yearly_v2` como **switches**.
+6. Activa el offering que quieras promocionar como **current**.
 
 > ⚠️ Los tests de compra real SOLO funcionan en un build firmado subido a una
 > pista de testing con los testers de licencia. Un `flutter run` en debug NO
@@ -74,7 +80,8 @@ Cuando una compra real se complete, Google Play notifica a RevenueCat y éste a
 tu servidor vía **webhook** (Dashboard → Integrations → Webhooks). Recomendado:
 
 - Añade un webhook en RevenueCat que llame a tu Supabase Edge Function o
-  backend para hacer `UPDATE users SET subscription_tier='premium'`.
+  backend para hacer `UPDATE users SET subscription_tier=...` según el
+  producto: `premium_*_v2` → `premium`, `business_*_v2` → `business`.
 - Sin ese webhook, una compra real NO cambia el tier en Supabase por sí sola.
   El mock, en cambio, sí lo hace localmente (a propósito).
 

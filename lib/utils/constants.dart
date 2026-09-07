@@ -9,20 +9,25 @@ class AppConstants {
       defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sc2tqa2J5enBvd3hsaGpob3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDQ2NzMsImV4cCI6MjA5NjQyMDY3M30.Q5YAMmsZdc9EZuh-f6FyAsiegE4ZSYcuAtS2HsTM1Xg');
 
   // === LÍMITES PLAN GRATUITO (FREEMIUM) ===
-  static const int freeMaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+  static const int freeMaxFileSizeBytes = 20 * 1024 * 1024; // 20 MB
+  static const int freeMaxLinksPerMonth = 20;
   static const int freeMaxActiveLinks = 3;
-  static const int freeMaxDurationHours = 48; // 2 días máximo
-  static const int freeDefaultDurationHours = 24; // Selección por defecto
+  static const int freeMaxDurationHours = 168; // 7 días
+  static const int freeDefaultDurationHours = 24;
 
-  // === LÍMITES PLAN PREMIUM / ENTERPRISE ===
-  static const int premiumMaxFileSizeBytes = 100 * 1024 * 1024; // 100 MB por archivo
-  static const int premiumMaxStorageBytes = 2 * 1024 * 1024 * 1024; // 2 GB de bóveda acumulada
-  static const int premiumMaxDurationHours = 30 * 24; // 720 Horas (30 días máximo)
-  static const int premiumDefaultDurationHours = 24; // Mantiene 24h por defecto
+  // === LÍMITES PLAN PREMIUM ===
+  static const int premiumMaxFileSizeBytes = 100 * 1024 * 1024; // 100 MB
+  static const int premiumBaseStorageBytes = 1 * 1024 * 1024 * 1024; // 1 GB
+  static const int premiumMaxDurationHours = 720; // 30 días
+
+  // === LÍMITES PLAN BUSINESS ===
+  static const int businessMaxFileSizeBytes = 200 * 1024 * 1024; // 200 MB
+  static const int businessBaseStorageBytes = 5 * 1024 * 1024 * 1024; // 5 GB
+  static const int businessMaxDurationHours = 1440; // 60 días
 
   // === ALIASES DE COMPATIBILIDAD (Free tier) ===
   static const int maxFileSizeBytes = freeMaxFileSizeBytes;
-  static const int maxLinksPerMonth = 20;
+  static const int maxLinksPerMonth = freeMaxLinksPerMonth;
   static const int maxActiveLinks = freeMaxActiveLinks;
   static const int maxDurationHours = freeMaxDurationHours;
   static const int defaultDurationHours = freeDefaultDurationHours;
@@ -67,28 +72,11 @@ class AppConstants {
   static const int heartbeatIntervalSeconds = 30;
   static const int maxTelemetryBufferSize = 50;
 
-  // === CONVERSIÓN OFFICE → PDF (FASE 1) ===
-  // En desarrollo el default apunta al conversion-gateway local (docker compose en infra/conversion).
-  // En producción se sobreescribe vía --dart-define=CONVERSION_SERVICE_URL=https://convert.kriptonshare.com.
-  //
-  // IMPORTANTE (dispositivo Android FÍSICO): 'localhost' apunta al propio
-  // teléfono, NO al PC que ejecuta el gateway. Usa la IP LAN del PC
-  // (ej. http://192.168.68.112:8080) donde corre docker compose.
-  // En el emulador Android usa --dart-define=CONVERSION_SERVICE_URL=http://10.0.2.2:8080.
-  static const String conversionServiceUrl = String.fromEnvironment(
-      'CONVERSION_SERVICE_URL',
-      defaultValue: 'http://192.168.68.112:8080');
-  static const Duration conversionTimeout = Duration(seconds: 120);
-
-  // Límite de conversión por plan: REUTILIZA los topes ya definidos para upload.
-  // Free: freeMaxFileSizeBytes (10 MB) · Premium: premiumMaxFileSizeBytes (100 MB).
-  static int conversionMaxBytesFor({required bool isPremium}) =>
-      isPremium ? premiumMaxFileSizeBytes : freeMaxFileSizeBytes;
-
   // === SUBSCRIPTION TIERS ===
   static const String tierFree = 'free';
   static const String tierPremium = 'premium';
-  static const String tierEnterprise = 'enterprise';
+  static const String tierBusiness = 'business';
+  // 'enterprise' se conserva en la DB por compatibilidad y se trata como 'business'.
 
   // === WATERMARK ===
   static const double watermarkOpacity = 0.35;
@@ -98,19 +86,24 @@ class AppConstants {
 
 /// Límites y capacidades por tier de suscripción.
 class PremiumLimits {
-  static const int freemiumMaxFileBytes = 10485760;      // 10 MB
-  static const int premiumMaxFileBytes = 104857600;      // 100 MB
-  static const int premiumBaseStorageBytes = 1073741824; // 1 GB
-  static const int gigabyteBytes = 1073741824;           // incremento por add-on
-  static const int freemiumLinkTtlHours = 48;
-  static const int premiumLinkTtlHours = 720;            // 30 días
+  static const int freemiumMaxFileBytes = 20971520;       // 20 MB
+  static const int premiumMaxFileBytes = 104857600;       // 100 MB
+  static const int businessMaxFileBytes = 209715200;      // 200 MB
+  static const int premiumBaseStorageBytes = 1073741824;  // 1 GB
+  static const int businessBaseStorageBytes = 5368709120; // 5 GB
+  static const int freemiumLinkTtlHours = 168;            // 7 días
+  static const int premiumLinkTtlHours = 720;             // 30 días
+  static const int businessLinkTtlHours = 1440;           // 60 días
   static const int freemiumMonthlyLinkQuota = 20;
   static const int freemiumMaxActiveLinks = 3;
+  static const int trialDurationDays = 14;                // Trial Premium sin tarjeta
 }
 
-/// Precios públicos de suscripción y add-ons.
+/// Precios públicos de suscripción (solo referencia en UI/marketing;
+/// la fuente de verdad es RevenueCat/Store).
 class Pricing {
-  static const double monthlyUsd = 19.0;
-  static const double yearlyUsd = 189.0;   // ahorro $39/año (~17%)
-  static const double addonPerGbMonthlyUsd = 5.0;
+  static const double premiumMonthlyUsd = 12.99;
+  static const double premiumYearlyUsd = 103.99;
+  static const double businessMonthlyUsd = 29.99;
+  static const double businessYearlyUsd = 239.99;
 }

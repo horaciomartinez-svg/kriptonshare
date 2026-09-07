@@ -1,5 +1,21 @@
 # KRIPTONSHARE — Memoria de sesión
 
+## 2026-09-07 — MVP realignment COMPLETADO (§16, todas las fases cerradas)
+
+**Contexto:** el producto pivotó en Sep-2026 al MVP: sin anuncios, sin conversión Office→PDF (Gotenberg/Docker fuera), sin Virtual Data Room por carpetas, 3 planes (Free/Premium/Business), trial 14 días, paywalls contextuales y telemetría de funnel. Especificación contractual: `KRIPTONSHARE_Actualizacion_Arquitectura_MVP_Sep2026.md`. Entradas de 2026-08 (conversión Office, VDR, etc.) son HISTORIA LEGACY y ya NO reflejan el producto.
+
+**Estado final del repo:** `flutter analyze` → No issues; `flutter test` → 54/54; `flutter gen-l10n` OK (5 ARB, 326 keys c/u, 0 missing). Trabajo sin commitear (git status 127 cambios, +2988/-10432).
+
+**Migración SQL APLICADA en remote** (`olskjkbyzpowxlhjhovu`): `20260907000000_mvp_realignment.sql`. Se corrigieron bugs que solo aparecieron contra la DB real (drop-order de policies, `CREATE OR REPLACE` con RETURNS cambiado → DROP previo, `INSERT..WHERE NOT EXISTS` inválido → `INSERT..SELECT`, y `files.file_size_bytes` es INTEGER no BIGINT → runtime 42804). Remote history reconciliada en la tabla `supabase_migrations` del CLI (la legacy `_supabase_migrations` no la leía). Sin docker daemon local: `db push` a remote funciona, solo avisa de caché.
+
+**Límites/planes en vigor:** FREE 20MB/20links/mes/3 activos/7d (168h); PREMIUM $12.99/$103.99 · 100MB/∞/30d/1GB; BUSINESS $29.99/$239.99 · 200MB/∞/60d/5GB. Productos RevenueCat: `*_v2`; `enterprise`→`business`. Trial: trigger server fija `trial_ends_at` (nunca el cliente). Formatos aceptados SOLO: PDF, imágenes, TXT/MD/CSV/LOG, video (ver `SupportedFormats`). Office → diálogo bloqueante.
+
+**Estructura clave post-pivot:** `lib/utils/constants.dart` (AppConstants+PremiumLimits+Pricing), `lib/utils/supported_formats.dart`, `lib/features/subscription/` (plans_screen, paywall_sheet), `lib/features/analytics/services/funnel_metrics_service.dart`, `lib/widgets/premium_storage_gauge.dart`, `assets/branding/kriptonshare_logo_primary.png` (logo en splash y auth, sin placeholder "K"). `lib/app/constants/storage_constants.dart` borrado (contradecía límites). Tests nuevos: supported_formats, user_model (effectiveTier), paywall_trigger_keys (5 locales). E2E_TEST_GUIDE.md y README.md reescritos (sin Docker/Gotenberg/anuncios/VDR).
+
+**Lección DB:** los RPCs con `RETURNS TABLE` deben declarar tipos idénticos a las columnas reales de las tablas, y al cambiar la firma de una función publicada hay que `DROP FUNCTION IF EXISTS` antes de `CREATE OR REPLACE`, o PostgREST da 42804 / ambigüedad de overloads.
+
+---
+
 ## 2026-08-06 (noche)
 
 ### Tarea

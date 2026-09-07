@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../providers/auth_provider.dart';
+import '../../features/analytics/services/funnel_metrics_service.dart';
 
 /// Configuración de compras dentro de la app.
 ///
@@ -44,17 +45,15 @@ class PurchasePackage {
   });
 }
 
-/// Ofertas de compra: paquetes de suscripción Premium y add-ons de storage.
+/// Ofertas de compra: paquetes de suscripción (Premium y Business).
 class PurchaseOfferings {
-  final List<PurchasePackage> currentPackages;
-  final List<PurchasePackage> addonPackages;
+  final List<PurchasePackage> packages;
 
   const PurchaseOfferings({
-    this.currentPackages = const [],
-    this.addonPackages = const [],
+    this.packages = const [],
   });
 
-  bool get isEmpty => currentPackages.isEmpty && addonPackages.isEmpty;
+  bool get isEmpty => packages.isEmpty;
 }
 
 /// Contrato de compras. La implementación puede ser RevenueCat (real) o un
@@ -64,8 +63,7 @@ abstract class IPurchaseService {
   bool get isMock;
 
   Future<PurchaseOfferings> getOfferings();
-  Future<bool> purchasePackage(PurchasePackage package);
-  Future<bool> purchaseAddon(PurchasePackage package);
+  Future<bool> purchase(PurchasePackage package);
   Future<bool> restorePurchases();
 }
 
@@ -104,18 +102,13 @@ class RevenueCatPurchaseServiceImpl implements IPurchaseService {
   Future<PurchaseOfferings> getOfferings() async {
     await _ensureConfigured();
     final offerings = await Purchases.getOfferings();
-    final current = offerings.current?.availablePackages ?? const <Package>[];
-    final addons = <PurchasePackage>[];
-    for (final entry in offerings.all.entries) {
-      if (entry.key == offerings.current?.identifier) continue;
-      for (final package in entry.value.availablePackages) {
-        addons.add(_toDomain(package));
+    final allPackages = <PurchasePackage>[];
+    for (final offering in offerings.all.values) {
+      for (final package in offering.availablePackages) {
+        allPackages.add(_toDomain(package));
       }
     }
-    return PurchaseOfferings(
-      currentPackages: current.map(_toDomain).toList(),
-      addonPackages: addons,
-    );
+    return PurchaseOfferings(packages: allPackages);
   }
 
   PurchasePackage _toDomain(Package package) => PurchasePackage(
@@ -138,16 +131,13 @@ class RevenueCatPurchaseServiceImpl implements IPurchaseService {
   }
 
   @override
-  Future<bool> purchasePackage(PurchasePackage package) async {
+  Future<bool> purchase(PurchasePackage package) async {
     await _ensureConfigured();
     await Purchases.purchasePackage(await _resolvePackage(package));
-    return true;
-  }
-
-  @override
-  Future<bool> purchaseAddon(PurchasePackage package) async {
-    await _ensureConfigured();
-    await Purchases.purchasePackage(await _resolvePackage(package));
+    await FunnelMetricsService().logEvent(
+      'purchase_completed',
+      metadata: {'product_id': package.identifier, 'source': 'revenuecat'},
+    );
     return true;
   }
 
@@ -175,41 +165,50 @@ class MockPurchaseServiceImpl implements IPurchaseService {
   @override
   Future<PurchaseOfferings> getOfferings() async {
     return const PurchaseOfferings(
-      currentPackages: [
+      packages: [
         PurchasePackage(
-          identifier: 'premium_monthly',
+          identifier: 'premium_monthly_v2',
           offeringIdentifier: 'premium',
           title: 'Kripton Premium (mensual)',
-          price: r'$3.99/mes',
+          price: r'$12.99/mes',
         ),
         PurchasePackage(
-          identifier: 'premium_annual',
+          identifier: 'premium_yearly_v2',
           offeringIdentifier: 'premium',
           title: 'Kripton Premium (anual)',
-          price: r'$29.99/año',
+          price: r'$103.99/año',
         ),
-      ],
-      addonPackages: [
         PurchasePackage(
-          identifier: 'storage_1gb',
-          offeringIdentifier: 'storage_addons',
-          title: 'Add-on +1 GB',
-          price: r'$0.99/mes',
+          identifier: 'business_monthly_v2',
+          offeringIdentifier: 'business',
+          title: 'Kripton Business (mensual)',
+          price: r'$29.99/mes',
+        ),
+        PurchasePackage(
+          identifier: 'business_yearly_v2',
+          offeringIdentifier: 'business',
+          title: 'Kripton Business (anual)',
+          price: r'$239.99/año',
         ),
       ],
     );
   }
 
-  Future<bool> _grantPremium() async {
-    await _ref.read(authStateProvider.notifier).setPremiumSimulation(true);
+  Future<bool> _grantTier(String tier) async {
+    await _ref.read(authStateProvider.notifier).setPremiumSimulation(true, tier: tier);
     return true;
   }
 
   @override
-  Future<bool> purchasePackage(PurchasePackage package) => _grantPremium();
-
-  @override
-  Future<bool> purchaseAddon(PurchasePackage package) => _grantPremium();
+  Future<bool> purchase(PurchasePackage package) async {
+    final tier = package.identifier.startsWith('business') ? 'business' : 'premium';
+    await _grantTier(tier);
+    await FunnelMetricsService().logEvent(
+      'purchase_completed',
+      metadata: {'product_id': package.identifier, 'source': 'mock', 'tier': tier},
+    );
+    return true;
+  }
 
   @override
   Future<bool> restorePurchases() async => true;

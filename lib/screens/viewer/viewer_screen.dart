@@ -15,7 +15,6 @@ import '../../models/kripton_file.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/file_provider.dart';
 import '../../services/screenshot_service.dart';
-import '../../utils/office_formats.dart';
 import '../../utils/theme.dart';
 import '../../widgets/video_player_screen.dart';
 
@@ -43,6 +42,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   // Fallback si pdfrx no logra renderizar el PDF.
   bool _pdfRenderFailed = false;
   Timer? _pdfLoadTimer;
+
+  // Guard: el primer view del receptor se registra una sola vez por sesión.
+  bool _firstRecipientViewLogged = false;
 
   // Tracking de telemetría por página.
   int? _currentPage;
@@ -138,18 +140,10 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       debugPrint('[VIEWER] Iniciando descarga y descifrado para linkId=$linkId');
       debugPrint('[VIEWER] Archivo: ${_file!.originalFilename} (${_file!.mimeType})');
 
-      final usePreview = OfficeFormats.isConvertible(
-              mimeType: _file!.mimeType, fileName: _file!.originalFilename) &&
-          _file!.hasPdfPreview;
-      debugPrint('[VIEWER] conversionStatus=${_file!.conversionStatus} '
-          'viewerObjectKey=${_file!.viewerObjectKey} '
-          'hasPdfPreview=${_file!.hasPdfPreview} usePreview=$usePreview');
-
       final decrypted = await fileService.downloadAndDecryptFile(
         _file!,
         _passwordController.text,
         linkId: linkId,
-        useViewerObject: usePreview,
       );
 
       debugPrint('[VIEWER] Descifrado exitoso: ${decrypted.length} bytes');
@@ -163,7 +157,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       });
 
       // Si el PDF no se renderiza en 3 segundos, ofrecer fallback.
-      if (_file!.mimeType == 'application/pdf' || usePreview) {
+      if (_file!.mimeType == 'application/pdf') {
         _pdfLoadTimer?.cancel();
         _pdfLoadTimer = Timer(const Duration(seconds: 3), () {
           if (mounted && !_pdfController.isReady) {
@@ -177,6 +171,17 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       await ScreenshotService.enableSecureView();
       // Registrar que el receptor descifró el archivo.
       await _logEvent('download_complete');
+      // Registrar primer view del receptor (funnel, RPC server-side).
+      if (!_firstRecipientViewLogged) {
+        _firstRecipientViewLogged = true;
+        try {
+          await ref
+              .read(supabaseClientProvider)
+              .rpc('log_first_recipient_view', params: {'p_link_id': linkId});
+        } catch (e) {
+          debugPrint('[VIEWER] log_first_recipient_view failed: $e');
+        }
+      }
       // Iniciar tracking de la primera página/vista.
       _startPageTracking(1);
     } on FormatException catch (e) {
@@ -474,14 +479,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           ),
         ),
       );
-    } else if (mimeType == 'application/pdf' ||
-        (OfficeFormats.isConvertible(
-                mimeType: mimeType, fileName: _file!.originalFilename) &&
-            _file!.hasPdfPreview)) {
-      // PDF original o vista previa PDF de un Office (Fase 1).
-      final isOfficePreview = OfficeFormats.isConvertible(
-              mimeType: mimeType, fileName: _file!.originalFilename) &&
-          _file!.hasPdfPreview;
+    } else if (mimeType == 'application/pdf') {
       final pdfParams = PdfViewerParams(
         backgroundColor: KriptonTheme.charcoalBlack,
         errorBannerBuilder: (context, error, stackTrace, documentRef) {
@@ -508,9 +506,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         content = PdfViewer.data(
           key: ValueKey('${_file!.id}-preview'),
           _decryptedBytes!,
-          sourceName: isOfficePreview
-              ? '${_file!.originalFilename} (vista previa)'
-              : _file!.originalFilename,
+          sourceName: _file!.originalFilename,
           controller: _pdfController,
           useProgressiveLoading: false,
           params: pdfParams,
@@ -556,8 +552,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         ),
       );
     } else {
-      // Formatos no visualizables de forma segura (Word, Excel, PowerPoint, etc.)
-      // No se ofrece abrir con app externa para evitar fugas de confidencialidad.
+      // Formatos no visualizables.
       content = Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -593,20 +588,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             ),
             const SizedBox(height: 32),
             Text(
-              _file!.conversionStatus == 'failed'
-                  ? l10n.pdfViewerFallback
-                  : l10n.officeNotViewable,
+              l10n.officeNotViewable,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: KriptonTheme.silver,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              l10n.convertToPdfAdvice,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: KriptonTheme.platinum,
-                    fontWeight: FontWeight.w600,
                   ),
               textAlign: TextAlign.center,
             ),

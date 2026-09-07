@@ -4,9 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/foundation.dart';
 import 'l10n/app_localizations.dart';
 
 import 'core/localization/locale_provider.dart';
@@ -14,33 +12,15 @@ import 'core/localization/locale_provider.dart';
 import 'core/network/network_info.dart';
 import 'core/utils/theme.dart';
 import 'utils/constants.dart';
-import 'features/data_room/data/repositories/crypto_repository_impl.dart';
-import 'features/data_room/data_room_providers.dart';
-import 'features/data_room/domain/repositories/i_crypto_repository.dart';
-import 'features/data_room/presentation/notifiers/data_room_notifier.dart';
 import 'features/qna/data/datasources/supabase_chat_datasource.dart';
 import 'features/qna/data/repositories/qna_repository_impl.dart';
 import 'features/qna/domain/repositories/i_qna_repository.dart';
 import 'providers/router_provider.dart';
-import 'services/crypto_service.dart';
 import 'services/screenshot_service.dart';
 
 // ─── Providers de la nueva arquitectura Clean Architecture ───
 
 final networkInfoProvider = Provider<NetworkInfo>((ref) => NetworkInfoImpl());
-
-final cryptoRepositoryProvider = Provider<ICryptoRepository>((ref) {
-  return CryptoRepositoryImpl(CryptoService());
-});
-
-// dataRoomRepositoryProvider se define en features/data_room/data_room_providers.dart
-
-final dataRoomNotifierProvider = StateNotifierProvider<DataRoomNotifier, DataRoomState>((ref) {
-  return DataRoomNotifier(
-    dataRoomRepository: ref.watch(dataRoomRepositoryProvider),
-    cryptoRepository: ref.watch(cryptoRepositoryProvider),
-  );
-});
 
 final qnaRepositoryProvider = Provider<IQnaRepository>((ref) {
   return QnaRepositoryImpl(
@@ -52,12 +32,7 @@ final qnaRepositoryProvider = Provider<IQnaRepository>((ref) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Google Mobile Ads SDK (AdMob)
-  if (!kIsWeb) {
-    await MobileAds.instance.initialize();
-  }
-  
+
   // Lock orientation to portrait for security
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -128,20 +103,11 @@ class _KriptonShareAppState extends ConsumerState<KriptonShareApp> {
 
     // Supported paths:
     //   https://kriptonshare.com/room/<id>
-    //   https://kriptonshare.com/folder-room/<id>
-    //   https://kriptonshare.com/f/<id>
     //   https://kriptonshare.com/d/<id>
     //   kriptonshare://room/<id>
     if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'room') {
       final linkId = uri.pathSegments[1];
       router.go('/room/$linkId');
-    } else if (uri.pathSegments.length >= 2 &&
-        uri.pathSegments[0] == 'folder-room') {
-      final folderLinkId = uri.pathSegments[1];
-      router.go('/folder-room/$folderLinkId');
-    } else if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'f') {
-      final folderLinkId = uri.pathSegments[1];
-      router.go('/f/$folderLinkId');
     } else if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'd') {
       final linkId = uri.pathSegments[1];
       router.go('/d/$linkId');

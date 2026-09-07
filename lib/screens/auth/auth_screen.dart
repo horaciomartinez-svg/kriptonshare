@@ -206,24 +206,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with SingleTickerProvid
               const SizedBox(height: 16),
               // Logo
               Center(
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    gradient: KriptonTheme.brandGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'K',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 32,
-                        color: KriptonTheme.platinum,
-                      ),
-                    ),
-                  ),
+                child: Image.asset(
+                  'assets/branding/kriptonshare_logo_primary.png',
+                  height: 100,
+                  fit: BoxFit.contain,
                 ),
               )
                   .animate()

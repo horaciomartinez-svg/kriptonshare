@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/entities/telemetry_event_entity.dart';
-import '../../../data_room/data/datasources/local_database_datasource.dart';
+import '../datasources/local_database_datasource.dart';
 import '../../domain/repositories/i_telemetry_repository.dart';
 
 /// Implementación de Telemetría: SQLite offline + Supabase eventual.

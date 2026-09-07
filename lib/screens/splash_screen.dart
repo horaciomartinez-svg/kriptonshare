@@ -68,31 +68,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  gradient: KriptonTheme.brandGradient,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: KriptonTheme.kryptonGreen.withOpacity(0.3),
-                      blurRadius: 24,
-                      spreadRadius: 4,
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Text(
-                    'K',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 40,
-                      color: KriptonTheme.platinum,
-                    ),
-                  ),
-                ),
+              Image.asset(
+                'assets/branding/kriptonshare_logo_primary.png',
+                height: 160,
+                fit: BoxFit.contain,
               )
                   .animate()
                   .scale(

@@ -12,10 +12,12 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/localization/formatters.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/file_provider.dart';
-import '../../../../utils/office_formats.dart';
+import '../../../../utils/supported_formats.dart';
 import '../../../../utils/theme.dart';
 import '../../../../utils/constants.dart';
-import '../widgets/ms_office_warning_dialog.dart';
+import '../../../../models/user_model.dart';
+import '../../../../features/subscription/presentation/widgets/paywall_sheet.dart';
+import '../widgets/unsupported_format_dialog.dart';
 
 class UploadScreen extends ConsumerStatefulWidget {
   const UploadScreen({super.key});
@@ -28,13 +30,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   XFile? _selectedFile;
   int? _selectedFileSize;
   bool _isEncrypting = false;
-  bool _isConverting = false;
   bool _isUploading = false;
-  bool _conversionFailed = false;
-  String? _conversionErrorDetail;
+  String _processingStep = 'encrypting';
   String? _shareLink;
   String? _errorMessage;
   double _progress = 0;
+
+  bool _durationPaywallShown = false;
 
   // Aguja del Slider: Inicializa estrictamente en 24 horas por defecto
   double _selectedDurationHours = AppConstants.defaultDurationHours.toDouble();
@@ -49,30 +51,46 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     super.dispose();
   }
 
+  String _mimeOf(XFile file) =>
+      file.mimeType ??
+      lookupMimeType(file.name) ??
+      'application/octet-stream';
+
   Future<void> _pickFile() async {
     final l10n = AppLocalizations.of(context);
     final user = ref.read(authStateProvider).valueOrNull;
-    final int maxLimit = user?.maxFileSizeBytes ?? AppConstants.freeMaxFileSizeBytes;
-    final String maxSize = formatBytes(context, maxLimit);
 
     try {
       final file = await openFile();
-      if (file != null) {
-        final length = await file.length();
-        if (length > maxLimit) {
-          setState(() {
-            _selectedFile = null;
-            _selectedFileSize = null;
-            _errorMessage = l10n.fileExceedsPlanLimit(maxSize);
-          });
-          return;
-        }
-        setState(() {
-          _selectedFile = file;
-          _selectedFileSize = length;
-          _errorMessage = null;
-        });
+      if (file == null || !mounted) return;
+
+      // Bloqueo de formatos en origen (§3.4): solo se aceptan formatos
+      // visualizables de forma segura dentro de la app.
+      if (!SupportedFormats.isViewable(
+        mimeType: _mimeOf(file),
+        fileName: file.name,
+      )) {
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const UnsupportedFormatDialog(),
+        );
+        return;
       }
+
+      final length = await file.length();
+      if (!mounted) return;
+      final int maxLimit = user?.maxFileSizeBytes ?? AppConstants.freeMaxFileSizeBytes;
+      if (length > maxLimit) {
+        await _rejectFileTooLarge(formatBytes(context, maxLimit));
+        return;
+      }
+
+      setState(() {
+        _selectedFile = file;
+        _selectedFileSize = length;
+        _errorMessage = null;
+      });
     } catch (e) {
       setState(() => _errorMessage = l10n.filePickError);
     }
@@ -94,7 +112,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       if (photo != null) {
         final length = await photo.length();
         if (length > maxLimit) {
-          setState(() => _errorMessage = l10n.captureExceedsPlanLimit(maxSize));
+          await _rejectFileTooLarge(maxSize);
           return;
         }
         setState(() {
@@ -106,6 +124,46 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     } catch (_) {
       setState(() => _errorMessage = l10n.cameraAccessCancelled);
     }
+  }
+
+  /// Paywall contextual `fileSizeLimit` para usuarios free; los planes de pago
+  /// (o el tope del propio plan) muestran solo un error plano (§10.2).
+  Future<void> _rejectFileTooLarge(String maxSize) async {
+    final l10n = AppLocalizations.of(context);
+    final user = ref.read(authStateProvider).valueOrNull;
+
+    setState(() {
+      _selectedFile = null;
+      _selectedFileSize = null;
+      _errorMessage = l10n.fileExceedsPlanLimit(maxSize);
+    });
+
+    if (user != null && user.isFree) {
+      await PaywallSheet.show(context, trigger: 'file_size');
+    }
+  }
+
+  /// Muestra paywall contextual según el motivo de rechazo de `canUpload()`,
+  /// o un error plano para usuarios de pago / motivos no comerciales (§10.2).
+  Future<void> _handleQuotaRejection(String? reasonCode, String? message) async {
+    final l10n = AppLocalizations.of(context);
+    final user = ref.read(authStateProvider).valueOrNull;
+    final isBusiness = user?.effectiveTier == 'business';
+
+    final bool canSell = user != null &&
+        user.isFree &&
+        !isBusiness &&
+        reasonCode != null &&
+        reasonCode != 'general';
+
+    if (!canSell) {
+      setState(() {
+        _errorMessage = message ?? l10n.errorQuotaExceeded;
+      });
+      return;
+    }
+
+    await PaywallSheet.show(context, trigger: reasonCode);
   }
 
   Future<void> _uploadAndEncrypt() async {
@@ -122,44 +180,29 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       return;
     }
 
-    final isConvertible = OfficeFormats.isConvertible(
-      mimeType: _selectedFile!.mimeType ??
-          lookupMimeType(_selectedFile!.name) ??
-          'application/octet-stream',
-      fileName: _selectedFile!.name,
-    );
+    final fileBytes = await _selectedFile!.readAsBytes();
 
-    if (isConvertible && mounted) {
-      final shouldProceed = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const MsOfficeWarningDialog(),
-      );
-      if (shouldProceed != true) return;
+    // Validación de cuotas autoritativa (RPC `check_upload_limits` con reason_code).
+    final fileService = ref.read(fileServiceProvider);
+    final limitResult = await fileService.canUpload(fileBytes.length, user.id);
+    if (!limitResult.allowed) {
+      await _handleQuotaRejection(limitResult.reasonCode, limitResult.message);
+      return;
     }
 
     setState(() {
       _isEncrypting = true;
-      _isConverting = false;
       _isUploading = false;
-      _conversionFailed = false;
+      _processingStep = 'encrypting';
       _errorMessage = null;
       _progress = 0.2;
     });
 
     await Future.delayed(const Duration(milliseconds: 600));
 
-    setState(() {
-      _isEncrypting = false;
-      _isConverting = isConvertible;
-      _progress = 0.45;
-    });
-
     try {
-      final fileBytes = await _selectedFile!.readAsBytes();
-      final mimeType = _selectedFile!.mimeType ?? lookupMimeType(_selectedFile!.name) ?? 'application/octet-stream';
+      final mimeType = _mimeOf(_selectedFile!);
 
-      final fileService = ref.read(fileServiceProvider);
       final link = await fileService.uploadAndCreateLink(
         fileBytes: fileBytes,
         fileName: _selectedFile!.name,
@@ -167,55 +210,27 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         userPassword: _passwordController.text,
         selectedDurationHours: _selectedDurationHours.toInt(),
         recipientEmail: _recipientController.text.isEmpty ? null : _recipientController.text,
-        onConversionStatus: (status, [detail]) {
-          if (status == 'ready') {
-            setState(() {
-              _isConverting = false;
-              _isUploading = true;
-              _progress = 0.75;
-            });
-          } else if (status == 'failed') {
-            final detailMsg = detail ?? 'Sin detalle';
-            debugPrint('[CONVERSION] Vista previa falló: $detailMsg');
-            setState(() {
-              _isConverting = false;
-              _isUploading = true;
-              _conversionFailed = true;
-              _conversionErrorDetail = detailMsg;
-              _progress = 0.75;
-            });
-            if (mounted) {
-              // Aviso VISIBLE con el error de red exacto del gateway (p. ej.
-              // SocketException / Connection refused / timeouts de ngrok).
-              // Sin SnackBarBehavior.floating: evita "Floating SnackBar
-              // presented off screen" cuando la vista tiene bottomNavigationBar
-              // o Scaffolds anidados (el dashboard queda registrado debajo).
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '${l10n.conversionPreviewFailed}\n$detailMsg',
-                    ),
-                    backgroundColor: KriptonTheme.alertRed,
-                    duration: const Duration(seconds: 6),
-                  ),
-                );
-            }
-          }
+        onProgress: (status) {
+          if (!mounted) return;
+          setState(() {
+            _isEncrypting = status == 'encrypting';
+            _isUploading = status == 'syncing';
+            _processingStep = status;
+            _progress = status == 'encrypting' ? 0.35 : 0.75;
+          });
         },
       );
 
       setState(() {
         _progress = 1.0;
         _isUploading = false;
+        _isEncrypting = false;
         _shareLink = AppConstants.shareUrl(link.id);
       });
     } catch (e) {
       setState(() {
         _isUploading = false;
         _isEncrypting = false;
-        _isConverting = false;
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
     }
@@ -229,32 +244,39 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       l10n.shareMessageTemplate(
         url,
         AppConstants.appLinkUrl(url),
-        AppConstants.maxDurationHours,
+        _selectedDurationHours.toInt(),
       ),
       subject: l10n.shareDataRoomTitle,
     );
   }
 
   // === COMPONENTE COMPACTO DEL SLIDER INTERACTIVO (ADAPTATIVO POR TIER) ===
-  Widget _buildInteractiveDurationSlider(bool isPremium) {
+  Widget _buildInteractiveDurationSlider(KriptonUser user) {
     final l10n = AppLocalizations.of(context);
-    final double maxRange = isPremium
-        ? AppConstants.premiumMaxDurationHours.toDouble() // 720h (30 días)
-        : AppConstants.freeMaxDurationHours.toDouble();   // 48h (2 días)
+    final bool isPremium = user.isPremium;
+    final double maxRange = user.maxDurationHours.toDouble(); // free 168h · premium/trial 720h · business 1440h
 
     String formattedDurationLabel(double hours) {
-      if (hours >= 24) {
-        return l10n.daysUnit(hours ~/ 24);
+      final rounded = hours.round();
+      if (rounded >= 24) {
+        return l10n.daysUnit(rounded ~/ 24);
       }
-      return l10n.hoursUnit(hours.toInt());
+      return l10n.hoursUnit(rounded);
     }
 
     String sliderThumbLabel(double hours) {
-      if (hours >= 24) {
-        return '${(hours / 24).toInt()}d';
+      final rounded = hours.round();
+      if (rounded >= 24) {
+        return '${rounded ~/ 24}d';
       }
-      return '${hours.toInt()}h';
+      return '${rounded}h';
     }
+
+    final String maxLabel = switch (user.effectiveTier) {
+      'business' => l10n.max60Days,
+      'premium' => l10n.max30Days,
+      _ => l10n.max7Days,
+    };
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -281,7 +303,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        l10n.premiumBadge,
+                        user.effectiveTier == 'business'
+                            ? l10n.businessBadge
+                            : l10n.premiumBadge,
                         style: const TextStyle(color: KriptonTheme.electricLime, fontSize: 9, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -314,23 +338,29 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               value: _selectedDurationHours.clamp(1.0, maxRange),
               min: 1.0,
               max: maxRange,
-              divisions: isPremium ? 29 : 47, // Días (30) o horas exactas (48)
               label: sliderThumbLabel(_selectedDurationHours),
-              onChanged: (_isEncrypting || _isConverting || _isUploading) ? null : (value) {
-                setState(() => _selectedDurationHours = value);
-              },
+              onChanged: (_isEncrypting || _isUploading)
+                  ? null
+                  : (value) {
+                      final snapped = value.round().clamp(1, maxRange.round()).toDouble();
+                      setState(() => _selectedDurationHours = snapped);
+
+                      // Usuario free: tope en 168 h y paywall suave la primera
+                      // vez que alcanza el máximo por sesión (§10.2 durationLimit).
+                      if (!user.isPremium &&
+                          snapped >= maxRange &&
+                          !_durationPaywallShown) {
+                        _durationPaywallShown = true;
+                        PaywallSheet.show(context, trigger: 'link_duration');
+                      }
+                    },
             ),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(l10n.oneHour, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite)),
-              if (isPremium)
-                Text(l10n.max30Days, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontWeight: FontWeight.bold))
-              else ...[
-                Text(l10n.default24h, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontSize: 10)),
-                Text(l10n.max48Hours, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite)),
-              ],
+              Text(maxLabel, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.graphite, fontWeight: FontWeight.bold)),
             ],
           ),
         ],
@@ -338,115 +368,47 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     );
   }
 
-  // === ESQUELETO PUBLICITARIO MIGRADO (40% / 40% / 20%) ===
-  Widget _buildProcessingAdOverlay() {
+  // === VISTA DE PROCESAMIENTO (sin publicidad) ===
+  Widget _buildProcessingView() {
     final l10n = AppLocalizations.of(context);
-    return Container(
-      color: KriptonTheme.charcoalBlack,
-      width: double.infinity,
-      height: MediaQuery.of(context).size.height,
-      padding: const EdgeInsets.all(24) + MediaQuery.of(context).padding,
-      child: SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.vertical - 48,
-          ),
-          child: IntrinsicHeight(
-            child: Column(
-              children: [
-                // 40% Superior: Zona de Autoridad
-                Expanded(
-                  flex: 4,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.lock_outline, size: 48, color: KriptonTheme.electricLime)
-                          .animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms),
-                      const SizedBox(height: 12),
-                      Text(l10n.protectingFiles, style: const TextStyle(color: KriptonTheme.platinum, fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      LinearProgressIndicator(
-                        value: _progress,
-                        backgroundColor: KriptonTheme.inkDeep,
-                        valueColor: const AlwaysStoppedAnimation(KriptonTheme.electricLime),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _isEncrypting
-                            ? l10n.encryptingAesStep
-                            : _isConverting
-                                ? l10n.generatingPreviewStep
-                                : l10n.syncingR2Step,
-                        style: const TextStyle(color: KriptonTheme.cyanTelemetry, fontFamily: 'SFMono', fontSize: 11),
-                      ),
-                    ],
-                  ),
+    return Scaffold(
+      backgroundColor: KriptonTheme.charcoalBlack,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lock_outline, size: 48, color: KriptonTheme.electricLime)
+                  .animate(onPlay: (c) => c.repeat())
+                  .shimmer(duration: 1200.ms),
+              const SizedBox(height: 12),
+              Text(
+                l10n.protectingFiles,
+                style: const TextStyle(
+                  color: KriptonTheme.platinum,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-
-                // 40% Central: Zona de Anuncio Nativo B2B
-                Expanded(
-                  flex: 4,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF121212),
-                      border: Border.all(color: KriptonTheme.cardBorder),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(width: 40, height: 40, color: KriptonTheme.ink, child: const Icon(Icons.business, color: KriptonTheme.silver, size: 20)),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(l10n.adSampleTitle, style: const TextStyle(color: KriptonTheme.platinum, fontWeight: FontWeight.bold, fontSize: 13)),
-                                  Text(l10n.adSampleBody, style: const TextStyle(color: KriptonTheme.silver, fontSize: 11)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: KriptonTheme.silver,
-                            side: const BorderSide(color: KriptonTheme.graphite),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(l10n.adSampleCta, style: const TextStyle(fontSize: 11)),
-                        ),
-                      ],
-                    ),
-                  ),
+              ),
+              const SizedBox(height: 16),
+              LinearProgressIndicator(
+                value: _progress,
+                backgroundColor: KriptonTheme.inkDeep,
+                valueColor: const AlwaysStoppedAnimation(KriptonTheme.electricLime),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _processingStep == 'encrypting'
+                    ? l10n.encryptingAesStep
+                    : l10n.syncingR2Step,
+                style: const TextStyle(
+                  color: KriptonTheme.cyanTelemetry,
+                  fontFamily: 'SFMono',
+                  fontSize: 11,
                 ),
-
-                // 20% Inferior: Zona de Escape (Upsell)
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(l10n.upsellTitle, style: const TextStyle(color: KriptonTheme.silver, fontSize: 11)),
-                      TextButton(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                        child: Text(l10n.upsellCta, style: const TextStyle(color: KriptonTheme.platinum, fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -458,10 +420,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     final l10n = AppLocalizations.of(context);
     final isComplete = _shareLink != null;
     final user = ref.watch(authStateProvider).valueOrNull;
-    final isPremium = user?.isPremium ?? false;
 
-    if (_isEncrypting || _isConverting || _isUploading) {
-      return Scaffold(body: _buildProcessingAdOverlay());
+    if (_isEncrypting || _isUploading) {
+      return _buildProcessingView();
     }
 
     return Scaffold(
@@ -555,35 +516,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                 ],
               ).animate().fade(),
               const SizedBox(height: 12),
-              if (_selectedFile != null &&
-                  OfficeFormats.isConvertible(
-                    mimeType: _selectedFile!.mimeType ??
-                        lookupMimeType(_selectedFile!.name) ??
-                        'application/octet-stream',
-                    fileName: _selectedFile!.name,
-                  )) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: KriptonTheme.electricLime.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: KriptonTheme.electricLime.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.picture_as_pdf, color: KriptonTheme.electricLime, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          l10n.pdfPreviewGeneratedNotice,
-                          style: const TextStyle(color: KriptonTheme.electricLime, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
               TextFormField(
                 controller: _passwordController,
                 obscureText: true,
@@ -598,7 +530,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               const SizedBox(height: 20),
 
               // INYECCIÓN DEL SLIDER DINÁMICO REFACTORIZADO
-              _buildInteractiveDurationSlider(isPremium),
+              if (user != null) _buildInteractiveDurationSlider(user),
 
               const SizedBox(height: 24),
               ElevatedButton(
@@ -615,46 +547,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                     const Icon(Icons.check_circle, size: 64, color: KriptonTheme.cryptoGreen),
                     const SizedBox(height: 16),
                     Text(l10n.dataRoomReadyBanner, style: Theme.of(context).textTheme.displayMedium),
-                    if (_conversionFailed) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: KriptonTheme.amber.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: KriptonTheme.amber.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.info_outline, color: KriptonTheme.amber, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    l10n.previewGenerationFailedNotice,
-                                    style: const TextStyle(color: KriptonTheme.amber, fontSize: 12),
-                                  ),
-                                  if (_conversionErrorDetail != null) ...[
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      _conversionErrorDetail!,
-                                      style: const TextStyle(
-                                        color: KriptonTheme.alertRed,
-                                        fontSize: 11,
-                                        fontFamily: 'SFMono',
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 20),
                     QrImageView(data: _shareLink!, version: QrVersions.auto, size: 140, backgroundColor: KriptonTheme.platinum),
                     const SizedBox(height: 20),

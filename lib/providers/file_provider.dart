@@ -7,12 +7,12 @@ import 'package:uuid/uuid.dart';
 import 'package:dio/dio.dart';
 import 'package:crypto/crypto.dart';
 import '../models/kripton_file.dart';
-import '../services/conversion_service.dart';
 import '../services/crypto_service.dart';
 import '../services/r2_signature_service.dart';
 import '../utils/constants.dart';
-import '../utils/office_formats.dart';
+
 import 'auth_provider.dart';
+import '../features/analytics/services/funnel_metrics_service.dart';
 
 final fileServiceProvider = Provider<FileService>((ref) => FileService(ref));
 
@@ -48,6 +48,23 @@ class ExpiredLinkItem {
     required this.expiredAt,
   });
 }
+
+/// Resultado de la validación de cuotas con código de razón.
+class UploadLimitResult {
+  final bool allowed;
+  final String? message;
+  /// `file_size`, `monthly_quota`, `active_links`, `storage`, or `null` (success).
+  final String? reasonCode;
+
+  const UploadLimitResult({
+    required this.allowed,
+    this.message,
+    this.reasonCode,
+  });
+}
+
+/// Estado de progreso de subida para la UI: 'encrypting' o 'syncing'.
+typedef UploadProgressCallback = void Function(String status);
 
 class FileService {
   final Ref _ref;
@@ -129,9 +146,9 @@ class FileService {
     return response.statusCode ?? 0;
   }
 
-  Future<bool> canUpload(int fileSizeBytes, String userId) async {
+  Future<UploadLimitResult> canUpload(int fileSizeBytes, String userId) async {
     final user = _ref.read(authStateProvider).valueOrNull;
-    if (user == null) return false;
+    if (user == null) return const UploadLimitResult(allowed: false);
 
     // 1. Validación autoritativa vía RPC (evita evasión desde clientes modificados)
     try {
@@ -142,23 +159,38 @@ class FileService {
       if (result is List && result.isNotEmpty) {
         final row = result.first as Map<String, dynamic>;
         final allowed = row['can_upload'] as bool;
-        final message = row['message'] as String? ?? 'Quota limit exceeded';
-        if (!allowed) throw Exception(message);
-        return true;
+        final message = row['message'] as String?;
+        final reasonCode = row['reason_code'] as String?;
+        if (!allowed) {
+          return UploadLimitResult(
+            allowed: false,
+            message: message ?? 'Quota limit exceeded',
+            reasonCode: reasonCode,
+          );
+        }
+        return const UploadLimitResult(allowed: true);
       }
     } catch (e) {
       debugPrint('[canUpload] RPC error, falling back to client-side validation: $e');
     }
 
-    // 2. Fallback cliente si la RPC no está disponible o falla
+    // 2. Fallback cliente si la RPC no está disponible o falla (tier-aware)
     if (user.isPremium) {
-      if (fileSizeBytes > AppConstants.premiumMaxFileSizeBytes) return false;
-      if ((user.totalStorageUsedBytes + fileSizeBytes) > user.maxStoragePremiumBytes) return false;
-      return true;
+      if (fileSizeBytes > user.maxFileSizeBytes) {
+        return const UploadLimitResult(allowed: false, reasonCode: 'file_size');
+      }
+      if ((user.totalStorageUsedBytes + fileSizeBytes) > user.maxStorageBytes) {
+        return const UploadLimitResult(allowed: false, reasonCode: 'storage');
+      }
+      return const UploadLimitResult(allowed: true);
     }
 
-    if (fileSizeBytes > AppConstants.freeMaxFileSizeBytes) return false;
-    if (user.monthlyLinksGenerated >= AppConstants.maxLinksPerMonth) return false;
+    if (fileSizeBytes > AppConstants.freeMaxFileSizeBytes) {
+      return const UploadLimitResult(allowed: false, reasonCode: 'file_size');
+    }
+    if (user.monthlyLinksGenerated >= AppConstants.maxLinksPerMonth) {
+      return const UploadLimitResult(allowed: false, reasonCode: 'monthly_quota');
+    }
 
     final activeLinksRes = await _client
         .from('share_links')
@@ -167,9 +199,11 @@ class FileService {
         .eq('is_active', true)
         .gte('expires_at', DateTime.now().toIso8601String());
 
-    if ((activeLinksRes as List).length >= AppConstants.maxActiveLinks) return false;
+    if ((activeLinksRes as List).length >= AppConstants.maxActiveLinks) {
+      return const UploadLimitResult(allowed: false, reasonCode: 'active_links');
+    }
 
-    return true;
+    return const UploadLimitResult(allowed: true);
   }
 
   Future<ShareLink> uploadAndCreateLink({
@@ -180,25 +214,21 @@ class FileService {
     required int selectedDurationHours,
     int? maxDownloads,
     String? recipientEmail,
-    void Function(String status, [String? detail])? onConversionStatus,
+    UploadProgressCallback? onProgress,
   }) async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) throw Exception('User not authenticated');
 
-    debugPrint('[UPLOAD_START] Iniciando subida de Office. '
-        'URL de conversión: ${AppConstants.conversionServiceUrl}');
+    debugPrint('[UPLOAD_START] Iniciando subida de $fileName');
 
-    final allowed = await canUpload(fileBytes.length, user.id);
-    if (!allowed) {
-      throw Exception('Upload cannot be completed. Check your plan limits.');
+    final limitResult = await canUpload(fileBytes.length, user.id);
+    if (!limitResult.allowed) {
+      throw Exception(limitResult.message ?? 'Upload cannot be completed. Check your plan limits.');
     }
-
-    // Prueba temporal de conectividad R2 eliminada: añadía un PUT diagnóstico
-    // en cada upload (latencia + punto de fallo por SocketException) sin valor
-    // en producción. testR2Connection() se conserva para diagnósticos manuales.
 
     // 1. Encriptación local Zero-Knowledge (AES-256-GCM) en Isolate
     //    para no bloquear el hilo de UI con archivos grandes.
+    onProgress?.call('encrypting');
     final encrypted = await Isolate.run(() => encryptFileInIsolate({
       'fileBytes': fileBytes,
       'password': userPassword,
@@ -222,78 +252,13 @@ class FileService {
     ]);
 
     // 2. SUBIDA DIRECTA A CLOUDFLARE R2 REST ENDPOINT (S3-compatible, firmada SigV4)
+    onProgress?.call('syncing');
     await _putEncryptedObject(storageKey, encryptedBytes);
 
-    // 3. Conversión Office → PDF (Fase 1). Se ejecuta en el emisor antes de
-    //    subir el preview cifrado como segundo objeto en R2.
-    String? viewerStorageKey;
-    int? viewerSizeBytes;
-    String conversionStatus = 'none';
-
-    if (OfficeFormats.isConvertible(mimeType: mimeType, fileName: fileName)) {
-      conversionStatus = 'pending';
-      onConversionStatus?.call(conversionStatus);
-      try {
-        final accessToken = _client.auth.currentSession?.accessToken;
-        if (accessToken == null) {
-          throw const ConversionException('unauthorized', 'No active session');
-        }
-        final result = await ConversionService().convertOfficeToPdf(
-          fileBytes: fileBytes,
-          fileName: fileName,
-          accessToken: accessToken,
-          maxBytes: AppConstants.conversionMaxBytesFor(isPremium: user.isPremium),
-        );
-        // Misma contraseña del usuario → el receptor solo necesita una.
-        final encPreview = await Isolate.run(() => encryptFileInIsolate({
-          'fileBytes': result.pdfBytes,
-          'password': userPassword,
-        }));
-        viewerStorageKey = _uuid.v4();
-        debugPrint('[CONVERSION] viewer_object_key=$viewerStorageKey '
-            '(pdf=${result.pdfBytes.length} bytes, cifrado=${(encPreview['ciphertext'] as Uint8List).length} bytes)');
-        final previewPayload = Uint8List.fromList([
-          ...(encPreview['salt'] as Uint8List),
-          ...(encPreview['nonce'] as Uint8List),
-          ...(encPreview['ciphertext'] as Uint8List),
-          ...(encPreview['authTag'] as Uint8List),
-        ]);
-        await _putEncryptedObject(viewerStorageKey, previewPayload);
-        viewerSizeBytes = result.pdfBytes.length;
-        conversionStatus = 'ready';
-        debugPrint('[CONVERSION] conversion_status=ready '
-            'viewer_file_size_bytes=$viewerSizeBytes '
-            'viewer_object_key=$viewerStorageKey');
-        onConversionStatus?.call(conversionStatus);
-      } catch (e) {
-        // Nunca bloquea la subida: si la conversión o la subida del preview fallan
-        // (servicio caído, red, límite, JWT inválido...), se conserva el archivo
-        // original y se registra conversion_status = 'failed'.
-        final code = e is ConversionException ? e.code : 'network';
-        // Mensaje amigable y conciso: para una DioException se usa solo el
-        // mensaje (sin stack trace ni toString() verboso). La vista previa es
-        // opcional y no debe saturar la consola ni el banner.
-        final message = e is ConversionException
-            ? e.message
-            : e is DioException
-                ? (e.message ?? 'Conversion failed')
-                : e.toString();
-        debugPrint('[CONVERSION] Failed ($code): $message. Continuing without preview.');
-        // Best-effort: si el preview cifrado llegó a subirse a R2 pero un paso
-        // posterior falló, limpiar el objeto huérfano.
-        if (viewerStorageKey != null) {
-          await _deleteR2Object(viewerStorageKey);
-        }
-        conversionStatus = 'failed';
-        viewerStorageKey = null;
-        onConversionStatus?.call(conversionStatus, '$code: $message');
-      }
-    }
-
-    // 4. Temporalidad dinámica inyectada desde el Slider
+    // 3. Temporalidad dinámica inyectada desde el Slider
     final expiresAt = DateTime.now().add(Duration(hours: selectedDurationHours));
 
-    // 5. Inserción de metadatos estructurales (Almacenamiento liviano en Supabase)
+    // 4. Inserción de metadatos estructurales (Almacenamiento liviano en Supabase)
     try {
       await _client.from('files').insert({
         'id': fileId,
@@ -305,9 +270,6 @@ class FileService {
         'bucket_name': AppConstants.bucketName,
         'storage_object_key': storageKey,
         'object_path': storageKey,
-        'viewer_object_key': viewerStorageKey,
-        'viewer_file_size_bytes': viewerSizeBytes,
-        'conversion_status': conversionStatus,
         'aes_key_encrypted': key,
         'salt': salt,
         'encryption_salt': salt,
@@ -319,13 +281,13 @@ class FileService {
         'status': 'active',
       });
     } catch (e) {
-      // Best-effort: si falla el insert, intentar limpiar ambos objetos R2.
-      debugPrint('[UPLOAD] Metadata insert failed, cleaning up R2 objects: $e');
+      // Best-effort: si falla el insert, intentar limpiar el objeto R2.
+      debugPrint('[UPLOAD] Metadata insert failed, cleaning up R2 object: $e');
       await _deleteR2Object(storageKey);
-      if (viewerStorageKey != null) await _deleteR2Object(viewerStorageKey);
       rethrow;
     }
 
+    final firstLinkEver = user.monthlyLinksGenerated == 0;
     await _client.from('share_links').insert({
       'id': linkId,
       'file_id': fileId,
@@ -340,6 +302,10 @@ class FileService {
     }).eq('id', user.id);
 
     await _ref.read(authStateProvider.notifier).refreshUser();
+
+    if (firstLinkEver) {
+      await FunnelMetricsService().logEvent('first_link_created');
+    }
 
     return ShareLink(
       id: linkId,
@@ -418,7 +384,7 @@ class FileService {
             'expires_at, '
             'recipient_email, '
             'is_active, '
-            'files!inner(id, owner_id, original_filename, file_size_bytes, mime_type, storage_provider, bucket_name, storage_object_key, viewer_object_key, viewer_file_size_bytes, conversion_status, created_at, expires_at, max_downloads, downloads_count, status)',
+            'files!inner(id, owner_id, original_filename, file_size_bytes, mime_type, storage_provider, bucket_name, storage_object_key, created_at, expires_at, max_downloads, downloads_count, status)',
           )
           .filter('recipient_email', 'ilike', user.email)
           .eq('is_active', true)
@@ -463,12 +429,9 @@ class FileService {
     KriptonFile file,
     String password, {
     String? linkId,
-    bool useViewerObject = false,
   }) async {
     // DESCARGA FLUIDA DESDE CLOUDFLARE R2 (S3-compatible, firmada SigV4)
-    final objectKey = useViewerObject && file.viewerObjectKey != null
-        ? file.viewerObjectKey!
-        : file.storageObjectKey;
+    final objectKey = file.storageObjectKey;
     final objectPath = '/${file.bucketName}/$objectKey';
     final downloadUrl = '${AppConstants.r2Endpoint}$objectPath';
     debugPrint('[R2 DOWNLOAD] URL: $downloadUrl');
@@ -522,12 +485,6 @@ class FileService {
 
     // Borrar objeto principal (original cifrado)
     await _deleteR2Object(file['storage_object_key'] as String);
-
-    // Borrar preview PDF cifrado si existe
-    final viewerKey = file['viewer_object_key'] as String?;
-    if (viewerKey != null && viewerKey.isNotEmpty) {
-      await _deleteR2Object(viewerKey);
-    }
 
     await _client.from('share_links').delete().eq('file_id', fileId);
     await _client.from('files').delete().eq('id', fileId);

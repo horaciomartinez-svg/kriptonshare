@@ -1,272 +1,155 @@
 # KRIPTONSHARE
 
 <p align="center">
-  <img src="assets/logo.png" alt="KRIPTONSHARE Logo" width="200">
+  <img src="assets/KRIPTONSHARE_Logo_Primary.png" alt="KRIPTONSHARE" width="220">
 </p>
 
 <p align="center">
-  <strong>Plataforma de Intercambio Seguro de Archivos con Almacenamiento Efímero</strong>
+  <strong>Intercambio seguro y efímero de archivos, con cifrado de extremo a extremo.</strong>
 </p>
 
 <p align="center">
+  <a href="#descripción">Descripción</a> •
   <a href="#características">Características</a> •
-  <a href="#stack-tecnológico">Stack</a> •
-  <a href="#arquitectura">Arquitectura</a> •
-  <a href="#instalación">Instalación</a> •
+  <a href="#planes">Planes</a> •
+  <a href="#stack">Stack</a> •
   <a href="#seguridad">Seguridad</a> •
-  <a href="#roadmap">Roadmap</a>
+  <a href="#instalación">Instalación</a>
 </p>
 
 ---
 
-## 📋 Descripción
+## Descripción
 
-**KRIPTONSHARE** es una aplicación móvil de Data Room que permite compartir documentos confidenciales de forma segura mediante una arquitectura de **almacenamiento efímero**. Cada archivo compartido tiene una vida limitada: se auto-destruye después de un tiempo configurable o número de visualizaciones, garantizando que la información sensible no permanezca indefinidamente en dispositivos de terceros.
+**KRIPTONSHARE** te permite compartir archivos con una vida limitada. Cada archivo
+se cifra **en tu dispositivo antes de subirse**, se almacena de forma efímera y se
+auto-destruye al vencer. Ni siquiera nosotros podemos leer su contenido.
 
-Ideal para:
-- **Due diligence** financiera y legal
-- Compartir **contratos y acuerdos** confidenciales
-- Distribuir **memorandos de colocación privada (PPM)**
-- Intercambio de **documentos corporativos sensibles**
-- Protección de **propiedad intelectual** en negociaciones
-
----
-
-## ✨ Características
-
-### 🔐 Seguridad de Nivel Empresarial
-
-- **Cifrado de extremo a extremo** (AES-256) para todos los archivos
-- **Links temporales** con expiración configurable (tiempo o vistas)
-- **Protección contra screenshots** (detección y prevención)
-- **Watermark dinámico** con identificador del receptor
-- **Control de acceso** por email, contraseña o autenticación 2FA
-
-### 📱 Funcionalidades Principales
-
-- **Data Room móvil** con organización por carpetas y etiquetas
-- **Visualizador seguro** con prevención de descarga directa
-- **Gestión de permisos** granulares por archivo y usuario
-- **Auditoría completa** de accesos y visualizaciones
-- **Notificaciones en tiempo real** de actividad del Data Room
-- **Dashboard de analytics** con métricas de engagement
-
-### 🏗️ Arquitectura de Almacenamiento Efímero
-
-- **Auto-eliminación** programada post-lectura
-- **No almacenamiento local** en dispositivos del receptor
-- **Streaming seguro** sin persistencia en caché
-- **Revocación instantánea** de accesos por el emisor
+Diseñado para compartir documentos confidenciales: contratos, estados financieros,
+resultados de laboratorio, material de inversión y cualquier información sensible
+que no debe quedarse para siempre en los dispositivos de terceros.
 
 ---
 
-## 🛠 Stack Tecnológico
+## Características
+
+- **Cifrado de extremo a extremo** AES-256-GCM en memoria, antes de subir nada.
+- **Zero-knowledge absoluto**: el servidor solo guarda el objeto cifrado; la clave
+  se deriva de tu contraseña (PBKDF2) y nunca viaja.
+- **Enlaces efímeros** con duración configurable según tu plan (7, 30 o 60 días).
+- **Formato protegido**: los archivos se visualizan dentro de la app; no se guardan
+  en el dispositivo del receptor.
+- **Formato restringido**: solo se aceptan archivos que la app puede mostrar de
+  forma segura (ver [Formatos soportados](#formatos-soportados)).
+- **14 días de Premium gratis** para todo usuario nuevo, sin tarjeta.
+- **Sin anuncios** en ningún plan.
+- **Internacionalización**: es, en, pt, fr, de.
+
+## Formatos soportados
+
+| Categoría | Formatos |
+|-----------|----------|
+| Documentos | PDF |
+| Imágenes | JPG, JPEG, PNG, GIF, WEBP, BMP, HEIC, HEIF |
+| Texto | TXT, MD, CSV, LOG |
+| Video | MP4, MOV, WEBM, MKV, M4V, 3GP |
+
+> Los documentos Office (Word, Excel, PowerPoint) **no se aceptan**: el diálogo
+> de bloqueo muestra esta lista y recomienda convertirlos a PDF. No existe
+> conversión de formatos en el servidor.
+
+## Planes
+
+| | Free | Premium | Business |
+|---|---|---|---|
+| **Precio** | $0 | $12.99/mes · $103.99/año | $29.99/mes · $239.99/año |
+| **Archivo máx.** | 20 MB | 100 MB | 200 MB |
+| **Links/mes** | 20 | Ilimitados | Ilimitados |
+| **Links activos** | 3 | Ilimitados | Ilimitados |
+| **Duración del link** | 7 días | 30 días | 60 días |
+| **Almacenamiento** | — | 1 GB | 5 GB |
+| **Anuncios** | No | No | No |
+
+- **Trial**: cada cuenta nueva recibe Premium por 14 días sin tarjeta.
+- Los precios de referencia para UI/marketing viven en
+  `lib/utils/constants.dart`; la fuente de verdad de cobro es RevenueCat/Store
+  (ver `REVENUECAT_SETUP.md`).
+
+## Stack
 
 | Capa | Tecnología |
 |------|-----------|
-| **Framework** | Flutter 3.x |
-| **Lenguaje** | Dart |
-| **Backend** | Supabase (PostgreSQL + Edge Functions) |
-| **Autenticación** | Supabase Auth (JWT) |
-| **Almacenamiento** | Cloudflare R2 (S3-compatible) |
-| **Cifrado** | AES-256-GCM + PBKDF2 |
-| **Conversión Office** | Gotenberg + gateway Deno propio |
-| **Estado** | Provider (Riverpod en roadmap) |
-| **Routing** | GoRouter |
-| **UI** | Material Design 3 + Custom Theme |
+| Framework | Flutter 3.x |
+| Lenguaje | Dart |
+| Backend | Supabase (PostgreSQL + Auth + RPCs) |
+| Almacenamiento | Cloudflare R2 (S3-compatible), cifrado cliente |
+| Facturación | RevenueCat (Google Play / App Store / Stripe) |
+| Estado | Riverpod |
+| Routing | GoRouter |
+| UI | Material Design 3 + tema propio |
+| Localización | `flutter gen-l10n` — 5 ARB: es, en, pt, fr, de |
 
----
+## Seguridad
 
-## 🏛 Arquitectura
+- ✅ Cifrado **AES-256-GCM** de extremo a extremo; la clave se deriva en el cliente.
+- ✅ **Zero-knowledge**: el servidor nunca ve claves ni contenido en claro; los
+  objetos se borran tras la expiración del link (más lifecycle rule de R2).
+- ✅ **TLS 1.3** en tránsito.
+- ✅ El archivo se descifra **en memoria** para visualizarse; no se persiste en el
+  dispositivo receptor.
+- ✅ Formato protegido: los tipos no visualizables se rechazan en origen; nunca se
+  sube contenido ejecutable u Office.
+
+Reporta vulnerabilidades a [security@kriptonshare.com](mailto:security@kriptonshare.com).
+
+## Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    CLIENTE (Flutter)                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │  Auth    │ │  File    │ │  Viewer  │            │
-│  │ Provider │ │ Provider │ │ Screen   │            │
-│  └──────────┘ └──────────┘ └──────────┘            │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │ Crypto   │ │ Screenshot│ │ Link    │            │
-│  │ Service  │ │ Service  │ │ Gauge    │            │
-│  └──────────┘ └──────────┘ └──────────┘            │
-└─────────────────────────────────────────────────────┘
-                         │
-                         │ HTTPS + WebSocket
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│                    SUPABASE CLOUD                    │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │  Auth    │ │ Database │ │ Storage  │            │
-│  │ (JWT)    │ │(PostgreSQL)│ │ (S3)    │            │
-│  └──────────┘ └──────────┘ └──────────┘            │
-│  ┌──────────┐ ┌──────────┐                         │
-│  │ Realtime │ │ Edge     │                         │
-│  │ (WS)     │ │ Functions│                         │
-│  └──────────┘ └──────────┘                         │
-└─────────────────────────────────────────────────────┘
+Dispositivo (Flutter)
+  │  cifra AES-256-GCM en RAM  +  genera link
+  ▼
+Supabase (Auth · PostgreSQL · RPC de límites/expiración)
+  ▼
+Cloudflare R2  ── objeto cifrado efímero, se auto-elimina al expirar
 ```
 
-### Flujo de Seguridad
+- **Upload**: cifrado local → verificación de límites (RPC `check_upload_limits`)
+  → subida del objeto cifrado a R2.
+- **Link**: URL temporal; el servidor valida destinatario, expiración y vigencia.
+- **View**: descifrado en memoria y renderizado in-app (PDF, imagen, texto, video).
+- **Destroy**: el objeto se elimina al vencer el link (72 h post-expiración).
 
-1. **Upload**: Archivo cifrado con AES-256-GCM antes de subir. Los documentos Office se convierten a PDF en un servicio efímero propio durante la subida.
-2. **Storage**: Almacenamiento cifrado en Cloudflare R2 (dos objetos para Office: original cifrado + PDF de vista previa cifrado)
-3. **Link**: Generación de URL temporal con token JWT
-4. **View**: Descifrado en memoria, streaming directo al visor seguro con watermark dinámico
-5. **Destroy**: Eliminación automática post-expiración
+La app no depende de servicios de conversión de documentos ni de SDKs de
+publicidad: cifra el archivo en el dispositivo y sube el objeto cifrado.
 
----
-
-## 📥 Instalación
-
-### Requisitos Previos
-
-- Flutter SDK 3.x ([instalar](https://docs.flutter.dev/get-started/install))
-- Dart SDK (incluido con Flutter)
-- Android Studio / VS Code con plugins de Flutter
-- Cuenta en Supabase ([crear](https://supabase.com))
-
-### Pasos
+## Instalación
 
 ```bash
-# 1. Clonar el repositorio
-git clone https://github.com/TU_USUARIO/kriptonshare.git
-cd kriptonshare
-
-# 2. Instalar dependencias
 flutter pub get
-
-# 3. Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales de Supabase
-
-# 4. Ejecutar en modo desarrollo
-flutter run
-
-# 5. Para producción
-flutter build apk --release    # Android
-flutter build ios --release    # iOS
+flutter gen-l10n
+flutter run          # modo desarrollo
 ```
 
-### Configuración de Supabase
+- Requiere las credenciales de Supabase y R2 por `--dart-define` o los defaults
+  de `lib/utils/constants.dart` (solo dev).
+- Aplica las migraciones de `supabase/migrations/` en tu proyecto Supabase.
+- Para pruebas manuales del flujo completo, ver `E2E_TEST_GUIDE.md`.
+- Para configurar RevenueCat y los 4 productos (`premium_*_v2`,
+  `business_*_v2`), ver `REVENUECAT_SETUP.md`.
 
-1. Crear proyecto en [Supabase](https://supabase.com)
-2. Obtener `SUPABASE_URL` y `SUPABASE_ANON_KEY`
-3. Configurar buckets de Storage con políticas de seguridad
-4. Ejecutar migraciones SQL en `supabase/migrations/`
+## Contribuir
 
----
+Envía un PR desde un fork. Antes de abrirlo verifica:
 
-## 📖 Uso
-
-### Crear un Data Room
-
-1. Inicia sesión en la app
-2. Ve a **"Nuevo Data Room"**
-3. Sube los archivos confidenciales
-4. Configura permisos de acceso
-5. Genera el link de invitación seguro
-
-### Compartir un Archivo
-
-1. Selecciona el archivo en el Data Room
-2. Toca **"Compartir"**
-3. Configura:
-   - Tiempo de expiración (1h, 24h, 7d, custom)
-   - Número máximo de visualizaciones
-   - Protección por contraseña (opcional)
-4. Copia el link generado y compártelo
-
-### Monitorear Accesos
-
-1. Ve a **"Analytics"** en el Dashboard
-2. Revisa quién accedió, cuándo y desde dónde
-3. Revoca accesos si es necesario
-
----
-
-## 🔒 Seguridad
-
-### Compromisos de Seguridad
-
-- ✅ **Cifrado en tránsito**: TLS 1.3 para todas las comunicaciones
-- ✅ **Cifrado en reposo**: AES-256-GCM para archivos almacenados
-- ✅ **Zero-knowledge**: Nosotros no podemos ver tu contenido (PDF, imágenes, texto, video)
-- ✅ **Vista previa Office segura**: Los documentos Office se convierten a PDF en un servicio efímero propio durante la subida; el contenido nunca se almacena sin cifrar ni sale de nuestra infraestructura.
-- ✅ **Auditoría completa**: Registro de todas las acciones
-- ✅ **Cumplimiento**: Diseñado para cumplir GDPR, CCPA, SOC2
-
-### Reportar Vulnerabilidades
-
-Si descubres una vulnerabilidad de seguridad, por favor envía un email a [security@kriptonshare.com](mailto:security@kriptonshare.com) en lugar de crear un issue público.
-
----
-
-## 🗺 Roadmap
-
-### MVP (Actual)
-- [x] Data Room móvil con organización
-- [x] Upload/download seguro con cifrado
-- [x] Links temporales con expiración
-- [x] Protección contra screenshots
-- [x] Dashboard de analytics
-- [x] Autenticación y autorización
-
-### Q3 2026
-- [x] Sistema de watermark dinámico
-- [x] Soporte para documentos Office (Word, Excel, PowerPoint) con vista previa PDF segura
-- [ ] Integración con firmas digitales (DocuSign, Adobe Sign)
-- [ ] Soporte para PDF con anotaciones
-- [ ] Notificaciones push avanzadas
-- [ ] Modo offline para documentos pre-autorizados
-
-### Q4 2026
-- [ ] Blockchain para prueba de integridad (opcional)
-- [ ] Integración con sistemas ERP (SAP, Oracle)
-- [ ] API pública para integraciones de terceros
-- [ ] White-label para empresas
-- [ ] Certificación ISO 27001
-
-### 2027
-- [ ] Soporte multi-idioma (es, en, pt, fr, de)
-- [ ] Aplicación de escritorio (Windows, macOS, Linux)
-- [ ] Extensión de navegador
-- [ ] Marketplace de templates de Data Room
-
----
-
-## 🤝 Contribuir
-
-¡Las contribuciones son bienvenidas! Por favor, lee nuestra [Guía de Contribución](CONTRIBUTING.md) antes de enviar un PR.
-
-### Cómo Contribuir
-
-1. Fork del repositorio
-2. Crea una rama (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit de tus cambios (`git commit -m 'Agrega nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abre un Pull Request
-
----
-
-## 📄 Licencia
-
-Este proyecto está licenciado bajo la **Licencia MIT**. Ver [LICENSE](LICENSE) para más detalles.
-
----
-
-## 📞 Contacto
-
-- **Email**: [contacto@kriptonshare.com](mailto:contacto@kriptonshare.com)
-- **LinkedIn**: [KRIPTONSHARE](https://linkedin.com/company/kriptonshare)
-- **Web**: [www.kriptonshare.com](https://www.kriptonshare.com)
+```bash
+dart format --set-exit-if-changed lib test
+flutter analyze
+flutter test
+flutter gen-l10n   # sin claves faltantes en los 5 ARB
+```
 
 ---
 
 <p align="center">
   <strong>🔒 Seguridad. ⚡ Velocidad. 🕐 Temporalidad.</strong>
-</p>
-
-<p align="center">
-  <sub>Construido con ❤️ para proteger la información confidencial del mundo empresarial.</sub>
 </p>
