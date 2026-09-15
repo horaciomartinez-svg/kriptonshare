@@ -1,13 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/analytics_event_entity.dart';
 import '../../domain/entities/dashboard_metrics_entity.dart';
+import '../../domain/entities/link_analytics_detail_entity.dart';
 import '../../domain/usecases/get_dashboard_metrics.dart';
 import '../../domain/usecases/get_events.dart';
+import '../../domain/usecases/get_link_analytics_detail.dart';
 
 /// Estado de analytics para la capa de presentación.
 class AnalyticsState {
   final DashboardMetricsEntity? metrics;
   final List<AnalyticsEventEntity> events;
+  final LinkAnalyticsDetailEntity? linkDetail;
   final bool isLoading;
   final String? error;
   final String? selectedLinkId;
@@ -15,6 +18,7 @@ class AnalyticsState {
   const AnalyticsState({
     this.metrics,
     this.events = const [],
+    this.linkDetail,
     this.isLoading = false,
     this.error,
     this.selectedLinkId,
@@ -23,6 +27,7 @@ class AnalyticsState {
   AnalyticsState copyWith({
     DashboardMetricsEntity? metrics,
     List<AnalyticsEventEntity>? events,
+    LinkAnalyticsDetailEntity? linkDetail,
     bool? isLoading,
     String? error,
     String? selectedLinkId,
@@ -30,6 +35,7 @@ class AnalyticsState {
     return AnalyticsState(
       metrics: metrics ?? this.metrics,
       events: events ?? this.events,
+      linkDetail: linkDetail ?? this.linkDetail,
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
       selectedLinkId: selectedLinkId ?? this.selectedLinkId,
@@ -41,12 +47,15 @@ class AnalyticsState {
 class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
   final GetEventsUseCase _getEvents;
   final GetDashboardMetricsUseCase _getDashboardMetrics;
+  final GetLinkAnalyticsDetailUseCase _getLinkDetail;
 
   AnalyticsNotifier({
     required GetEventsUseCase getEvents,
     required GetDashboardMetricsUseCase getDashboardMetrics,
+    required GetLinkAnalyticsDetailUseCase getLinkDetail,
   })  : _getEvents = getEvents,
         _getDashboardMetrics = getDashboardMetrics,
+        _getLinkDetail = getLinkDetail,
         super(const AnalyticsState());
 
   /// Cargar métricas agregadas del dashboard.
@@ -78,6 +87,23 @@ class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
       ),
       (events) => state = state.copyWith(
         events: events,
+        isLoading: false,
+      ),
+    );
+  }
+
+  /// Cargar detalle analítico de un link (metadata + tiempo por página).
+  Future<void> loadLinkAnalyticsDetail(String linkId) async {
+    state = state.copyWith(isLoading: true, error: null, selectedLinkId: linkId);
+
+    final result = await _getLinkDetail(linkId);
+    result.fold(
+      (failure) => state = state.copyWith(
+        error: failure.message,
+        isLoading: false,
+      ),
+      (detail) => state = state.copyWith(
+        linkDetail: detail,
         isLoading: false,
       ),
     );

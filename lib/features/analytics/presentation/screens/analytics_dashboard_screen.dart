@@ -43,14 +43,6 @@ class _AnalyticsDashboardScreenState
     }
   }
 
-  String _formatDuration(double milliseconds) {
-    final seconds = (milliseconds / 1000).round();
-    if (seconds < 60) return '${seconds}s';
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    return '${minutes}m ${remainingSeconds}s';
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -197,7 +189,7 @@ class _AnalyticsDashboardScreenState
       ),
       _MetricItem(
         l10n.avgDuration,
-        _formatDuration(metrics.averageViewDurationMs),
+        formatDurationCompact(context, metrics.averageViewDurationMs.round()),
         Icons.schedule,
       ),
       _MetricItem(
@@ -345,7 +337,10 @@ class _AnalyticsDashboardScreenState
               overflow: TextOverflow.ellipsis,
             ),
             subtitle: Text(
-              l10n.viewsDownloadsSummary(link.views, link.downloads),
+              l10n.viewsDurationSummary(
+                link.views,
+                formatDurationCompact(context, link.totalViewDurationMs),
+              ),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: KriptonTheme.silver,
                   ),
@@ -450,7 +445,7 @@ class _AnalyticsDashboardScreenState
                 ),
               ),
               Text(
-                _formatDuration(event.durationMs.toDouble()),
+                formatDurationCompact(context, event.durationMs),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: KriptonTheme.cyanTelemetry,
                       fontFamily: 'SFMono',

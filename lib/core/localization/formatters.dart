@@ -1,5 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../l10n/app_localizations.dart';
+
+/// Formatea una duración en formato compacto localizado ("2m 04s" / "1h 05m").
+String formatDurationCompact(BuildContext context, int milliseconds) {
+  final l10n = AppLocalizations.of(context);
+  final totalSeconds = (milliseconds / 1000).round();
+  if (totalSeconds < 60) return l10n.durationSecondsCompact(totalSeconds);
+
+  final minutes = totalSeconds ~/ 60;
+  final remainingSeconds = totalSeconds % 60;
+  if (minutes < 60) {
+    final mm = l10n.durationMinutesCompact(minutes);
+    if (remainingSeconds == 0) return mm;
+    return '$mm ${_twoDigits(l10n.durationSecondsCompact, remainingSeconds)}';
+  }
+
+  final hours = minutes ~/ 60;
+  final remainingMinutes = minutes % 60;
+  final hh = l10n.durationHoursCompact(hours);
+  if (remainingMinutes == 0) return hh;
+  return '$hh ${_twoDigits(l10n.durationMinutesCompact, remainingMinutes)}';
+}
+
+String _twoDigits(String Function(int) format, int value) {
+  return format(int.parse(value.toString().padLeft(2, '0')));
+}
 
 /// Formatea una fecha de expiración respetando el locale activo.
 ///

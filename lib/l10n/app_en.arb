@@ -225,17 +225,11 @@
   "deleteDocumentWarning": "This action is irreversible. The document will be permanently deleted.",
   "linkRevoked": "Link revoked",
   "documentDeleted": "Document deleted",
-  "shareMessageTemplate": "Secure document via KRIPTONSHARE\n\n{url}\n\nIf the link does not open the app, use:\n{appUrl}\n\nThis link expires in {hours}h.",
+  "shareMessageTemplate": "Secure document via KRIPTONSHARE\n\n{url}\n\nIf the link does not open the app, download it and try again.",
   "@shareMessageTemplate": {
     "placeholders": {
       "url": {
         "type": "String"
-      },
-      "appUrl": {
-        "type": "String"
-      },
-      "hours": {
-        "type": "int"
       }
     }
   },
@@ -401,14 +395,57 @@
   "storageLabel": "Storage",
   "noActivityYet": "No activity yet",
   "topLinksEmptyHint": "Your most viewed links will appear here",
-  "unnamedDocument": "Unnamed document",
-  "viewsDownloadsSummary": "{views} views · {downloads} downloads",
-  "@viewsDownloadsSummary": {
+  "linkAnalyticsTitle": "Link analytics",
+  "fileInfo": "File",
+  "linkInfo": "Link",
+  "statusLabel": "Status",
+  "createdOnLabel": "Created",
+  "viewsLabel": "Views",
+  "viewTimeLabel": "View time",
+  "perPageBreakdownTitle": "Time per page",
+  "pageAnalyticsSummary": "{views} views · {duration}",
+  "@pageAnalyticsSummary": {
     "placeholders": {
       "views": {
         "type": "int"
       },
-      "downloads": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "unnamedDocument": "Unnamed document",
+  "viewsDurationSummary": "{views} views · {duration} viewed",
+  "@viewsDurationSummary": {
+    "placeholders": {
+      "views": {
+        "type": "int"
+      },
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "durationSecondsCompact": "{count} s",
+  "@durationSecondsCompact": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "durationMinutesCompact": "{count} min",
+  "@durationMinutesCompact": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "durationHoursCompact": "{count} h",
+  "@durationHoursCompact": {
+    "placeholders": {
+      "count": {
         "type": "int"
       }
     }

@@ -135,9 +135,8 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
   void _shareLink(String linkId) {
     final l10n = AppLocalizations.of(context);
     final url = AppConstants.shareUrl(linkId);
-    final appUrl = AppConstants.appLinkUrl(linkId);
     Share.share(
-      l10n.shareMessageTemplate(url, appUrl, AppConstants.maxDurationHours),
+      l10n.shareMessageTemplate(url),
     );
   }
 

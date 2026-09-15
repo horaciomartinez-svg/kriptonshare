@@ -917,8 +917,8 @@ abstract class AppLocalizations {
   /// No description provided for @shareMessageTemplate.
   ///
   /// In en, this message translates to:
-  /// **'Secure document via KRIPTONSHARE\n\n{url}\n\nIf the link does not open the app, use:\n{appUrl}\n\nThis link expires in {hours}h.'**
-  String shareMessageTemplate(String url, String appUrl, int hours);
+  /// **'Secure document via KRIPTONSHARE\n\n{url}\n\nIf the link does not open the app, download it and try again.'**
+  String shareMessageTemplate(String url);
 
   /// No description provided for @hoursRemaining.
   ///
@@ -1352,17 +1352,89 @@ abstract class AppLocalizations {
   /// **'Your most viewed links will appear here'**
   String get topLinksEmptyHint;
 
+  /// No description provided for @linkAnalyticsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Link analytics'**
+  String get linkAnalyticsTitle;
+
+  /// No description provided for @fileInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get fileInfo;
+
+  /// No description provided for @linkInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Link'**
+  String get linkInfo;
+
+  /// No description provided for @statusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get statusLabel;
+
+  /// No description provided for @createdOnLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get createdOnLabel;
+
+  /// No description provided for @viewsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Views'**
+  String get viewsLabel;
+
+  /// No description provided for @viewTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'View time'**
+  String get viewTimeLabel;
+
+  /// No description provided for @perPageBreakdownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time per page'**
+  String get perPageBreakdownTitle;
+
+  /// No description provided for @pageAnalyticsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{views} views · {duration}'**
+  String pageAnalyticsSummary(int views, String duration);
+
   /// No description provided for @unnamedDocument.
   ///
   /// In en, this message translates to:
   /// **'Unnamed document'**
   String get unnamedDocument;
 
-  /// No description provided for @viewsDownloadsSummary.
+  /// No description provided for @viewsDurationSummary.
   ///
   /// In en, this message translates to:
-  /// **'{views} views · {downloads} downloads'**
-  String viewsDownloadsSummary(int views, int downloads);
+  /// **'{views} views · {duration} viewed'**
+  String viewsDurationSummary(int views, String duration);
+
+  /// No description provided for @durationSecondsCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} s'**
+  String durationSecondsCompact(int count);
+
+  /// No description provided for @durationMinutesCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min'**
+  String durationMinutesCompact(int count);
+
+  /// No description provided for @durationHoursCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} h'**
+  String durationHoursCompact(int count);
 
   /// No description provided for @noEventsForLink.
   ///

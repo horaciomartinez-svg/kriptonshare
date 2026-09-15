@@ -61,14 +61,14 @@ class LinkMetric extends Equatable {
   final String linkId;
   final String? fileName;
   final int views;
-  final int downloads;
+  final int totalViewDurationMs;
   final DateTime? lastAccessedAt;
 
   const LinkMetric({
     required this.linkId,
     this.fileName,
     required this.views,
-    required this.downloads,
+    required this.totalViewDurationMs,
     this.lastAccessedAt,
   });
 
@@ -77,7 +77,7 @@ class LinkMetric extends Equatable {
       linkId: json['link_id'] as String,
       fileName: json['file_name'] as String?,
       views: json['views'] as int? ?? 0,
-      downloads: json['downloads'] as int? ?? 0,
+      totalViewDurationMs: json['total_view_duration_ms'] as int? ?? 0,
       lastAccessedAt: json['last_accessed_at'] != null
           ? DateTime.parse(json['last_accessed_at'] as String)
           : null,
@@ -89,11 +89,17 @@ class LinkMetric extends Equatable {
       'link_id': linkId,
       'file_name': fileName,
       'views': views,
-      'downloads': downloads,
+      'total_view_duration_ms': totalViewDurationMs,
       'last_accessed_at': lastAccessedAt?.toIso8601String(),
     };
   }
 
   @override
-  List<Object?> get props => [linkId, fileName, views, downloads, lastAccessedAt];
+  List<Object?> get props => [
+        linkId,
+        fileName,
+        views,
+        totalViewDurationMs,
+        lastAccessedAt,
+      ];
 }

@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/analytics_event_entity.dart';
 import '../../domain/entities/dashboard_metrics_entity.dart';
+import '../../domain/entities/link_analytics_detail_entity.dart';
 import '../../domain/repositories/i_analytics_repository.dart';
 import '../datasources/supabase_analytics_datasource.dart';
 
@@ -51,6 +52,18 @@ class AnalyticsRepositoryImpl implements IAnalyticsRepository {
       );
     } catch (e) {
       return Left(ServerFailure('Error fetching dashboard metrics: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, LinkAnalyticsDetailEntity>> getLinkAnalyticsDetail(
+    String linkId,
+  ) async {
+    try {
+      final detail = await _dataSource.getLinkAnalyticsDetail(linkId);
+      return Right(detail);
+    } catch (e) {
+      return Left(ServerFailure('Error fetching link analytics detail: $e'));
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../domain/entities/link_analytics_detail_entity.dart';
 import '../models/analytics_model.dart';
 
 /// Fuente de datos remota de Supabase para analytics.
@@ -6,6 +7,67 @@ class SupabaseAnalyticsDataSource {
   final SupabaseClient _supabase;
 
   SupabaseAnalyticsDataSource(this._supabase);
+
+  /// Obtener detalle analítico de un link (metadata + tiempo por página).
+  Future<LinkAnalyticsDetailEntity> getLinkAnalyticsDetail(String linkId) async {
+    // Acceso acotado a links del dueño (RLS) con metadata del archivo.
+    final linkResponse = await _supabase
+        .from('share_links')
+        .select(
+          'id, created_at, expires_at, is_active, access_count, '
+          'files(original_filename)',
+        )
+        .eq('id', linkId)
+        .maybeSingle();
+
+    if (linkResponse == null) {
+      throw StateError('Link not found: $linkId');
+    }
+
+    final link = linkResponse;
+    final file = link['files'] as Map<String, dynamic>?;
+
+    // Eventos de telemetría del link y agregación por página.
+    final eventsResponse = await _supabase
+        .from('telemetry_events')
+        .select('event_type, page_number, duration_ms')
+        .eq('link_id', linkId);
+
+    int totalDurationMs = 0;
+    final pages = <int, Map<String, int>>{};
+    for (final event in (eventsResponse as List).cast<Map<String, dynamic>>()) {
+      if (event['event_type'] != 'page_view') continue;
+      final pageNumber = (event['page_number'] as int?) ?? 1;
+      final durationMs = event['duration_ms'] as int? ?? 0;
+      totalDurationMs += durationMs;
+
+      final page = pages.putIfAbsent(pageNumber, () => {'views': 0, 'duration_ms': 0});
+      page['views'] = (page['views']! + 1);
+      page['duration_ms'] = (page['duration_ms']! + durationMs);
+    }
+
+    final pageEntities = pages.entries
+        .map(
+          (e) => PageAnalyticsEntity(
+            pageNumber: e.key,
+            views: e.value['views'] ?? 0,
+            durationMs: e.value['duration_ms'] ?? 0,
+          ),
+        )
+        .toList()
+      ..sort((a, b) => a.pageNumber.compareTo(b.pageNumber));
+
+    return LinkAnalyticsDetailEntity(
+      linkId: link['id'] as String,
+      fileName: file?['original_filename'] as String?,
+      createdAt: DateTime.parse(link['created_at'] as String),
+      expiresAt: DateTime.parse(link['expires_at'] as String),
+      isActive: link['is_active'] as bool? ?? true,
+      views: link['access_count'] as int? ?? 0,
+      totalViewDurationMs: totalDurationMs,
+      pages: {for (final p in pageEntities) p.pageNumber: p},
+    );
+  }
 
   /// Obtener eventos de telemetry_events por link_id.
   Future<List<AnalyticsModel>> getEventsByLinkId(String linkId) async {
@@ -41,6 +103,23 @@ class SupabaseAnalyticsDataSource {
     int totalDownloads = 0;
     int totalDurationMs = 0;
     final downloadsByLink = <String, int>{};
+
+    // 2b. Duración total de visualización por link (histórico, no solo 24h).
+    //     Se usa para el top de links y reemplaza la métrica de descargas.
+    final durationByLink = <String, int>{};
+    if (linkIds.isNotEmpty) {
+      final allEventsResponse = await _supabase
+          .from('telemetry_events')
+          .select('event_type, duration_ms, link_id')
+          .inFilter('link_id', linkIds);
+
+      for (final event in (allEventsResponse as List).cast<Map<String, dynamic>>()) {
+        if (event['event_type'] != 'page_view') continue;
+        final linkId = event['link_id'] as String;
+        durationByLink[linkId] =
+            (durationByLink[linkId] ?? 0) + (event['duration_ms'] as int? ?? 0);
+      }
+    }
 
     if (linkIds.isNotEmpty) {
       final eventsResponse = await _supabase
@@ -94,7 +173,7 @@ class SupabaseAnalyticsDataSource {
         'link_id': linkId,
         'file_name': file?['original_filename'] as String?,
         'views': link['access_count'] as int? ?? 0,
-        'downloads': downloadsByLink[linkId] ?? 0,
+        'total_view_duration_ms': durationByLink[linkId] ?? 0,
         'last_accessed_at': link['last_accessed_at'],
       });
     }

@@ -241,11 +241,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     final l10n = AppLocalizations.of(context);
     ref.invalidate(userLinksProvider);
     Share.share(
-      l10n.shareMessageTemplate(
-        url,
-        AppConstants.appLinkUrl(url),
-        _selectedDurationHours.toInt(),
-      ),
+      l10n.shareMessageTemplate(url),
       subject: l10n.shareDataRoomTitle,
     );
   }

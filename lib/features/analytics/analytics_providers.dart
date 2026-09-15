@@ -5,6 +5,7 @@ import 'data/repositories/analytics_repository_impl.dart';
 import 'domain/repositories/i_analytics_repository.dart';
 import 'domain/usecases/get_dashboard_metrics.dart';
 import 'domain/usecases/get_events.dart';
+import 'domain/usecases/get_link_analytics_detail.dart';
 import 'presentation/notifiers/analytics_notifier.dart';
 
 /// Fuente de datos remota de Supabase para analytics.
@@ -27,10 +28,16 @@ final getDashboardMetricsUseCaseProvider = Provider<GetDashboardMetricsUseCase>(
   return GetDashboardMetricsUseCase(ref.watch(analyticsRepositoryProvider));
 });
 
+/// Caso de uso para obtener el detalle analítico de un link.
+final getLinkAnalyticsDetailUseCaseProvider = Provider<GetLinkAnalyticsDetailUseCase>(
+  (ref) => GetLinkAnalyticsDetailUseCase(ref.watch(analyticsRepositoryProvider)),
+);
+
 /// Notifier de estado para analytics.
 final analyticsNotifierProvider = StateNotifierProvider<AnalyticsNotifier, AnalyticsState>((ref) {
   return AnalyticsNotifier(
     getEvents: ref.watch(getEventsUseCaseProvider),
     getDashboardMetrics: ref.watch(getDashboardMetricsUseCaseProvider),
+    getLinkDetail: ref.watch(getLinkAnalyticsDetailUseCaseProvider),
   );
 });

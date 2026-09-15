@@ -13,6 +13,7 @@ import '../../utils/theme.dart';
 import '../../utils/constants.dart';
 import '../../widgets/link_gauge.dart';
 import '../../features/analytics/services/funnel_metrics_service.dart';
+import '../../features/analytics/presentation/widgets/active_link_analytics_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -422,68 +423,83 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         itemCount: activeLinks.take(5).length,
                         itemBuilder: (context, index) {
                           final link = activeLinks[index];
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: KriptonTheme.ink,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: KriptonTheme.cardBorder,
-                                width: 1,
+                          return GestureDetector(
+                            onTap: () =>
+                                ActiveLinkAnalyticsSheet.show(context, link),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: KriptonTheme.ink,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: KriptonTheme.cardBorder,
+                                  width: 1,
+                                ),
                               ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: KriptonTheme.electricLime.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(10),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: KriptonTheme.electricLime
+                                          .withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.link,
+                                      color: KriptonTheme.electricLime,
+                                    ),
                                   ),
-                                  child: const Icon(
-                                    Icons.link,
-                                    color: KriptonTheme.electricLime,
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          link.id.substring(0, 8).toUpperCase(),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: KriptonTheme.platinum,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _linkStatusLabel(l10n, link),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: KriptonTheme.silver,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        link.id.substring(0, 8).toUpperCase(),
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                              color: KriptonTheme.platinum,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _linkStatusLabel(l10n, link),
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                              color: KriptonTheme.silver,
-                                            ),
-                                      ),
-                                    ],
+                                  const Icon(
+                                    Icons.chevron_right,
+                                    color: KriptonTheme.silver,
                                   ),
-                                ),
-                                const Icon(
-                                  Icons.chevron_right,
-                                  color: KriptonTheme.silver,
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           )
                               .animate()
-                              .fade(delay: Duration(milliseconds: 300 + index * 100))
+                              .fade(
+                                  delay:
+                                      Duration(milliseconds: 300 + index * 100))
                               .slideY(
                                 begin: 0.2,
                                 end: 0,
-                                delay: Duration(milliseconds: 300 + index * 100),
+                                delay:
+                                    Duration(milliseconds: 300 + index * 100),
                               );
                         },
                       );

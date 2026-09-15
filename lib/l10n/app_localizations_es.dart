@@ -459,8 +459,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get documentDeleted => 'Documento eliminado';
 
   @override
-  String shareMessageTemplate(String url, String appUrl, int hours) {
-    return 'Documento seguro via KRIPTONSHARE\n\n$url\n\nSi el link no abre la app, usa:\n$appUrl\n\nEste enlace expira en ${hours}h.';
+  String shareMessageTemplate(String url) {
+    return 'Documento seguro via KRIPTONSHARE\n\n$url\n\nSi el enlace no abre la app, descárgala e inténtalo de nuevo.';
   }
 
   @override
@@ -713,11 +713,55 @@ class AppLocalizationsEs extends AppLocalizations {
   String get topLinksEmptyHint => 'Los links más vistos aparecerán aquí';
 
   @override
+  String get linkAnalyticsTitle => 'Analíticas del link';
+
+  @override
+  String get fileInfo => 'Archivo';
+
+  @override
+  String get linkInfo => 'Link';
+
+  @override
+  String get statusLabel => 'Estado';
+
+  @override
+  String get createdOnLabel => 'Creado';
+
+  @override
+  String get viewsLabel => 'Vistas';
+
+  @override
+  String get viewTimeLabel => 'Tiempo de visualización';
+
+  @override
+  String get perPageBreakdownTitle => 'Tiempo por página';
+
+  @override
+  String pageAnalyticsSummary(int views, String duration) {
+    return '$views vistas · $duration';
+  }
+
+  @override
   String get unnamedDocument => 'Documento sin nombre';
 
   @override
-  String viewsDownloadsSummary(int views, int downloads) {
-    return '$views vistas · $downloads descargas';
+  String viewsDurationSummary(int views, String duration) {
+    return '$views vistas · $duration de visualización';
+  }
+
+  @override
+  String durationSecondsCompact(int count) {
+    return '$count s';
+  }
+
+  @override
+  String durationMinutesCompact(int count) {
+    return '$count min';
+  }
+
+  @override
+  String durationHoursCompact(int count) {
+    return '$count h';
   }
 
   @override
