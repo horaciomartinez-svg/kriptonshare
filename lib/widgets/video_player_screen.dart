@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import 'package:path/path.dart' as path;
@@ -9,15 +8,17 @@ import '../utils/theme.dart';
 
 /// Reproductor de video seguro para contenido descifrado.
 ///
-/// Escribe los bytes descifrados a un archivo temporal privado, lo reproduce
-/// con el reproductor nativo y elimina el archivo temporal al cerrarse.
+/// Recibe la ruta del archivo temporal **ya descifrado** (con su extensión
+/// original, p. ej. `.mp4`) y lo reproduce con el reproductor nativo. El
+/// archivo lo posee el visor, que lo elimina al salir; este widget nunca
+/// vuelve a copiar el contenido en memoria.
 class SecureVideoPlayerScreen extends StatefulWidget {
-  final Uint8List videoBytes;
+  final String filePath;
   final String fileName;
 
   const SecureVideoPlayerScreen({
     super.key,
-    required this.videoBytes,
+    required this.filePath,
     required this.fileName,
   });
 
@@ -28,9 +29,12 @@ class SecureVideoPlayerScreen extends StatefulWidget {
 
 class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
   VideoPlayerController? _controller;
-  File? _tempFile;
   bool _isLoading = true;
   String? _error;
+
+  /// Solo se rellena si tuvimos que copiar el archivo (fuera de tempDir); esa
+  /// copia descifrada es nuestra y hay que borrarla al salir.
+  File? _ownedCopy;
 
   @override
   void initState() {
@@ -40,18 +44,35 @@ class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
 
   Future<void> _initPlayer() async {
     final l10n = AppLocalizations.of(context);
+    final stopwatch = Stopwatch()..start();
     try {
-      final tempDir = await getTemporaryDirectory();
-      final safeName = path.basenameWithoutExtension(widget.fileName);
-      final ext = path.extension(widget.fileName);
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_$safeName$ext';
-      _tempFile = File(path.join(tempDir.path, fileName));
-      await _tempFile!.writeAsBytes(widget.videoBytes, flush: true);
+      final file = File(widget.filePath);
+      if (!await file.exists()) {
+        throw Exception('decrypted video file is missing');
+      }
 
-      _controller = VideoPlayerController.file(_tempFile!);
+      // Garantiza que el archivo temporal vive en el directorio privado de la
+      // app (aunque el visor ya lo creó ahí) y conserva la extensión original.
+      final tempDir = await getTemporaryDirectory();
+      final resolved = path.isWithin(tempDir.path, file.path)
+          ? file
+          : File(path.join(
+              tempDir.path,
+              '${DateTime.now().millisecondsSinceEpoch}'
+                  '_${path.basename(widget.filePath)}',
+            ));
+      if (resolved.path != file.path) {
+        await file.copy(resolved.path);
+        _ownedCopy = resolved;
+      }
+
+      _controller = VideoPlayerController.file(resolved);
       await _controller!.initialize();
       await _controller!.setLooping(true);
       await _controller!.play();
+      stopwatch.stop();
+      debugPrint('[VIEWER-PERF] player init: ${stopwatch.elapsedMilliseconds}ms '
+          '(file=${path.basename(resolved.path)})');
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -69,14 +90,17 @@ class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
   @override
   void dispose() {
     _controller?.dispose();
-    _deleteTempFile();
+    _deleteOwnedCopy();
     super.dispose();
   }
 
-  Future<void> _deleteTempFile() async {
+  /// Borra la copia descifrada que creó este widget (si la hubo). El archivo
+  /// original lo posee el visor, que lo elimina al salir.
+  Future<void> _deleteOwnedCopy() async {
     try {
-      if (_tempFile != null && await _tempFile!.exists()) {
-        await _tempFile!.delete();
+      final copy = _ownedCopy;
+      if (copy != null && await copy.exists()) {
+        await copy.delete();
       }
     } catch (_) {
       // Limpieza best-effort.
@@ -85,6 +109,8 @@ class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: KriptonTheme.charcoalBlack,
       appBar: AppBar(
@@ -97,8 +123,19 @@ class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
       body: SafeArea(
         child: Center(
           child: _isLoading
-              ? const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation(KriptonTheme.electricLime),
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(
+                      valueColor:
+                          AlwaysStoppedAnimation(KriptonTheme.electricLime),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.viewerPreparingVideo,
+                      style: const TextStyle(color: KriptonTheme.silver),
+                    ),
+                  ],
                 )
               : _error != null
                   ? Padding(

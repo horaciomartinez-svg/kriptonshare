@@ -1,5 +1,37 @@
 # KRIPTONSHARE — Memoria de sesión
 
+## 2026-09-15 (2) — BUG visor: MP4 grande no descargaba/descifraba/reproducía (RESUELTO, falta E2E)
+
+**Síntoma:** MP4 de 22 MB tarda ~5 min en descargar+descifrar y nunca arranca; PDF/imagen sí.
+
+**Causa raíz (aclaración explícita pedida por el usuario):** NO era el reproductor: el visor anterior YA hacía `VideoPlayerController.file(tempFile)` con la extensión original (`.mp4`). Lo que impedía reproducir era aguas arriba: (1) PBKDF2-100k + AES-GCM sobre todo el archivo **síncrono en el isolate de UI** → `_decryptAndView` nunca llegaba a `_status = viewing` (UI congelada minutos); (2) ciphertext completo en memoria con 5+ copias (`sublist`/`.toList()` boxed) → riesgo de OOM. Nunca había archivo descifrado disponible. Extra: el reproductor reescribía los 22 MB a disco en el hilo de UI (`writeAsBytes`) antes de inicializar.
+
+**Fix:** `lib/services/secure_decrypt_service.dart` (descifrado en isolate `ks-decrypt`, escribe `*.part`, renombra solo tras validar authTag, borra parcial si falla, lanza `FileIntegrityException`); `file_provider.downloadAndDecryptToFile()` con Dio `ResponseType.stream` directo a disco (`$baseName.enc`, total = `fileSizeBytes + 44`) + logs `[VIEWER-PERF]`; `SecureVideoPlayerScreen` basado en `filePath`; visor con `PdfViewer.file`, video/PDF en disco, imagen/texto a memoria con borrado del temporal, `dispose` limpia; progreso localizado (5 idiomas: `viewerPhaseDownloading/Decrypting(int)`, `viewerPreparingVideo`, `viewerIntegrityError`). Formato de payload intacto.
+
+**PASO 2 (confirmado con `git show HEAD`):** el flujo termina en `VideoPlayerController.file()` sobre el archivo descifrado **verificado** y con extensión original (`file_provider.dart:480-483` → `$baseName.mp4`; `video_player_screen.dart:68`; el visor pasa `filePath: _decryptedFilePath!`). Sí se tocó: de `videoBytes` (Uint8List) a `filePath`, eliminando la segunda copia en el hilo de UI. Añadido `_ownedCopy` en el reproductor para borrar la copia descifrada del fallback fuera de `tempDir` (antes quedaba huérfana en disco → fuga). El archivo bueno lo sigue poseyendo el visor (`dispose` → `_deleteTempFile`).
+
+**Hallazgo clave:** bug en pointycastle `BaseAEADBlockCipher.processBytes` (no avanza `inpOff` al iniciar con bloque parcial) → falla con ciphertext no múltiplo de 16. Workaround: chunks intermedios múltiplos de 16 y authTag pegado al último chunk de ciphertext en una sola llamada.
+
+**Aceleración (decisión del usuario: opción A):** + `cryptography: ^2.8.1`. `SecureDecryptService` usa **fast path** one-shot `AesGcm.with256bits()` en `Isolate.run` para payloads ≤ **128 MB** y **streaming** pointycastle (memoria plana) por encima. Se descartó `cryptography_flutter` (nativo, plugin no verificable aquí) como mejora futura.
+
+**Verificación:** analyze No issues; **72/72 tests** (batería paramétrica: motor fast y streaming; compat byte-for-byte vs `CryptoService.decryptFileBytes`, progreso, tamper/tag/password/truncado). Benchmark host AOT motor por defecto: **22 MB → 2.98 s (7.4 MB/s)** y **90 MB → 9.20 s (9.8 MB/s)** (antes 20.5 s / 91.6 s). Detalle en `memory/2026-09-15.md`. Sin commitear.
+
+---
+
+## 2026-09-15 — BUG trial Premium no aplicaba límites Premium (RESUELTO)
+
+**Síntoma:** usuario free con trial 14d activo sube 25 MB y se le rechaza con el tope free de 20 MB.
+
+**Causa raíz (2 capas):**
+1. Servidor (principal): `check_upload_limits()` resolvía `v_tier` con el CASE de §7.1 (trial=premium) pero derivaba `v_file_size_max`/storage de las columnas de `users` (free=20 MB) → rechazo `file_size` aun con trial.
+2. Cliente: `AuthNotifier.setTrialSimulation()` escribía `trial_ends_at` directo en `users` (viola §7.2.1), sin RPC ni guard de no-reactivación; no existía CTA de activación en perfil.
+
+**Fix:** migración `supabase/migrations/20260916000000_trial_effective_tier.sql` **APLICADA** a remote `olskjkbyzpowxlhjhovu` — `start_premium_trial()` SECURITY DEFINER (auth.uid, solo free, bloquea si `trial_ends_at` ya existe, +14d) y `check_upload_limits`/`validate_share_link_expiration` con topes derivados del tier efectivo. Cliente: `KriptonUser.isInTrial`/`isBusiness`/`exceedsFileSizeLimit`; `startPremiumTrial()` en auth_provider; upload usa la nueva validación; CTA en profile; banner por `isInTrial`.
+
+**Verificación:** `flutter analyze` No issues; `flutter test` **60/60**; remote: 25 MB premium → true, 150 MB → "excede el límite de 100 MB" (tope derivado de tier OK); CASE simulado trial activo→premium, expirado→free. Detalle en `memory/2026-09-15.md`. **Pendiente:** E2E en dispositivo (activar trial → 25 MB; forzar expiración → vuelve free sin reiniciar). Sin commitear.
+
+---
+
 ## 2026-09-07 — MVP realignment COMPLETADO (§16, todas las fases cerradas)
 
 **Contexto:** el producto pivotó en Sep-2026 al MVP: sin anuncios, sin conversión Office→PDF (Gotenberg/Docker fuera), sin Virtual Data Room por carpetas, 3 planes (Free/Premium/Business), trial 14 días, paywalls contextuales y telemetría de funnel. Especificación contractual: `KRIPTONSHARE_Actualizacion_Arquitectura_MVP_Sep2026.md`. Entradas de 2026-08 (conversión Office, VDR, etc.) son HISTORIA LEGACY y ya NO reflejan el producto.

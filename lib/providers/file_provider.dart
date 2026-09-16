@@ -1,4 +1,5 @@
 // lib/providers/file_provider.dart
+import 'dart:io';
 import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,8 +7,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:dio/dio.dart';
 import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import '../models/kripton_file.dart';
 import '../services/crypto_service.dart';
+import '../services/secure_decrypt_service.dart';
 import '../services/r2_signature_service.dart';
 import '../utils/constants.dart';
 
@@ -66,10 +70,38 @@ class UploadLimitResult {
 /// Estado de progreso de subida para la UI: 'encrypting' o 'syncing'.
 typedef UploadProgressCallback = void Function(String status);
 
+/// Resultado de la descarga + descifrado en streaming a un archivo temporal.
+class DecryptedFileResult {
+  final String filePath;
+  final int plaintextBytes;
+  final int encryptedBytes;
+  final int downloadMs;
+  final int decryptMs;
+
+  const DecryptedFileResult({
+    required this.filePath,
+    required this.plaintextBytes,
+    required this.encryptedBytes,
+    required this.downloadMs,
+    required this.decryptMs,
+  });
+
+  double get downloadMegabytesPerSecond {
+    if (downloadMs <= 0) return 0;
+    return (encryptedBytes / (1024 * 1024)) / (downloadMs / 1000);
+  }
+
+  double get decryptMegabytesPerSecond {
+    if (decryptMs <= 0) return 0;
+    return (plaintextBytes / (1024 * 1024)) / (decryptMs / 1000);
+  }
+}
+
 class FileService {
   final Ref _ref;
   final _uuid = const Uuid();
   final _dio = Dio();
+  final _secureDecrypt = SecureDecryptService();
   late final R2SignatureService _r2Signer;
 
   FileService(this._ref) {
@@ -425,52 +457,116 @@ class FileService {
     return KriptonFile.fromJson(response.first as Map<String, dynamic>);
   }
 
-  Future<Uint8List> downloadAndDecryptFile(
+  /// Descarga el objeto cifrado desde R2 **en streaming a un archivo temporal**
+  /// (nunca completo en memoria) y lo descifra en un isolate por chunks hacia
+  /// un segundo archivo temporal con la extensión original.
+  ///
+  /// Es el pipeline que usa el visor para **todos** los formatos. Las imágenes
+  /// y el texto leen el archivo resultante y lo borran; el video y el PDF
+  /// conservan el archivo para reproducción/vista previa nativas.
+  Future<DecryptedFileResult> downloadAndDecryptToFile(
     KriptonFile file,
     String password, {
     String? linkId,
+    void Function(SecureTransferProgress progress)? onProgress,
   }) async {
-    // DESCARGA FLUIDA DESDE CLOUDFLARE R2 (S3-compatible, firmada SigV4)
-    final objectKey = file.storageObjectKey;
-    final objectPath = '/${file.bucketName}/$objectKey';
+    final objectPath = '/${file.bucketName}/${file.storageObjectKey}';
     final downloadUrl = '${AppConstants.r2Endpoint}$objectPath';
     debugPrint('[R2 DOWNLOAD] URL: $downloadUrl');
 
-    final signedHeaders = _r2Signer.signRequest(
-      method: 'GET',
-      path: objectPath,
-    );
+    final signedHeaders = _r2Signer.signRequest(method: 'GET', path: objectPath);
 
-    final response = await _dio.get<List<int>>(
-      downloadUrl,
-      options: Options(
-        responseType: ResponseType.bytes,
-        headers: signedHeaders,
-      ),
-    );
-    debugPrint('[R2 DOWNLOAD] Response size: ${response.data?.length ?? 0} bytes');
+    final tempDir = await getTemporaryDirectory();
+    final extension = p.extension(file.originalFilename);
+    final baseName = 'ks_${DateTime.now().microsecondsSinceEpoch}';
+    final encryptedPath = p.join(tempDir.path, '$baseName.enc');
+    final outputPath = p.join(tempDir.path, '$baseName$extension');
+    final encryptedFile = File(encryptedPath);
 
-    final encryptedBytes = Uint8List.fromList(response.data!);
-    final salt = encryptedBytes.sublist(0, AppConstants.saltSize);
-    final nonce = encryptedBytes.sublist(AppConstants.saltSize, AppConstants.saltSize + AppConstants.aesNonceSize);
-    final ciphertext = encryptedBytes.sublist(AppConstants.saltSize + AppConstants.aesNonceSize, encryptedBytes.length - AppConstants.aesTagSize);
-    final authTag = encryptedBytes.sublist(encryptedBytes.length - AppConstants.aesTagSize);
+    // Tamaño cifrado = plaintext + salt + nonce + authTag.
+    final expectedEncryptedBytes = file.fileSizeBytes +
+        AppConstants.saltSize +
+        AppConstants.aesNonceSize +
+        AppConstants.aesTagSize;
 
-    final cryptoService = CryptoService();
-    final key = cryptoService.deriveKey(password, salt.toList());
-    final decrypted = cryptoService.decrypt(
-      ciphertext: ciphertext.toList(),
-      key: key,
-      nonce: nonce.toList(),
-      authTag: authTag.toList(),
-    );
+    final downloadStopwatch = Stopwatch()..start();
+    IOSink? sink;
+    try {
+      final response = await _dio.get<ResponseBody>(
+        downloadUrl,
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: signedHeaders,
+        ),
+      );
+      final body = response.data;
+      if (body == null) {
+        throw Exception('Empty response body from R2');
+      }
 
-    if (linkId != null) {
-      try { await _client.rpc('increment_link_access_count', params: {'p_link_id': linkId}); } catch (_) {}
+      sink = encryptedFile.openWrite();
+      var received = 0;
+      await for (final chunk in body.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+        onProgress?.call(SecureTransferProgress(
+          phase: SecureTransferPhase.downloading,
+          processedBytes: received,
+          totalBytes: expectedEncryptedBytes,
+        ));
+      }
+      await sink.flush();
+      await sink.close();
+      sink = null;
+      downloadStopwatch.stop();
+
+      final downloadMs = downloadStopwatch.elapsedMilliseconds;
+      debugPrint('[VIEWER-PERF] download: $received bytes in ${downloadMs}ms '
+          '(${_megabytesPerSecond(received, downloadMs)} MB/s)');
+
+      final decryptResult = await _secureDecrypt.decryptPayloadFileToFile(
+        encryptedPath: encryptedPath,
+        outputPath: outputPath,
+        password: password,
+        onProgress: (processed, total) => onProgress?.call(SecureTransferProgress(
+          phase: SecureTransferPhase.decrypting,
+          processedBytes: processed,
+          totalBytes: total,
+        )),
+      );
+      debugPrint('[VIEWER-PERF] decrypt: ${decryptResult.plaintextBytes} bytes in '
+          '${decryptResult.elapsedMs}ms '
+          '(${decryptResult.megabytesPerSecond.toStringAsFixed(1)} MB/s) '
+          'isolate=ks-decrypt');
+
+      if (linkId != null) {
+        try {
+          await _client.rpc('increment_link_access_count', params: {'p_link_id': linkId});
+        } catch (_) {}
+      }
+      try {
+        await _client.rpc('increment_file_download_count', params: {'p_file_id': file.id});
+      } catch (_) {}
+
+      return DecryptedFileResult(
+        filePath: outputPath,
+        plaintextBytes: decryptResult.plaintextBytes,
+        encryptedBytes: received,
+        downloadMs: downloadMs,
+        decryptMs: decryptResult.elapsedMs,
+      );
+    } finally {
+      // El ciphertext temporal nunca debe quedar en disco.
+      await _safeCloseSink(sink);
+      try {
+        if (await encryptedFile.exists()) await encryptedFile.delete();
+      } catch (_) {}
     }
-    try { await _client.rpc('increment_file_download_count', params: {'p_file_id': file.id}); } catch (_) {}
+  }
 
-    return decrypted;
+  static String _megabytesPerSecond(int bytes, int ms) {
+    if (ms <= 0) return '0';
+    return ((bytes / (1024 * 1024)) / (ms / 1000)).toStringAsFixed(1);
   }
 
   Future<void> revokeLink(String linkId) async {
@@ -489,4 +585,10 @@ class FileService {
     await _client.from('share_links').delete().eq('file_id', fileId);
     await _client.from('files').delete().eq('id', fileId);
   }
+}
+
+Future<void> _safeCloseSink(IOSink? sink) async {
+  try {
+    await sink?.close();
+  } catch (_) {}
 }

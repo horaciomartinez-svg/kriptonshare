@@ -47,9 +47,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   /// Banner de cuenta regresiva del trial (visible mientras el trial esté
   /// activo). Al tocarlo lleva a /plans para renovar antes de que expire.
   Widget? _buildTrialBanner(AppLocalizations l10n, KriptonUser user) {
-    final trialEndsAt = user.trialEndsAt;
-    if (user.subscriptionTier != 'free' || trialEndsAt == null) return null;
-    if (!trialEndsAt.isAfter(DateTime.now())) return null;
+    if (!user.isInTrial) return null;
+    final trialEndsAt = user.trialEndsAt!;
 
     final daysLeft = (trialEndsAt.difference(DateTime.now()).inHours / 24).ceil();
     return GestureDetector(

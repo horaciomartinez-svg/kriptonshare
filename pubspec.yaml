@@ -18,6 +18,9 @@ dependencies:
   # Crypto - AES-256-GCM via pointycastle
   pointycastle: ^3.7.4
   encrypt: ^5.0.3
+  # AES-GCM ~12x más rápido que pointycastle (puro Dart, host-testeable);
+  # base para habilitar nativo con cryptography_flutter en el futuro.
+  cryptography: ^2.8.1
   
   # PDF Viewer nativo para abrir documentos descifrados dentro de la app
   pdfrx: ^1.1.24

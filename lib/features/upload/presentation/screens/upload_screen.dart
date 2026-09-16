@@ -81,7 +81,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       final length = await file.length();
       if (!mounted) return;
       final int maxLimit = user?.maxFileSizeBytes ?? AppConstants.freeMaxFileSizeBytes;
-      if (length > maxLimit) {
+      final bool tooLarge = user != null
+          ? user.exceedsFileSizeLimit(length)
+          : length > AppConstants.freeMaxFileSizeBytes;
+      if (tooLarge) {
         await _rejectFileTooLarge(formatBytes(context, maxLimit));
         return;
       }
@@ -111,7 +114,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       );
       if (photo != null) {
         final length = await photo.length();
-        if (length > maxLimit) {
+        final bool tooLarge = user != null
+            ? user.exceedsFileSizeLimit(length)
+            : length > AppConstants.freeMaxFileSizeBytes;
+        if (tooLarge) {
           await _rejectFileTooLarge(maxSize);
           return;
         }

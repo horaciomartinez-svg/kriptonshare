@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import '../../models/kripton_file.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/file_provider.dart';
 import '../../services/screenshot_service.dart';
+import '../../services/secure_decrypt_service.dart';
 import '../../utils/theme.dart';
 import '../../widgets/video_player_screen.dart';
 
@@ -35,6 +37,12 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   String? _errorMessage;
   KriptonFile? _file;
   Uint8List? _decryptedBytes;
+  String? _decryptedFilePath;
+
+  // Progreso real de la transferencia (descarga → descifrado).
+  SecureTransferPhase _transferPhase = SecureTransferPhase.downloading;
+  double _transferFraction = 0;
+  int _transferPercent = 0;
 
   final _passwordController = TextEditingController();
   final _pdfController = PdfViewerController();
@@ -67,9 +75,24 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     _pdfLoadTimer?.cancel();
     _flushPageView();
     _pdfController.removeListener(_onPdfPageChanged);
+    // Borrado seguro del temporal descifrado al salir del visor.
+    _deleteTempFile(_decryptedFilePath);
     // No deshabilitamos FLAG_SECURE aquí: ahora es global para toda la app.
     _passwordController.dispose();
     super.dispose();
+  }
+
+  /// Borra best-effort un archivo temporal descifrado.
+  Future<void> _deleteTempFile(String? filePath) async {
+    if (filePath == null) return;
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Limpieza best-effort: nunca debe romper la salida del visor.
+    }
   }
 
   Future<void> _loadFileMetadata() async {
@@ -131,6 +154,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     setState(() {
       _status = _ViewerStatus.decrypting;
       _errorMessage = null;
+      _transferPhase = SecureTransferPhase.downloading;
+      _transferFraction = 0;
+      _transferPercent = 0;
     });
 
     final fileService = ref.read(fileServiceProvider);
@@ -140,18 +166,36 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       debugPrint('[VIEWER] Iniciando descarga y descifrado para linkId=$linkId');
       debugPrint('[VIEWER] Archivo: ${_file!.originalFilename} (${_file!.mimeType})');
 
-      final decrypted = await fileService.downloadAndDecryptFile(
+      final result = await fileService.downloadAndDecryptToFile(
         _file!,
         _passwordController.text,
         linkId: linkId,
+        onProgress: _onTransferProgress,
       );
 
-      debugPrint('[VIEWER] Descifrado exitoso: ${decrypted.length} bytes');
+      debugPrint('[VIEWER] Descifrado exitoso: ${result.plaintextBytes} bytes '
+          '(download=${result.downloadMs}ms, decrypt=${result.decryptMs}ms)');
 
-      if (!mounted) return;
+      // Los formatos con visor nativo (video/PDF) conservan el archivo en
+      // disco; el resto se carga en memoria y el temporal se borra de inmediato.
+      final isFileBacked = _isFileBacked(_file!.mimeType);
+      Uint8List? bytes;
+      String? filePath;
+      if (isFileBacked) {
+        filePath = result.filePath;
+      } else {
+        bytes = await File(result.filePath).readAsBytes();
+        await _deleteTempFile(result.filePath);
+      }
+
+      if (!mounted) {
+        await _deleteTempFile(filePath);
+        return;
+      }
 
       setState(() {
-        _decryptedBytes = decrypted;
+        _decryptedBytes = bytes;
+        _decryptedFilePath = filePath;
         _pdfRenderFailed = false;
         _status = _ViewerStatus.viewing;
       });
@@ -184,6 +228,14 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       }
       // Iniciar tracking de la primera página/vista.
       _startPageTracking(1);
+    } on FileIntegrityException catch (e) {
+      debugPrint('[VIEWER] Verificación de integridad fallida: $e');
+      if (mounted) {
+        setState(() {
+          _status = _ViewerStatus.password;
+          _errorMessage = l10n.viewerIntegrityError;
+        });
+      }
     } on FormatException catch (e) {
       debugPrint('[VIEWER] Error de formato al descifrar: $e');
       if (mounted) {
@@ -209,6 +261,23 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         });
       }
     }
+  }
+
+  /// Formatos que se reproducen/visualizan desde su archivo temporal en disco.
+  bool _isFileBacked(String mimeType) =>
+      mimeType.startsWith('video/') || mimeType == 'application/pdf';
+
+  /// Actualiza la barra de progreso sin reconstruir por cada chunk.
+  void _onTransferProgress(SecureTransferProgress progress) {
+    if (!mounted) return;
+    if (progress.phase == _transferPhase && progress.percent == _transferPercent) {
+      return;
+    }
+    setState(() {
+      _transferPhase = progress.phase;
+      _transferFraction = progress.fraction;
+      _transferPercent = progress.percent;
+    });
   }
 
   /// Registra un evento de telemetría silenciosamente (no falla la UI).
@@ -419,19 +488,31 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   }
 
   Widget _buildDecrypting() {
+    final l10n = AppLocalizations.of(context);
+    final isDownloading = _transferPhase == SecureTransferPhase.downloading;
+    final label = isDownloading
+        ? l10n.viewerPhaseDownloading(_transferPercent)
+        : l10n.viewerPhaseDecrypting(_transferPercent);
+
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(KriptonTheme.electricLime),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            AppLocalizations.of(context).decryptingDocument,
-            style: const TextStyle(color: KriptonTheme.silver),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              value: _transferPercent > 0 ? _transferFraction : null,
+              valueColor:
+                  const AlwaysStoppedAnimation(KriptonTheme.electricLime),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              label,
+              style: const TextStyle(color: KriptonTheme.silver),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -439,7 +520,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   Widget _buildDocumentViewer() {
     final l10n = AppLocalizations.of(context);
 
-    if (_decryptedBytes == null || _file == null) {
+    if (_file == null ||
+        (_decryptedBytes == null && _decryptedFilePath == null)) {
       return Center(
         child: Text(
           l10n.unexpectedError,
@@ -496,19 +578,17 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         ),
       );
 
-      if (_pdfRenderFailed) {
+      if (_pdfRenderFailed || _decryptedFilePath == null) {
         content = _buildPdfFallback(
           l10n.pdfViewerFallback,
         );
       } else {
-        // Usamos PdfViewer.data para evitar problemas de URI de archivo
-        // en algunos dispositivos Android.
-        content = PdfViewer.data(
+        // El PDF descifrado vive en un archivo temporal; pdfrx lo abre con
+        // acceso aleatorio a disco en lugar de mantenerlo entero en memoria.
+        content = PdfViewer.file(
+          _decryptedFilePath!,
           key: ValueKey('${_file!.id}-preview'),
-          _decryptedBytes!,
-          sourceName: _file!.originalFilename,
           controller: _pdfController,
-          useProgressiveLoading: false,
           params: pdfParams,
         );
       }
@@ -534,16 +614,18 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SecureVideoPlayerScreen(
-                        videoBytes: _decryptedBytes!,
-                        fileName: _file!.originalFilename,
-                      ),
-                    ),
-                  );
-                },
+                onPressed: _decryptedFilePath == null
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SecureVideoPlayerScreen(
+                              filePath: _decryptedFilePath!,
+                              fileName: _file!.originalFilename,
+                            ),
+                          ),
+                        );
+                      },
                 icon: const Icon(Icons.play_arrow),
                 label: Text(l10n.playVideo),
               ),

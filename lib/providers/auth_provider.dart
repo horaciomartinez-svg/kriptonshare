@@ -279,20 +279,33 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
     }
   }
 
-  /// Modo prueba Trial: establece trial_ends_at 14 días en el futuro.
-  Future<void> setTrialSimulation(bool enabled) async {
+  /// Activa la prueba Premium de 14 días vía RPC SECURITY DEFINER.
+  ///
+  /// El cliente NUNCA escribe `trial_ends_at` directamente (§7.2.1): la RPC
+  /// `start_premium_trial()` valida en servidor que el usuario sea free y que
+  /// no haya consumido antes la prueba (impide reactivarla). Tras activar el
+  /// trial se recarga el usuario para que todos los límites visibles reflejen
+  /// Premium de inmediato (tamaño, duración, links, storage).
+  ///
+  /// Devuelve `true` si el trial quedó activo.
+  Future<bool> startPremiumTrial() async {
     try {
       final client = _ref.read(supabaseClientProvider);
       final currentUser = client.auth.currentUser;
-      if (currentUser == null) return;
+      if (currentUser == null) return false;
 
-      await client.from('users').update({
-        'trial_ends_at': enabled ? DateTime.now().add(const Duration(days: 14)).toIso8601String() : null,
-      }).eq('id', currentUser.id);
-
+      final result = await client.rpc('start_premium_trial');
       await refreshUser();
+
+      if (result is List && result.isNotEmpty) {
+        final row = result.first as Map<String, dynamic>;
+        return row['started'] as bool? ?? false;
+      }
+      return false;
     } catch (e) {
-      // Silently fail
+      debugPrint('[AuthNotifier.startPremiumTrial] Error: $e');
+      await refreshUser();
+      return false;
     }
   }
 

@@ -258,6 +258,71 @@ class ProfileScreen extends ConsumerWidget {
                     .slideY(begin: 0.2, end: 0),
                 const SizedBox(height: 24),
 
+                // Activación de la prueba Premium (free que nunca la consumió).
+                // El servidor valida y concede el trial vía RPC SECURITY DEFINER.
+                if (user.isFree && user.trialEndsAt == null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: KriptonTheme.ink,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: KriptonTheme.electricLime.withOpacity(0.4),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.trialBannerTitle,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.trialPromo,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: KriptonTheme.silver,
+                              ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final started = await ref
+                                  .read(authStateProvider.notifier)
+                                  .startPremiumTrial();
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    started
+                                        ? l10n.trialBanner(
+                                            PremiumLimits.trialDurationDays)
+                                        : l10n.unknownError,
+                                  ),
+                                  backgroundColor: started
+                                      ? KriptonTheme.kryptonGreen
+                                      : KriptonTheme.alertRed,
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: KriptonTheme.electricLime,
+                              foregroundColor: KriptonTheme.charcoalBlack,
+                            ),
+                            child: Text(l10n.trialBannerTitle),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                      .animate()
+                      .fade(delay: 350.ms, duration: 400.ms),
+                  const SizedBox(height: 24),
+                ],
+
                 // Upgrade CTA (solo usuarios free; quienes pagan gestionan en /plans)
                 if (!user.isPremium) ...[
                   Container(

@@ -100,4 +100,56 @@ void main() {
       expect(user.remainingPremiumStorageBytes, 0);
     });
   });
+
+  group('KriptonUser.isInTrial', () {
+    test('free con trial activo → true', () {
+      final user = _user(
+        trialEndsAt: DateTime.now().add(const Duration(days: 3)),
+      );
+      expect(user.isInTrial, isTrue);
+    });
+
+    test('free con trial expirado → false', () {
+      final user = _user(
+        trialEndsAt: DateTime.now().subtract(const Duration(days: 1)),
+      );
+      expect(user.isInTrial, isFalse);
+    });
+
+    test('premium/business no cuentan como trial', () {
+      expect(_user(tier: 'premium').isInTrial, isFalse);
+      expect(_user(tier: 'business').isInTrial, isFalse);
+    });
+  });
+
+  group('Validación de tamaño del flujo de upload', () {
+    const twentyFiveMb = 25 * 1024 * 1024;
+
+    test('25 MB con trial activo pasa la validación del cliente (Premium)', () {
+      final user = _user(
+        trialEndsAt: DateTime.now().add(const Duration(days: 3)),
+      );
+      expect(user.effectiveTier, 'premium');
+      expect(user.maxFileSizeBytes, AppConstants.premiumMaxFileSizeBytes);
+      expect(user.exceedsFileSizeLimit(twentyFiveMb), isFalse);
+      expect(user.isFree, isFalse,
+          reason: 'no debe dispararse el PaywallSheet(file_size)');
+    });
+
+    test('25 MB sin trial excede el tope free y dispara paywall file_size', () {
+      final user = _user();
+      expect(user.maxFileSizeBytes, AppConstants.freeMaxFileSizeBytes);
+      expect(user.exceedsFileSizeLimit(twentyFiveMb), isTrue);
+      expect(user.isFree, isTrue,
+          reason: 'se muestra PaywallSheet(trigger: file_size)');
+    });
+
+    test('trial expirado vuelve a aplicar el tope free sobre 25 MB', () {
+      final user = _user(
+        trialEndsAt: DateTime.now().subtract(const Duration(days: 1)),
+      );
+      expect(user.effectiveTier, 'free');
+      expect(user.exceedsFileSizeLimit(twentyFiveMb), isTrue);
+    });
+  });
 }

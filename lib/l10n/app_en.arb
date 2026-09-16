@@ -336,6 +336,24 @@
       }
     }
   },
+  "viewerPhaseDownloading": "Downloading… {percent}%",
+  "@viewerPhaseDownloading": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerPhaseDecrypting": "Decrypting… {percent}%",
+  "@viewerPhaseDecrypting": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "viewerPreparingVideo": "Preparing video…",
+  "viewerIntegrityError": "The file failed the integrity check and was discarded for security.",
   "fileSizeAndType": "{size} · {mimeType}",
   "@fileSizeAndType": {
     "placeholders": {

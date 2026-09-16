@@ -123,6 +123,15 @@ class KriptonUser {
 
   bool get isFree => effectiveTier == 'free';
   bool get isPremium => effectiveTier == 'premium' || effectiveTier == 'business';
+  bool get isBusiness => effectiveTier == 'business';
+
+  /// Trial Premium activo: usuario free dentro de los 14 días posteriores al
+  /// registro. §6.3: `subscription_tier == 'free' && trial_ends_at > now`.
+  bool get isInTrial => subscriptionTier == 'free' && _isTrialActive;
+
+  /// Validación de tamaño del flujo de upload. Una sola fuente de verdad para
+  /// cliente y tests: el tope sale de [maxFileSizeBytes] (tier efectivo).
+  bool exceedsFileSizeLimit(int fileSizeBytes) => fileSizeBytes > maxFileSizeBytes;
 
   int get linksRemaining => (AppConstants.maxLinksPerMonth - monthlyLinksGenerated).clamp(0, AppConstants.maxLinksPerMonth);
   bool get canCreateLink => isPremium || monthlyLinksGenerated < AppConstants.maxLinksPerMonth;

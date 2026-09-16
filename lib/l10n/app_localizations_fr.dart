@@ -606,6 +606,23 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String viewerPhaseDownloading(int percent) {
+    return 'Téléchargement… $percent%';
+  }
+
+  @override
+  String viewerPhaseDecrypting(int percent) {
+    return 'Déchiffrement… $percent%';
+  }
+
+  @override
+  String get viewerPreparingVideo => 'Préparation de la vidéo…';
+
+  @override
+  String get viewerIntegrityError =>
+      'Le fichier n\'a pas passé la vérification d\'intégrité et a été rejeté pour des raisons de sécurité.';
+
+  @override
   String fileSizeAndType(String size, String mimeType) {
     return '$size · $mimeType';
   }

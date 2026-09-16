@@ -1142,6 +1142,30 @@ abstract class AppLocalizations {
   /// **'Could not play the video: {error}'**
   String videoPlaybackError(String error);
 
+  /// No description provided for @viewerPhaseDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading… {percent}%'**
+  String viewerPhaseDownloading(int percent);
+
+  /// No description provided for @viewerPhaseDecrypting.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypting… {percent}%'**
+  String viewerPhaseDecrypting(int percent);
+
+  /// No description provided for @viewerPreparingVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing video…'**
+  String get viewerPreparingVideo;
+
+  /// No description provided for @viewerIntegrityError.
+  ///
+  /// In en, this message translates to:
+  /// **'The file failed the integrity check and was discarded for security.'**
+  String get viewerIntegrityError;
+
   /// No description provided for @fileSizeAndType.
   ///
   /// In en, this message translates to:
