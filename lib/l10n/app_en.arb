@@ -353,6 +353,7 @@
     }
   },
   "viewerPreparingVideo": "Preparing video…",
+  "videoPlayerOpenError": "Could not open the video.",
   "viewerIntegrityError": "The file failed the integrity check and was discarded for security.",
   "fileSizeAndType": "{size} · {mimeType}",
   "@fileSizeAndType": {

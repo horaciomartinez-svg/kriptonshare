@@ -1160,6 +1160,12 @@ abstract class AppLocalizations {
   /// **'Preparing video…'**
   String get viewerPreparingVideo;
 
+  /// No description provided for @videoPlayerOpenError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the video.'**
+  String get videoPlayerOpenError;
+
   /// No description provided for @viewerIntegrityError.
   ///
   /// In en, this message translates to:

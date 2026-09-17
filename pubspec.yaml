@@ -44,8 +44,14 @@ dependencies:
   # Biometric Auth
   local_auth: ^2.2.0
   
-  # File Picker (oficial de Flutter, compatible con AGP 9)
-  file_selector: ^1.0.3
+  # File Picker: devuelve una ruta local SIN cargar el archivo en memoria.
+  # file_selector siempre leía el archivo completo (byte[]) en el canal de
+  # plataforma y provocaba OOM con archivos grandes. file_picker 10.x aplica
+  # KGP incondicionalmente, compatible con Flutter 3.44 + AGP 9
+  # (android.builtInKotlin=false). 11.x asume built-in Kotlin de AGP 9, que
+  # requiere Flutter 3.47+ y dejaría el .kt del plugin sin compilar
+  # (cannot find symbol FilePickerPlugin).
+  file_picker: ^10.3.10
   mime: ^1.0.6
   
   # HTTP

@@ -1,5 +1,17 @@
 # KRIPTONSHARE — Memoria de sesión
 
+## 2026-09-16 (2) — FIX OOM al subir archivos grandes (RESUELTO en código)
+
+**Síntoma:** `OutOfMemoryError` al elegir archivos >~50 MB en la pantalla de subida.
+
+**Causa raíz:** `file_selector_android.toFileResponse()` hace SIEMPRE `new byte[size]` y lee el archivo completo en el canal de plataforma; el pipeline antiguo además multiplicaba copias (`readAsBytes` → boxing en `encryptFileInIsolate` → `Uint8List.fromList([...salt,...nonce,...ct,...tag])`). Sin arreglo posible dentro de `file_selector`.
+
+**Fix:** sustituido por `file_picker` (`withData:false`, devuelve ruta; API 11.x es estático `FilePicker.pickFiles`); nuevo `SecureEncryptService` (cifrado streaming disco→disco en isolate, formato `salt||nonce||ct||tag` intacto, SHA-256 del payload en el mismo paso); nuevo `FileSelectionService` (gateway inyectable + copia por stream con log `[PICKER] copied N bytes in Xms`); `FileService.uploadAndCreateLink` pasa a `filePath`+`fileSizeBytes` y sube el `.enc` como stream con Content-Length; `UploadScreen` usa `PickedFile` (path+tamaño, nunca bytes) y `image_picker` con `hide PickedFile`.
+
+**Verificación:** `flutter analyze` No issues; `flutter test` **85/85** (2 tests nuevos de servicio). Pendiente E2E en dispositivo (50–100 MB sin OOM + build AGP 9 con file_picker). Detalle en `memory/2026-09-16.md`. Sin commitear.
+
+---
+
 ## 2026-09-15 (2) — BUG visor: MP4 grande no descargaba/descifraba/reproducía (RESUELTO, falta E2E)
 
 **Síntoma:** MP4 de 22 MB tarda ~5 min en descargar+descifrar y nunca arranca; PDF/imagen sí.
@@ -543,3 +555,32 @@ Prueba de extremo a extremo (E2E) en dos dispositivos Android:
 ### Notas técnicas
 - El entorno Windows actual no permite ejecutar comandos Bash/PowerShell a través de la herramienta `Bash` (falla el separador `&&`).
 - `main.dart` ahora importa `utils/constants.dart` en lugar de `core/utils/constants.dart` para usar las credenciales reales de Supabase hardcodeadas.
+
+## 2026-09-16
+
+### Tarea
+FIX: `flutter run`/`build` Android falla con `cannot find symbol FilePickerPlugin` tras migrar de `file_selector` a `file_picker ^11.0.2` (11.0.3). Causa: incompatibilidad entre file_picker 11.x y Flutter 3.44 + AGP 9 (`android.builtInKotlin=false`).
+
+### Decisión técnica
+Vía B (downgrade): `file_picker: ^10.3.10` (10.3.11 retracted). Vía A descartada porque Built-in Kotlin requiere Flutter 3.47+ y `purchases_flutter`/`share_plus` aún aplican KGP.
+
+### Cambios realizados
+- `pubspec.yaml`: `file_picker: ^11.0.2` → `^10.3.10`. Comentario actualizado.
+- `lib/services/file_selection_service.dart`: `FilePicker.pickFiles(...)` (estático 11.x) → `FilePicker.platform.pickFiles(...)` (instancia 10.x).
+- `android/app/build.gradle.kts`: eliminado `proguardFiles(...)` manual que referenciaba `proguard-rules.pro` inexistente → release R8 fallaba ("Supplied proguard configuration does not exist"). Flutter ya inyecta las reglas automáticamente.
+- `dart_test.yaml` nuevo: `timeout: 120s` (PBKDF2 100k + 3 MB streaming supera 30 s default en máquina cargada).
+
+### Resultado
+- `flutter analyze` → sin errores.
+- `flutter test` → **85/85** (verde determinista con dart_test.yaml).
+- `flutter build apk --debug` → OK.
+- `flutter run -d RZCWA0JFDCJ` (SM A546E, Android 16/API 36) → built + installed + launched sin errores.
+- `flutter build apk --release` → OK (app-release.apk, 95.8 MB).
+- Smoke test picker pendiente (manual; no hay integration_test ni acceso visual a pantalla).
+
+### Lección
+No fijarse solo en "analyze/tests verdes": un plugin con lógica condicional por AGP puede romper el build aunque Dart sea correcto. Verificar SIEMPRE el toolchain real (`flutter --version`, gradle-wrapper, settings.gradle.kts) contra lo que el plugin asume. `file_picker` 11.x no es compatible con Flutter 3.44 + AGP 9; usar 10.3.10.
+
+### Pendiente
+- Smoke test manual del selector de archivos nativo en dispositivo: elegir video pequeño, confirmar log `[PICKER] copied ...`.
+- Warning KGP en `file_picker` (10.x), `purchases_flutter`, `share_plus`: documentado, no se migran en este cambio.

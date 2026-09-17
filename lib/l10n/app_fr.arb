@@ -176,6 +176,7 @@
   "viewerPhaseDownloading": "Téléchargement… {percent}%",
   "viewerPhaseDecrypting": "Déchiffrement… {percent}%",
   "viewerPreparingVideo": "Préparation de la vidéo…",
+  "videoPlayerOpenError": "Impossible d'ouvrir la vidéo.",
   "viewerIntegrityError": "Le fichier n'a pas passé la vérification d'intégrité et a été rejeté pour des raisons de sécurité.",
   "fileSizeAndType": "{size} · {mimeType}",
   "profileTitle": "Profil",

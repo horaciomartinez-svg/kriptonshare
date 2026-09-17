@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:file_selector/file_selector.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:image_picker/image_picker.dart' hide PickedFile;
 import 'package:mime/mime.dart' show lookupMimeType;
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -12,6 +11,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/localization/formatters.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/file_provider.dart';
+import '../../../../providers/file_selection_provider.dart';
+import '../../../../services/file_selection_service.dart';
 import '../../../../utils/supported_formats.dart';
 import '../../../../utils/theme.dart';
 import '../../../../utils/constants.dart';
@@ -27,8 +28,7 @@ class UploadScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
-  XFile? _selectedFile;
-  int? _selectedFileSize;
+  PickedFile? _selectedFile;
   bool _isEncrypting = false;
   bool _isUploading = false;
   String _processingStep = 'encrypting';
@@ -44,24 +44,39 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   final _passwordController = TextEditingController();
   final _recipientController = TextEditingController();
 
+  FileSelectionService get _fileSelection =>
+      ref.read(fileSelectionServiceProvider);
+
   @override
   void dispose() {
+    // El archivo temporal elegido nunca debe quedar en disco.
+    _fileSelection.delete(_selectedFile);
     _passwordController.dispose();
     _recipientController.dispose();
     super.dispose();
   }
 
-  String _mimeOf(XFile file) =>
-      file.mimeType ??
-      lookupMimeType(file.name) ??
-      'application/octet-stream';
+  String _mimeOf(PickedFile file) =>
+      lookupMimeType(file.name) ?? 'application/octet-stream';
+
+  Future<void> _setSelectedFile(PickedFile file) async {
+    final previous = _selectedFile;
+    if (previous != null && previous.path != file.path) {
+      await _fileSelection.delete(previous);
+    }
+    if (!mounted) return;
+    setState(() {
+      _selectedFile = file;
+      _errorMessage = null;
+    });
+  }
 
   Future<void> _pickFile() async {
     final l10n = AppLocalizations.of(context);
     final user = ref.read(authStateProvider).valueOrNull;
 
     try {
-      final file = await openFile();
+      final file = await _fileSelection.pickFile();
       if (file == null || !mounted) return;
 
       // Bloqueo de formatos en origen (§3.4): solo se aceptan formatos
@@ -70,6 +85,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         mimeType: _mimeOf(file),
         fileName: file.name,
       )) {
+        await _fileSelection.delete(file);
+        if (!mounted) return;
         await showDialog<void>(
           context: context,
           barrierDismissible: false,
@@ -78,23 +95,21 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         return;
       }
 
-      final length = await file.length();
-      if (!mounted) return;
+      // El tamaño viene de la metadata del picker: nunca se leen los bytes.
       final int maxLimit = user?.maxFileSizeBytes ?? AppConstants.freeMaxFileSizeBytes;
       final bool tooLarge = user != null
-          ? user.exceedsFileSizeLimit(length)
-          : length > AppConstants.freeMaxFileSizeBytes;
+          ? user.exceedsFileSizeLimit(file.sizeBytes)
+          : file.sizeBytes > AppConstants.freeMaxFileSizeBytes;
       if (tooLarge) {
+        await _fileSelection.delete(file);
+        if (!mounted) return;
         await _rejectFileTooLarge(formatBytes(context, maxLimit));
         return;
       }
 
-      setState(() {
-        _selectedFile = file;
-        _selectedFileSize = length;
-        _errorMessage = null;
-      });
+      await _setSelectedFile(file);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _errorMessage = l10n.filePickError);
     }
   }
@@ -112,22 +127,28 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         imageQuality: 85,
         preferredCameraDevice: CameraDevice.rear,
       );
-      if (photo != null) {
-        final length = await photo.length();
-        final bool tooLarge = user != null
-            ? user.exceedsFileSizeLimit(length)
-            : length > AppConstants.freeMaxFileSizeBytes;
-        if (tooLarge) {
-          await _rejectFileTooLarge(maxSize);
-          return;
-        }
-        setState(() {
-          _selectedFile = photo;
-          _selectedFileSize = length;
-          _errorMessage = null;
-        });
+      if (photo == null || !mounted) return;
+
+      // Copia por stream (la captura vive en la caché del plugin).
+      final staged = await _fileSelection.stageFromPath(
+        path: photo.path,
+        name: photo.name,
+      );
+      if (!mounted) return;
+
+      final bool tooLarge = user != null
+          ? user.exceedsFileSizeLimit(staged.sizeBytes)
+          : staged.sizeBytes > AppConstants.freeMaxFileSizeBytes;
+      if (tooLarge) {
+        await _fileSelection.delete(staged);
+        if (!mounted) return;
+        await _rejectFileTooLarge(maxSize);
+        return;
       }
+
+      await _setSelectedFile(staged);
     } catch (_) {
+      if (!mounted) return;
       setState(() => _errorMessage = l10n.cameraAccessCancelled);
     }
   }
@@ -140,7 +161,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
     setState(() {
       _selectedFile = null;
-      _selectedFileSize = null;
       _errorMessage = l10n.fileExceedsPlanLimit(maxSize);
     });
 
@@ -186,11 +206,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       return;
     }
 
-    final fileBytes = await _selectedFile!.readAsBytes();
+    final selected = _selectedFile!;
 
-    // Validación de cuotas autoritativa (RPC `check_upload_limits` con reason_code).
+    // El tamaño ya se conoce desde la selección: nunca se cargan los bytes en
+    // memoria para validar ni para cifrar.
     final fileService = ref.read(fileServiceProvider);
-    final limitResult = await fileService.canUpload(fileBytes.length, user.id);
+    final limitResult = await fileService.canUpload(selected.sizeBytes, user.id);
     if (!limitResult.allowed) {
       await _handleQuotaRejection(limitResult.reasonCode, limitResult.message);
       return;
@@ -207,11 +228,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     await Future.delayed(const Duration(milliseconds: 600));
 
     try {
-      final mimeType = _mimeOf(_selectedFile!);
+      final mimeType = _mimeOf(selected);
 
       final link = await fileService.uploadAndCreateLink(
-        fileBytes: fileBytes,
-        fileName: _selectedFile!.name,
+        filePath: selected.path,
+        fileSizeBytes: selected.sizeBytes,
+        fileName: selected.name,
         mimeType: mimeType,
         userPassword: _passwordController.text,
         selectedDurationHours: _selectedDurationHours.toInt(),
@@ -227,10 +249,14 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         },
       );
 
+      await _fileSelection.delete(selected);
+      if (!mounted) return;
+
       setState(() {
         _progress = 1.0;
         _isUploading = false;
         _isEncrypting = false;
+        _selectedFile = null;
         _shareLink = AppConstants.shareUrl(link.id);
       });
     } catch (e) {
@@ -479,10 +505,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            if (_selectedFile != null && _selectedFileSize != null) ...[
+                            if (_selectedFile != null) ...[
                               const SizedBox(height: 4),
                               Text(
-                                formatBytes(context, _selectedFileSize!),
+                                formatBytes(context, _selectedFile!.sizeBytes),
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: KriptonTheme.silver, fontSize: 10),
                               ),
                             ],

@@ -1,0 +1,4 @@
+# Los tests de cifrado/descifrado hacen PBKDF2 (100k iteraciones) + AES-GCM
+# sobre payloads de varios MB. En máquinas cargadas superan el límite por
+# defecto de 30 s aunque la lógica sea correcta, así que damos margen.
+timeout: 120s

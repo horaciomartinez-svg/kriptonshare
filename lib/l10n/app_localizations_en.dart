@@ -610,6 +610,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewerPreparingVideo => 'Preparing video…';
 
   @override
+  String get videoPlayerOpenError => 'Could not open the video.';
+
+  @override
   String get viewerIntegrityError =>
       'The file failed the integrity check and was discarded for security.';
 

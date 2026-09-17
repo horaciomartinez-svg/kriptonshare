@@ -31,14 +31,28 @@ class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
   VideoPlayerController? _controller;
   bool _isLoading = true;
   String? _error;
+  String? _errorDetail;
 
   /// Solo se rellena si tuvimos que copiar el archivo (fuera de tempDir); esa
   /// copia descifrada es nuestra y hay que borrarla al salir.
   File? _ownedCopy;
 
+  /// Evita reinicializar en reconstrucciones posteriores.
+  bool _didInit = false;
+
   @override
   void initState() {
     super.initState();
+    // Nada que dependa de context aquí: los inherited widgets (localizaciones,
+    // tema, media query) no están disponibles durante initState. La
+    // inicialización real ocurre en didChangeDependencies.
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didInit) return;
+    _didInit = true;
     _initPlayer();
   }
 
@@ -66,29 +80,84 @@ class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
         _ownedCopy = resolved;
       }
 
-      _controller = VideoPlayerController.file(resolved);
-      await _controller!.initialize();
-      await _controller!.setLooping(true);
-      await _controller!.play();
+      final controller = VideoPlayerController.file(resolved);
+      _controller = controller;
+      controller.addListener(_onControllerChanged);
+
+      await controller.initialize();
       stopwatch.stop();
-      debugPrint('[VIEWER-PERF] player init: ${stopwatch.elapsedMilliseconds}ms '
+      debugPrint('[PLAYER-PERF] init: ${stopwatch.elapsedMilliseconds}ms '
           '(file=${path.basename(resolved.path)})');
+
+      if (controller.value.hasError) {
+        throw Exception(
+          controller.value.errorDescription ?? 'unknown player error',
+        );
+      }
+
+      await controller.setLooping(true);
+      await controller.play();
 
       if (mounted) {
         setState(() => _isLoading = false);
       }
     } catch (e) {
+      stopwatch.stop();
+      debugPrint('[PLAYER-PERF] init failed after '
+          '${stopwatch.elapsedMilliseconds}ms: $e');
+      final controller = _controller;
+      if (controller != null && controller.value.hasError) {
+        debugPrint('[PLAYER-PERF] controller errorDescription: '
+            '${controller.value.errorDescription}');
+      }
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = l10n.videoPlaybackError(e.toString());
+          _error = l10n.videoPlayerOpenError;
+          _errorDetail = e.toString();
         });
       }
     }
   }
 
+  /// Captura errores asíncronos reportados por el reproductor nativo una vez
+  /// que la reproducción ya arrancó.
+  void _onControllerChanged() {
+    final controller = _controller;
+    if (controller == null || !mounted || _error != null) return;
+    if (controller.value.hasError) {
+      final description =
+          controller.value.errorDescription ?? 'unknown player error';
+      debugPrint('[PLAYER-PERF] controller error: $description');
+      setState(() {
+        _isLoading = false;
+        _error = AppLocalizations.of(context).videoPlayerOpenError;
+        _errorDetail = description;
+      });
+    }
+  }
+
+  Future<void> _retry() async {
+    final old = _controller;
+    _controller = null;
+    if (old != null) {
+      old.removeListener(_onControllerChanged);
+      await old.dispose();
+    }
+    await _deleteOwnedCopy();
+    _ownedCopy = null;
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _errorDetail = null;
+    });
+    await _initPlayer();
+  }
+
   @override
   void dispose() {
+    _controller?.removeListener(_onControllerChanged);
     _controller?.dispose();
     _deleteOwnedCopy();
     super.dispose();
@@ -140,10 +209,51 @@ class _SecureVideoPlayerScreenState extends State<SecureVideoPlayerScreen> {
               : _error != null
                   ? Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: KriptonTheme.alertRed),
-                        textAlign: TextAlign.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: KriptonTheme.alertRed,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _error!,
+                            style: const TextStyle(
+                              color: KriptonTheme.alertRed,
+                              fontSize: 16,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (_errorDetail != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              _errorDetail!,
+                              style: const TextStyle(
+                                color: KriptonTheme.graphite,
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: _retry,
+                            icon: const Icon(Icons.refresh),
+                            label: Text(l10n.retry),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: Text(
+                              l10n.backToHome,
+                              style: const TextStyle(
+                                color: KriptonTheme.silver,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   : AspectRatio(

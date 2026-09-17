@@ -31,10 +31,11 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
+            // El plugin Gradle de Flutter ya inyecta
+            // proguard-android-optimize.txt + flutter_proguard_rules.pro, y
+            // añade app/proguard-rules.pro solo si el archivo existe. No
+            // referenciar "proguard-rules.pro" aquí: al no existir, R8 fallaba
+            // con "Supplied proguard configuration does not exist".
         }
     }
 }

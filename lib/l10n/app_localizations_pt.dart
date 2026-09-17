@@ -613,6 +613,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get viewerPreparingVideo => 'Preparando vídeo…';
 
   @override
+  String get videoPlayerOpenError => 'Não foi possível abrir o vídeo.';
+
+  @override
   String get viewerIntegrityError =>
       'O arquivo não passou na verificação de integridade e foi descartado por segurança.';
 

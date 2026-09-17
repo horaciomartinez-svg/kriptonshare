@@ -1,17 +1,15 @@
 // lib/providers/file_provider.dart
 import 'dart:io';
-import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide Headers;
 import 'package:uuid/uuid.dart';
 import 'package:dio/dio.dart';
-import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/kripton_file.dart';
-import '../services/crypto_service.dart';
 import '../services/secure_decrypt_service.dart';
+import '../services/secure_encrypt_service.dart';
 import '../services/r2_signature_service.dart';
 import '../utils/constants.dart';
 
@@ -102,6 +100,7 @@ class FileService {
   final _uuid = const Uuid();
   final _dio = Dio();
   final _secureDecrypt = SecureDecryptService();
+  final _secureEncrypt = SecureEncryptService();
   late final R2SignatureService _r2Signer;
 
   FileService(this._ref) {
@@ -120,19 +119,30 @@ class FileService {
   String _objectPath(String storageKey) => '/${AppConstants.bucketName}/$storageKey';
 
   /// Sube un objeto cifrado a Cloudflare R2 con firma SigV4.
-  Future<void> _putEncryptedObject(String storageKey, Uint8List encryptedBytes) async {
+  ///
+  /// El cuerpo se envía como stream (`File.openRead()`) para que un archivo
+  /// grande nunca tenga que caber completo en memoria.
+  Future<void> _putEncryptedObject({
+    required String storageKey,
+    required String encryptedPath,
+    required String payloadHash,
+    required int contentLength,
+  }) async {
     final objectPath = _objectPath(storageKey);
-    final payloadHash = sha256.convert(encryptedBytes).toString();
     final signedHeaders = _r2Signer.signRequest(
       method: 'PUT',
       path: objectPath,
       payloadHash: payloadHash,
       headers: {'Content-Type': 'application/octet-stream'},
     );
+    final headers = <String, dynamic>{
+      ...signedHeaders,
+      Headers.contentLengthHeader: '$contentLength',
+    };
     await _dio.put(
       '${AppConstants.r2Endpoint}$objectPath',
-      data: encryptedBytes,
-      options: Options(headers: signedHeaders),
+      data: File(encryptedPath).openRead(),
+      options: Options(headers: headers),
     );
   }
 
@@ -238,8 +248,11 @@ class FileService {
     return const UploadLimitResult(allowed: true);
   }
 
+  /// Cifra [filePath] en streaming y sube el resultado a R2 sin cargarlo nunca
+  /// completo en memoria.
   Future<ShareLink> uploadAndCreateLink({
-    required Uint8List fileBytes,
+    required String filePath,
+    required int fileSizeBytes,
     required String fileName,
     required String mimeType,
     required String userPassword,
@@ -251,101 +264,117 @@ class FileService {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) throw Exception('User not authenticated');
 
-    debugPrint('[UPLOAD_START] Iniciando subida de $fileName');
+    debugPrint(
+        '[UPLOAD_START] Iniciando subida de $fileName ($fileSizeBytes bytes)');
 
-    final limitResult = await canUpload(fileBytes.length, user.id);
+    final limitResult = await canUpload(fileSizeBytes, user.id);
     if (!limitResult.allowed) {
-      throw Exception(limitResult.message ?? 'Upload cannot be completed. Check your plan limits.');
+      throw Exception(limitResult.message ??
+          'Upload cannot be completed. Check your plan limits.');
     }
 
-    // 1. Encriptación local Zero-Knowledge (AES-256-GCM) en Isolate
-    //    para no bloquear el hilo de UI con archivos grandes.
-    onProgress?.call('encrypting');
-    final encrypted = await Isolate.run(() => encryptFileInIsolate({
-      'fileBytes': fileBytes,
-      'password': userPassword,
-    }));
-
-    final salt = (encrypted['salt'] as Uint8List).toList();
-    final nonce = (encrypted['nonce'] as Uint8List).toList();
-    final ciphertext = (encrypted['ciphertext'] as Uint8List).toList();
-    final authTag = (encrypted['authTag'] as Uint8List).toList();
-    final key = (encrypted['key'] as Uint8List).toList();
-
-    final storageKey = _uuid.v4();
-    final fileId = _uuid.v4();
-    final linkId = _uuid.v4();
-
-    final encryptedBytes = Uint8List.fromList([
-      ...salt,
-      ...nonce,
-      ...ciphertext,
-      ...authTag,
-    ]);
-
-    // 2. SUBIDA DIRECTA A CLOUDFLARE R2 REST ENDPOINT (S3-compatible, firmada SigV4)
-    onProgress?.call('syncing');
-    await _putEncryptedObject(storageKey, encryptedBytes);
-
-    // 3. Temporalidad dinámica inyectada desde el Slider
-    final expiresAt = DateTime.now().add(Duration(hours: selectedDurationHours));
-
-    // 4. Inserción de metadatos estructurales (Almacenamiento liviano en Supabase)
-    try {
-      await _client.from('files').insert({
-        'id': fileId,
-        'owner_id': user.id,
-        'original_filename': fileName,
-        'file_size_bytes': fileBytes.length,
-        'mime_type': mimeType,
-        'storage_provider': 'r2',
-        'bucket_name': AppConstants.bucketName,
-        'storage_object_key': storageKey,
-        'object_path': storageKey,
-        'aes_key_encrypted': key,
-        'salt': salt,
-        'encryption_salt': salt,
-        'nonce': nonce,
-        'mac_tag': authTag,
-        'is_deleted': false,
-        'expires_at': expiresAt.toIso8601String(),
-        'max_downloads': maxDownloads ?? AppConstants.maxDownloadsDefault,
-        'status': 'active',
-      });
-    } catch (e) {
-      // Best-effort: si falla el insert, intentar limpiar el objeto R2.
-      debugPrint('[UPLOAD] Metadata insert failed, cleaning up R2 object: $e');
-      await _deleteR2Object(storageKey);
-      rethrow;
-    }
-
-    final firstLinkEver = user.monthlyLinksGenerated == 0;
-    await _client.from('share_links').insert({
-      'id': linkId,
-      'file_id': fileId,
-      'created_by': user.id,
-      'expires_at': expiresAt.toIso8601String(),
-      'recipient_email': recipientEmail,
-      'is_active': true,
-    });
-
-    await _client.from('users').update({
-      'monthly_links_generated': user.monthlyLinksGenerated + 1,
-    }).eq('id', user.id);
-
-    await _ref.read(authStateProvider.notifier).refreshUser();
-
-    if (firstLinkEver) {
-      await FunnelMetricsService().logEvent('first_link_created');
-    }
-
-    return ShareLink(
-      id: linkId,
-      fileId: fileId,
-      createdBy: user.id,
-      expiresAt: expiresAt,
-      createdAt: DateTime.now(),
+    final tempDir = await getTemporaryDirectory();
+    final encryptedPath = p.join(
+      tempDir.path,
+      'ks_upload_${DateTime.now().microsecondsSinceEpoch}.enc',
     );
+
+    try {
+      // 1. Cifrado local Zero-Knowledge (AES-256-GCM) en Isolate, disco -> disco.
+      onProgress?.call('encrypting');
+      final encrypted = await _secureEncrypt.encryptPayloadFileToFile(
+        plaintextPath: filePath,
+        outputPath: encryptedPath,
+        password: userPassword,
+      );
+      debugPrint(
+          '[UPLOAD-PERF] encrypt: ${encrypted.plaintextBytes} bytes in ${encrypted.elapsedMs}ms '
+          '(${encrypted.megabytesPerSecond.toStringAsFixed(1)} MB/s)');
+
+      final storageKey = _uuid.v4();
+      final fileId = _uuid.v4();
+      final linkId = _uuid.v4();
+
+      // 2. SUBIDA DIRECTA A CLOUDFLARE R2 REST ENDPOINT (stream + SigV4).
+      onProgress?.call('syncing');
+      final uploadStopwatch = Stopwatch()..start();
+      await _putEncryptedObject(
+        storageKey: storageKey,
+        encryptedPath: encryptedPath,
+        payloadHash: encrypted.payloadHash,
+        contentLength: encrypted.encryptedBytes,
+      );
+      uploadStopwatch.stop();
+      debugPrint(
+          '[UPLOAD-PERF] upload: ${encrypted.encryptedBytes} bytes in ${uploadStopwatch.elapsedMilliseconds}ms');
+
+      // 3. Temporalidad dinámica inyectada desde el Slider
+      final expiresAt =
+          DateTime.now().add(Duration(hours: selectedDurationHours));
+
+      // 4. Inserción de metadatos estructurales (Almacenamiento liviano en Supabase)
+      try {
+        await _client.from('files').insert({
+          'id': fileId,
+          'owner_id': user.id,
+          'original_filename': fileName,
+          'file_size_bytes': fileSizeBytes,
+          'mime_type': mimeType,
+          'storage_provider': 'r2',
+          'bucket_name': AppConstants.bucketName,
+          'storage_object_key': storageKey,
+          'object_path': storageKey,
+          'aes_key_encrypted': encrypted.key,
+          'salt': encrypted.salt,
+          'encryption_salt': encrypted.salt,
+          'nonce': encrypted.nonce,
+          'mac_tag': encrypted.authTag,
+          'is_deleted': false,
+          'expires_at': expiresAt.toIso8601String(),
+          'max_downloads': maxDownloads ?? AppConstants.maxDownloadsDefault,
+          'status': 'active',
+        });
+      } catch (e) {
+        // Best-effort: si falla el insert, intentar limpiar el objeto R2.
+        debugPrint('[UPLOAD] Metadata insert failed, cleaning up R2 object: $e');
+        await _deleteR2Object(storageKey);
+        rethrow;
+      }
+
+      final firstLinkEver = user.monthlyLinksGenerated == 0;
+      await _client.from('share_links').insert({
+        'id': linkId,
+        'file_id': fileId,
+        'created_by': user.id,
+        'expires_at': expiresAt.toIso8601String(),
+        'recipient_email': recipientEmail,
+        'is_active': true,
+      });
+
+      await _client.from('users').update({
+        'monthly_links_generated': user.monthlyLinksGenerated + 1,
+      }).eq('id', user.id);
+
+      await _ref.read(authStateProvider.notifier).refreshUser();
+
+      if (firstLinkEver) {
+        await FunnelMetricsService().logEvent('first_link_created');
+      }
+
+      return ShareLink(
+        id: linkId,
+        fileId: fileId,
+        createdBy: user.id,
+        expiresAt: expiresAt,
+        createdAt: DateTime.now(),
+      );
+    } finally {
+      // El ciphertext temporal nunca debe quedar en disco.
+      try {
+        final encFile = File(encryptedPath);
+        if (await encFile.exists()) await encFile.delete();
+      } catch (_) {}
+    }
   }
 
   Future<List<ShareLink>> getUserLinks() async {
