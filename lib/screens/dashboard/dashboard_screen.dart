@@ -5,12 +5,14 @@ import '../../l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/localization/formatters.dart';
 import '../../core/localization/language_selector_modal.dart';
+import '../../models/active_links_summary.dart';
 import '../../models/kripton_file.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/file_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
+import '../../widgets/active_links_summary_bar.dart';
 import '../../widgets/link_gauge.dart';
 import '../../features/analytics/services/funnel_metrics_service.dart';
 import '../../features/analytics/presentation/widgets/active_link_analytics_sheet.dart';
@@ -380,6 +382,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
+
+                  // Resumen (cantidad + almacenamiento) de los Active Links.
+                  Builder(
+                    builder: (context) {
+                      final links = linksAsync.valueOrNull;
+                      if (links == null) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: ActiveLinksSummaryBar(
+                          summary: ActiveLinksSummary.fromLinks(
+                            links,
+                            effectiveTier: user.effectiveTier,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
 
                   linksAsync.when(
                     data: (links) {

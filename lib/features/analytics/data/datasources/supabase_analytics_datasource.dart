@@ -90,7 +90,7 @@ class SupabaseAnalyticsDataSource {
     // 1. Links del usuario con metadata de archivos
     final linksResponse = await _supabase
         .from('share_links')
-        .select('*, files(original_filename, file_size_bytes, expires_at, status)')
+        .select('*, files(original_filename)')
         .eq('created_by', ownerId)
         .order('access_count', ascending: false);
 
@@ -149,7 +149,6 @@ class SupabaseAnalyticsDataSource {
     var activeLinks = 0;
     var expiredLinks = 0;
     var totalViews = 0;
-    var storageUsedBytes = 0;
     final topLinks = <Map<String, dynamic>>[];
 
     for (final link in links) {
@@ -166,7 +165,6 @@ class SupabaseAnalyticsDataSource {
       }
 
       totalViews += (link['access_count'] as int? ?? 0);
-      storageUsedBytes += (file?['file_size_bytes'] as int? ?? 0);
 
       final linkId = link['id'] as String;
       topLinks.add({
@@ -190,7 +188,6 @@ class SupabaseAnalyticsDataSource {
       'total_downloads': totalDownloads,
       'average_view_duration_ms': averageViewDurationMs,
       'events_last_24h': eventsLast24h,
-      'storage_used_bytes': storageUsedBytes,
       'top_links': topLinks.take(5).toList(),
       'generated_at': now.toIso8601String(),
     };

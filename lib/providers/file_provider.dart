@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/kripton_file.dart';
+import '../models/active_links_summary.dart';
 import '../services/secure_decrypt_service.dart';
 import '../services/secure_encrypt_service.dart';
 import '../services/r2_signature_service.dart';
@@ -22,6 +23,16 @@ final userLinksProvider = FutureProvider.autoDispose<List<ShareLink>>((ref) asyn
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) throw Exception('Usuario no autenticado');
   return ref.watch(fileServiceProvider).getUserLinks();
+});
+
+/// Suma de bytes de los archivos con link activo y no expirado.
+/// Derivado de [userLinksProvider] para que Dashboard y Analytics lean la
+/// misma fuente de verdad y se actualicen automáticamente al revocar/borrar.
+/// El cálculo vive en [ActiveLinksSummary.sumActiveFileBytes].
+final analyticsActiveStorageProvider =
+    FutureProvider.autoDispose<int>((ref) async {
+  final links = await ref.watch(userLinksProvider.future);
+  return ActiveLinksSummary.sumActiveFileBytes(links);
 });
 
 final receivedFilesProvider = FutureProvider.autoDispose<List<KriptonFile>>((ref) async {
@@ -380,7 +391,13 @@ class FileService {
   Future<List<ShareLink>> getUserLinks() async {
     final user = _ref.read(authStateProvider).valueOrNull;
     if (user == null) throw Exception('User not authenticated');
-    final response = await _client.from('share_links').select().eq('created_by', user.id).order('created_at', ascending: false);
+    // El embed `files(file_size_bytes)` trae el tamaño del archivo en la misma
+    // consulta que alimenta la lista de Active Links (sin queries extra).
+    final response = await _client
+        .from('share_links')
+        .select('*, files(file_size_bytes)')
+        .eq('created_by', user.id)
+        .order('created_at', ascending: false);
     return (response as List).map((json) => ShareLink.fromJson(json)).toList();
   }
 

@@ -128,6 +128,44 @@
   "activeLinks": "Active links",
   "viewAll": "View all",
   "noActiveLinks": "No active links",
+  "activeLinksSummaryCount": "{count, plural, =1{1 active link} other{{count} active links}}",
+  "@activeLinksSummaryCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "activeLinksSummaryCountOfMax": "{count} / {max} active links",
+  "@activeLinksSummaryCountOfMax": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "activeLinksSummaryStorage": "{used} used",
+  "@activeLinksSummaryStorage": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    }
+  },
+  "activeLinksSummaryStorageOfQuota": "{used} of {quota} used",
+  "@activeLinksSummaryStorageOfQuota": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "quota": {
+        "type": "String"
+      }
+    }
+  },
   "createFirstDataRoom": "Create your first secure Data Room",
   "expiresLabel": "Expires",
   "expiresInMinutes": "in {minutes}m",

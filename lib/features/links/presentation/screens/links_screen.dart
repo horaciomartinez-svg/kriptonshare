@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/utils/theme.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../providers/file_provider.dart';
 import '../../../../utils/constants.dart';
 import '../../links_providers.dart';
 import '../../domain/entities/link_entity.dart';
@@ -96,6 +97,8 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
 
     try {
       await ref.read(linksNotifierProvider.notifier).revokeLink(linkId, user.id);
+      // Mantiene sincronizados los contadores de Active Links del Dashboard.
+      ref.invalidate(userLinksProvider);
       if (mounted) {
         _showSnackBar(l10n.linkRevoked, KriptonTheme.kryptonGreen);
       }
@@ -122,6 +125,8 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
       await ref
           .read(linksNotifierProvider.notifier)
           .deleteFile(fileId, user.id);
+      // Mantiene sincronizados los contadores de Active Links del Dashboard.
+      ref.invalidate(userLinksProvider);
       if (mounted) {
         _showSnackBar(l10n.documentDeleted, KriptonTheme.kryptonGreen);
       }

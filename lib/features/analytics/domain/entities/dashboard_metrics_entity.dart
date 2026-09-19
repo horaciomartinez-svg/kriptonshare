@@ -9,7 +9,6 @@ class DashboardMetricsEntity extends Equatable {
   final int totalDownloads;
   final double averageViewDurationMs;
   final int eventsLast24h;
-  final int storageUsedBytes;
   final List<LinkMetric> topLinks;
   final DateTime generatedAt;
 
@@ -21,7 +20,6 @@ class DashboardMetricsEntity extends Equatable {
     required this.totalDownloads,
     required this.averageViewDurationMs,
     required this.eventsLast24h,
-    required this.storageUsedBytes,
     required this.topLinks,
     required this.generatedAt,
   });
@@ -35,7 +33,6 @@ class DashboardMetricsEntity extends Equatable {
       totalDownloads: 0,
       averageViewDurationMs: 0.0,
       eventsLast24h: 0,
-      storageUsedBytes: 0,
       topLinks: const [],
       generatedAt: DateTime.now(),
     );
@@ -50,7 +47,6 @@ class DashboardMetricsEntity extends Equatable {
         totalDownloads,
         averageViewDurationMs,
         eventsLast24h,
-        storageUsedBytes,
         topLinks,
         generatedAt,
       ];

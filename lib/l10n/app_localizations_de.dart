@@ -323,6 +323,32 @@ class AppLocalizationsDe extends AppLocalizations {
   String get noActiveLinks => 'Keine aktiven Links';
 
   @override
+  String activeLinksSummaryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count aktive Links',
+      one: '1 aktiver Link',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String activeLinksSummaryCountOfMax(int count, int max) {
+    return '$count / $max aktive Links';
+  }
+
+  @override
+  String activeLinksSummaryStorage(String used) {
+    return '$used belegt';
+  }
+
+  @override
+  String activeLinksSummaryStorageOfQuota(String used, String quota) {
+    return '$used von $quota belegt';
+  }
+
+  @override
   String get createFirstDataRoom =>
       'Erstellen Sie Ihren ersten sicheren Data Room';
 

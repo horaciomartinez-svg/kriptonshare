@@ -45,7 +45,6 @@ class AnalyticsRepositoryImpl implements IAnalyticsRepository {
           averageViewDurationMs:
               (data['average_view_duration_ms'] as num).toDouble(),
           eventsLast24h: data['events_last_24h'] as int,
-          storageUsedBytes: data['storage_used_bytes'] as int,
           topLinks: topLinks,
           generatedAt: DateTime.parse(data['generated_at'] as String),
         ),

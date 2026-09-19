@@ -668,6 +668,30 @@ abstract class AppLocalizations {
   /// **'No active links'**
   String get noActiveLinks;
 
+  /// No description provided for @activeLinksSummaryCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 active link} other{{count} active links}}'**
+  String activeLinksSummaryCount(int count);
+
+  /// No description provided for @activeLinksSummaryCountOfMax.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} / {max} active links'**
+  String activeLinksSummaryCountOfMax(int count, int max);
+
+  /// No description provided for @activeLinksSummaryStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} used'**
+  String activeLinksSummaryStorage(String used);
+
+  /// No description provided for @activeLinksSummaryStorageOfQuota.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} of {quota} used'**
+  String activeLinksSummaryStorageOfQuota(String used, String quota);
+
   /// No description provided for @createFirstDataRoom.
   ///
   /// In en, this message translates to:

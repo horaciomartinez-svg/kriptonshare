@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/localization/formatters.dart';
 import '../../../../core/utils/theme.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../providers/file_provider.dart';
 import '../../analytics_providers.dart';
 import '../../domain/entities/dashboard_metrics_entity.dart';
 import '../notifiers/analytics_notifier.dart';
@@ -68,6 +69,9 @@ class _AnalyticsDashboardScreenState
 
   Widget _buildBody(AnalyticsState state) {
     final l10n = AppLocalizations.of(context);
+    // Fuente de verdad para "Storage" en Analytics: se calcula en cliente
+    // desde [userLinksProvider] y se mantiene sincronizado con el Dashboard.
+    final activeStorage = ref.watch(analyticsActiveStorageProvider);
     if (state.isLoading && state.metrics == null) {
       return const Center(
         child: CircularProgressIndicator(
@@ -131,7 +135,7 @@ class _AnalyticsDashboardScreenState
           const SizedBox(height: 24),
 
           // Metrics grid
-          _buildMetricsGrid(metrics)
+          _buildMetricsGrid(metrics, activeStorage)
               .animate()
               .fade(delay: 100.ms, duration: 400.ms),
           const SizedBox(height: 32),
@@ -175,7 +179,10 @@ class _AnalyticsDashboardScreenState
     );
   }
 
-  Widget _buildMetricsGrid(DashboardMetricsEntity metrics) {
+  Widget _buildMetricsGrid(
+    DashboardMetricsEntity metrics,
+    AsyncValue<int> activeStorage,
+  ) {
     final l10n = AppLocalizations.of(context);
     final items = [
       _MetricItem(l10n.totalLinks, metrics.totalLinks.toString(), Icons.link),
@@ -197,9 +204,12 @@ class _AnalyticsDashboardScreenState
         metrics.eventsLast24h.toString(),
         Icons.flash_on,
       ),
+      // Storage usa el valor vivo calculado desde userLinksProvider (misma
+      // fuente que el Dashboard) en lugar del snapshot del RPC, así se refleja
+      // al instante cualquier revocación/borrado sin recargar.
       _MetricItem(
         l10n.storageLabel,
-        formatBytes(context, metrics.storageUsedBytes),
+        formatBytes(context, activeStorage.valueOrNull ?? 0),
         Icons.storage,
       ),
     ];

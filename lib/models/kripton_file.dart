@@ -157,6 +157,11 @@ class ShareLink {
   final bool isActive;
   final DateTime createdAt;
 
+  /// Tamaño del archivo referenciado, cuando la consulta lo incluye mediante
+  /// el embed `files(file_size_bytes)`. Es un dato derivado (join), por eso no
+  /// se serializa en [toJson]; vale `0` si no vino en la consulta.
+  final int fileSizeBytes;
+
   ShareLink({
     required this.id,
     required this.fileId,
@@ -168,6 +173,7 @@ class ShareLink {
     this.recipientEmail,
     this.isActive = true,
     required this.createdAt,
+    this.fileSizeBytes = 0,
   });
 
   factory ShareLink.fromJson(Map<String, dynamic> json) {
@@ -184,7 +190,22 @@ class ShareLink {
       recipientEmail: json['recipient_email'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: DateTime.parse(json['created_at'] as String),
+      fileSizeBytes: _parseJoinedFileSize(json),
     );
+  }
+
+  /// Lee `file_size_bytes` ya sea plano (`select('..., file_size_bytes')`) o
+  /// anidado en el embed `files(file_size_bytes)` de PostgREST.
+  static int _parseJoinedFileSize(Map<String, dynamic> json) {
+    final direct = json['file_size_bytes'];
+    if (direct is int) return direct;
+
+    final joined = json['files'];
+    if (joined is Map<String, dynamic>) {
+      final nested = joined['file_size_bytes'];
+      if (nested is int) return nested;
+    }
+    return 0;
   }
 
   Map<String, dynamic> toJson() {
