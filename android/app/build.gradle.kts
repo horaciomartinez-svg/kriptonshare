@@ -1,8 +1,25 @@
+import java.io.StringReader
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    // key.properties puede venir con BOM UTF-8 (típico al crearlo en Windows);
+    // se elimina para que la primera propiedad (storePassword) se lea bien.
+    val keystoreText = keystorePropertiesFile.readText(Charsets.UTF_8).removePrefix("\uFEFF")
+    StringReader(keystoreText).use { keystoreProperties.load(it) }
+}
+val hasUploadKeystore = keystorePropertiesFile.exists() &&
+    keystoreProperties.getProperty("storeFile") != null &&
+    keystoreProperties.getProperty("storePassword") != null &&
+    keystoreProperties.getProperty("keyAlias") != null &&
+    keystoreProperties.getProperty("keyPassword") != null
 
 android {
     namespace = "com.kriptonshare.app"
@@ -26,9 +43,20 @@ android {
         multiDexEnabled = true
     }
 
+    signingConfigs {
+        if (hasUploadKeystore) {
+            create("upload") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasUploadKeystore) "upload" else "debug")
             isMinifyEnabled = true
             isShrinkResources = true
             // El plugin Gradle de Flutter ya inyecta
