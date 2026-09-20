@@ -13,6 +13,7 @@ import '../../providers/file_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
 import '../../widgets/active_links_summary_bar.dart';
+import '../../widgets/dashboard_trial_banner.dart';
 import '../../widgets/link_gauge.dart';
 import '../../features/analytics/services/funnel_metrics_service.dart';
 import '../../features/analytics/presentation/widgets/active_link_analytics_sheet.dart';
@@ -46,61 +47,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return l10n.daysRemaining(remainingHours ~/ 24);
   }
 
-  /// Banner de cuenta regresiva del trial (visible mientras el trial esté
-  /// activo). Al tocarlo lleva a /plans para renovar antes de que expire.
-  Widget? _buildTrialBanner(AppLocalizations l10n, KriptonUser user) {
-    if (!user.isInTrial) return null;
-    final trialEndsAt = user.trialEndsAt!;
-
-    final daysLeft = (trialEndsAt.difference(DateTime.now()).inHours / 24).ceil();
-    return GestureDetector(
-      onTap: () => context.push('/plans'),
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              KriptonTheme.electricLime.withOpacity(0.14),
-              KriptonTheme.kryptonGreen.withOpacity(0.08),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: KriptonTheme.electricLime.withOpacity(0.35),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.workspace_premium_outlined,
-              color: KriptonTheme.electricLime,
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                l10n.trialBanner(daysLeft),
-                style: const TextStyle(
-                  color: KriptonTheme.platinum,
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right,
-              color: KriptonTheme.silver,
-              size: 20,
-            ),
-          ],
-        ),
-      ).animate().fade(delay: 200.ms, duration: 300.ms),
+  /// Banner del trial (cuenta regresiva si está activo; invitación si el
+  /// usuario Free aún no lo ha consumido). Oculto para premium/business.
+  Widget _buildTrialBanner(KriptonUser user) {
+    return DashboardTrialBanner(
+      user: user,
+      onViewPlans: () => context.push('/plans'),
+      onStartTrial: () => ref.read(authStateProvider.notifier).startPremiumTrial(),
     );
   }
 
@@ -209,7 +162,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTrialBanner(l10n, user) ?? const SizedBox.shrink(),
+                  _buildTrialBanner(user),
                   // Welcome
                   Text(
                     l10n.welcome,

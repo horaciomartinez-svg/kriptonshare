@@ -1115,6 +1115,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trialPromo => '14 days of Premium free. No card required.';
 
   @override
+  String get trialCta => 'Start free trial';
+
+  @override
+  String get trialAlreadyUsed => 'You\'ve already used your free trial.';
+
+  @override
+  String get trialNotEligible => 'Your plan already includes Premium.';
+
+  @override
   String get trialExpiredTitle => 'Your Premium trial has ended';
 
   @override

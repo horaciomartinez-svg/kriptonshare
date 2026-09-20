@@ -2024,6 +2024,24 @@ abstract class AppLocalizations {
   /// **'14 days of Premium free. No card required.'**
   String get trialPromo;
 
+  /// No description provided for @trialCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Start free trial'**
+  String get trialCta;
+
+  /// No description provided for @trialAlreadyUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve already used your free trial.'**
+  String get trialAlreadyUsed;
+
+  /// No description provided for @trialNotEligible.
+  ///
+  /// In en, this message translates to:
+  /// **'Your plan already includes Premium.'**
+  String get trialNotEligible;
+
   /// No description provided for @trialExpiredTitle.
   ///
   /// In en, this message translates to:

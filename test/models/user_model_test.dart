@@ -122,6 +122,26 @@ void main() {
     });
   });
 
+  group('Aislamiento de tier entre cuentas', () {
+    test('una cuenta Premium previa no contagia a un usuario nuevo Free', () {
+      final premium = _user(
+        tier: 'premium',
+        trialEndsAt: DateTime.now().add(const Duration(days: 14)),
+      );
+      expect(premium.isPremium, isTrue);
+
+      // Registro nuevo: free sin trial (ya no hay auto-trial en el INSERT).
+      final fresh = _user();
+      expect(fresh.effectiveTier, 'free');
+      expect(fresh.isPremium, isFalse);
+      expect(fresh.isFree, isTrue);
+      expect(fresh.maxFileSizeBytes, AppConstants.freeMaxFileSizeBytes);
+
+      // La instancia previa no se altera.
+      expect(premium.isPremium, isTrue);
+    });
+  });
+
   group('Validación de tamaño del flujo de upload', () {
     const twentyFiveMb = 25 * 1024 * 1024;
 

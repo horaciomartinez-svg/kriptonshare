@@ -704,6 +704,9 @@
     }
   },
   "trialPromo": "14 days of Premium free. No card required.",
+  "trialCta": "Start free trial",
+  "trialAlreadyUsed": "You've already used your free trial.",
+  "trialNotEligible": "Your plan already includes Premium.",
   "trialExpiredTitle": "Your Premium trial has ended",
   "trialExpiredBody": "You are back on the free plan: 20 MB per file, 20 links a month and 7-day expiry. Keep 100 MB, unlimited links and 30 days with Premium.",
   "businessBenefits": "200 MB per file · 5 GB total · links up to 60 days · everything in Premium · priority support · custom branding in the viewer (coming soon)",

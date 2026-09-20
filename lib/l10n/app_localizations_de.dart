@@ -1134,6 +1134,16 @@ class AppLocalizationsDe extends AppLocalizations {
       '14 Tage Premium kostenlos. Keine Karte erforderlich.';
 
   @override
+  String get trialCta => 'Kostenlos testen';
+
+  @override
+  String get trialAlreadyUsed =>
+      'Du hast deine kostenlose Testphase bereits genutzt.';
+
+  @override
+  String get trialNotEligible => 'Dein Tarif enthält bereits Premium.';
+
+  @override
   String get trialExpiredTitle => 'Ihre Premium-Testphase ist beendet';
 
   @override

@@ -1121,6 +1121,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get trialPromo => '14 días de Premium gratis. No se requiere tarjeta.';
 
   @override
+  String get trialCta => 'Activar prueba gratis';
+
+  @override
+  String get trialAlreadyUsed => 'Ya usaste tu prueba gratuita.';
+
+  @override
+  String get trialNotEligible => 'Tu plan ya incluye Premium.';
+
+  @override
   String get trialExpiredTitle => 'Tu prueba de Premium terminó';
 
   @override

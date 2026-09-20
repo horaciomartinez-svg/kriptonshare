@@ -7,6 +7,7 @@ import '../../features/analytics/services/funnel_metrics_service.dart';
 import '../core/localization/locale_provider.dart';
 import '../core/localization/supported_locales.dart';
 import '../models/user_model.dart';
+import '../models/trial_start_outcome.dart';
 import '../utils/constants.dart';
 
 final loggerProvider = Provider<Logger>((ref) => Logger());
@@ -39,7 +40,7 @@ final authProvider = StreamProvider<KriptonUser?>((ref) async* {
               debugPrint('[authProvider] Sin email para crear el registro.');
               yield null;
             } else {
-              await _createPublicUserRecord(client, userId: userId, email: email);
+              await _upsertUserRecord(client, userId: userId, email: email);
               final userData = await _fetchUserRow(client, userId);
               yield KriptonUser.fromJson(userData);
             }
@@ -72,10 +73,29 @@ Future<Map<String, dynamic>> _fetchUserRow(SupabaseClient client, String userId)
   return await client.from('users').select().eq('id', userId).single();
 }
 
-/// Crea el registro en public.users para un usuario autenticado que aún no
-/// tiene fila (por ejemplo, usuarios creados desde el dashboard de Auth).
-/// Idempotente: si la fila ya existe (23505 unique_violation), no hace nada.
-Future<void> _createPublicUserRecord(
+/// Carga el perfil de public.users; si no existe (usuario huérfano anterior al
+/// trigger `on_auth_user_created`), lo crea con un upsert idempotente.
+///
+/// El trigger server-side es la fuente de verdad: en el flujo normal la fila
+/// ya existe y aquí solo se hace SELECT (nunca INSERT), evitando 23505/42501.
+Future<Map<String, dynamic>> _loadOrCreateUserRow(
+  SupabaseClient client, {
+  required String userId,
+  required String email,
+}) async {
+  try {
+    return await _fetchUserRow(client, userId);
+  } on PostgrestException catch (e) {
+    if (e.code != 'PGRST116') rethrow;
+  }
+
+  await _upsertUserRecord(client, userId: userId, email: email);
+  return await _fetchUserRow(client, userId);
+}
+
+/// Fallback: crea/actualiza el perfil de un usuario autenticado sin fila.
+/// Solo se invoca cuando el SELECT confirmó que la fila no existe.
+Future<void> _upsertUserRecord(
   SupabaseClient client, {
   required String userId,
   required String email,
@@ -85,7 +105,7 @@ Future<void> _createPublicUserRecord(
     final preferredLanguage =
         prefs.getString(kLocaleStorageKey) ?? kFallbackLocale.languageCode;
 
-    await client.from('users').insert({
+    await client.from('users').upsert({
       'id': userId,
       'email': email,
       'subscription_tier': 'free',
@@ -94,7 +114,7 @@ Future<void> _createPublicUserRecord(
       'total_storage_used_bytes': 0,
       'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
       'preferred_language': preferredLanguage,
-    });
+    }, onConflict: 'id');
   } on PostgrestException catch (e) {
     // 23505 = unique_violation (race condition). Se ignora.
     if (e.code != '23505') rethrow;
@@ -144,38 +164,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
         throw const AuthException('Sign in failed');
       }
 
-      try {
-        final userData = await client
-            .from('users')
-            .select()
-            .eq('id', user.id)
-            .single();
-        state = AsyncValue.data(KriptonUser.fromJson(userData));
-        await _ref.read(localeProvider.notifier).reconcileWithRemote();
-      } on PostgrestException catch (e) {
-        // Si el registro no existe, intentar crearlo automáticamente.
-        // Esto suele ocurrir cuando el UUID en public.users no coincide
-        // con auth.users (p. ej. usuario recreado en Auth).
-        debugPrint('[AuthNotifier.signIn] PostgrestException al leer users: '
-            'code=${e.code} message=${e.message}');
-        if (e.code == 'PGRST116') {
-          await _ensureUserRecord(client, user.id, email);
-          final userData = await client
-              .from('users')
-              .select()
-              .eq('id', user.id)
-              .single();
-          state = AsyncValue.data(KriptonUser.fromJson(userData));
-          await _ref.read(localeProvider.notifier).reconcileWithRemote();
-        } else {
-          rethrow;
-        }
-      } catch (e) {
-        throw Exception(
-          'Authenticated user not found in the users table. '
-          'Make sure to run test_users_setup.sql with the correct UUID.',
-        );
-      }
+      // El trigger server-side ya creó el perfil; aquí se lee y, solo si
+      // faltara (usuario antiguo huérfano), se hace upsert de respaldo.
+      final userData = await _loadOrCreateUserRow(
+        client,
+        userId: user.id,
+        email: email,
+      );
+      state = AsyncValue.data(KriptonUser.fromJson(userData));
+      await _ref.read(localeProvider.notifier).reconcileWithRemote();
     } catch (e, st) {
       debugPrint('[AuthNotifier.signIn] Error: tipo=${e.runtimeType} '
           'error=$e\n$st');
@@ -193,29 +190,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
       );
 
       if (response.user != null) {
-        // Propagar el idioma seleccionado localmente al registro remoto.
-        final prefs = await SharedPreferences.getInstance();
-        final preferredLanguage =
-            prefs.getString(kLocaleStorageKey) ?? kFallbackLocale.languageCode;
-
-        // Create user record in users table
-        await client.from('users').insert({
-          'id': response.user!.id,
-          'email': email,
-          'subscription_tier': 'free',
-          'monthly_links_generated': 0,
-          'monthly_links_reset_at': DateTime.now().toIso8601String(),
-          'total_storage_used_bytes': 0,
-          'max_storage_bytes': PremiumLimits.premiumBaseStorageBytes,
-          'preferred_language': preferredLanguage,
-        });
-
-        final userData = await client
-            .from('users')
-            .select()
-            .eq('id', response.user!.id)
-            .single();
+        // El trigger on_auth_user_created ya creó el perfil: se lee (el
+        // upsert queda solo como respaldo si faltara). reconcileWithRemote
+        // propaga el idioma elegido vía UPDATE, sin insertar.
+        final userData = await _loadOrCreateUserRow(
+          client,
+          userId: response.user!.id,
+          email: email,
+        );
         state = AsyncValue.data(KriptonUser.fromJson(userData));
+
+        await _ref.read(localeProvider.notifier).reconcileWithRemote();
 
         await FunnelMetricsService().logEvent('signup_completed');
         await FunnelMetricsService().logEvent('trial_started');
@@ -248,15 +233,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
     }
   }
 
-  /// Crea el registro de usuario en public.users si no existe.
-  /// Útil cuando el UUID en auth.users no coincide con public.users.
-  Future<void> _ensureUserRecord(SupabaseClient client, String userId, String email) async {
-    await _createPublicUserRecord(client, userId: userId, email: email);
-  }
-
   /// Modo prueba: activa/desactiva una suscripción simulada directamente en
   /// Supabase sin pasar por RevenueCat. Solo disponible en debug builds.
   Future<void> setPremiumSimulation(bool enabled, {String tier = 'premium'}) async {
+    // Blindaje: la simulación jamás debe otorgar Premium en release.
+    if (!kDebugMode) return;
     try {
       final client = _ref.read(supabaseClientProvider);
       final currentUser = client.auth.currentUser;
@@ -287,25 +268,32 @@ class AuthNotifier extends StateNotifier<AsyncValue<KriptonUser?>> {
   /// trial se recarga el usuario para que todos los límites visibles reflejen
   /// Premium de inmediato (tamaño, duración, links, storage).
   ///
-  /// Devuelve `true` si el trial quedó activo.
-  Future<bool> startPremiumTrial() async {
+  /// Devuelve el [TrialStartOutcome] con el resultado y el código de error
+  /// (`already_used`, `not_eligible`, ...) para feedback localizado.
+  Future<TrialStartOutcome> startPremiumTrial() async {
     try {
       final client = _ref.read(supabaseClientProvider);
       final currentUser = client.auth.currentUser;
-      if (currentUser == null) return false;
+      if (currentUser == null) {
+        return const TrialStartOutcome(started: false, code: 'no_session');
+      }
 
       final result = await client.rpc('start_premium_trial');
       await refreshUser();
 
       if (result is List && result.isNotEmpty) {
-        final row = result.first as Map<String, dynamic>;
-        return row['started'] as bool? ?? false;
+        final row = Map<String, dynamic>.from(result.first as Map);
+        return TrialStartOutcome(
+          started: row['started'] == true,
+          code: row['code'] as String?,
+          message: row['message'] as String?,
+        );
       }
-      return false;
-    } catch (e) {
-      debugPrint('[AuthNotifier.startPremiumTrial] Error: $e');
+      return const TrialStartOutcome(started: false, code: 'error');
+    } catch (e, st) {
+      debugPrint('[AuthNotifier.startPremiumTrial] Error: $e\n$st');
       await refreshUser();
-      return false;
+      return TrialStartOutcome.error;
     }
   }
 

@@ -9,6 +9,7 @@ import '../../core/localization/supported_locales.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
+import '../../widgets/trial_activation_button.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -286,34 +287,11 @@ class ProfileScreen extends ConsumerWidget {
                               ),
                         ),
                         const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              final started = await ref
-                                  .read(authStateProvider.notifier)
-                                  .startPremiumTrial();
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    started
-                                        ? l10n.trialBanner(
-                                            PremiumLimits.trialDurationDays)
-                                        : l10n.unknownError,
-                                  ),
-                                  backgroundColor: started
-                                      ? KriptonTheme.kryptonGreen
-                                      : KriptonTheme.alertRed,
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: KriptonTheme.electricLime,
-                              foregroundColor: KriptonTheme.charcoalBlack,
-                            ),
-                            child: Text(l10n.trialBannerTitle),
-                          ),
+                        TrialActivationButton(
+                          onActivate: () => ref
+                              .read(authStateProvider.notifier)
+                              .startPremiumTrial(),
+                          label: l10n.trialBannerTitle,
                         ),
                       ],
                     ),
